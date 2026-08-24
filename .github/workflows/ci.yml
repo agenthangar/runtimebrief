@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  daemon:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: daemon
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: daemon/package-lock.json
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+
+  ios:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v7
+      - run: brew install xcodegen
+      - run: xcodegen generate
+        working-directory: ios
+      - name: Build and test without signing
+        run: >-
+          xcodebuild -project ios/RuntimeBrief.xcodeproj
+          -scheme RuntimeBrief
+          -sdk iphonesimulator
+          -destination 'platform=iOS Simulator,OS=latest,name=iPhone 17 Pro'
+          CODE_SIGNING_ALLOWED=NO
+          test

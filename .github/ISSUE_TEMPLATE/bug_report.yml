@@ -1,0 +1,19 @@
+name: Bug report
+description: Report a reproducible RuntimeBrief problem
+title: "[Bug]: "
+body:
+  - type: textarea
+    attributes:
+      label: What happened?
+      description: Do not include tokens, private code, or transcript content.
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Reproduction steps
+    validations:
+      required: true
+  - type: input
+    attributes:
+      label: Environment
+      description: RuntimeBrief version, macOS/iOS version, and Node version.

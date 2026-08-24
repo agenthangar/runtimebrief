@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "runtimebrief": {
+      "command": "runtimebriefd",
+      "args": ["mcp"],
+      "env_vars": ["RUNTIMEBRIEF_CONFIG_DIR"]
+    }
+  }
+}

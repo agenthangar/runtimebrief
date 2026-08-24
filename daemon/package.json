@@ -1,0 +1,60 @@
+{
+  "name": "runtimebriefd",
+  "version": "0.1.0",
+  "description": "RuntimeBrief daemon — evidence-backed project state for AI agent fleets",
+  "homepage": "https://github.com/agenthangar/runtimebrief#readme",
+  "bugs": {
+    "url": "https://github.com/agenthangar/runtimebrief/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/agenthangar/runtimebrief.git",
+    "directory": "daemon"
+  },
+  "main": "dist/cli.js",
+  "directories": {
+    "test": "test"
+  },
+  "scripts": {
+    "pretest": "npm run build",
+    "test": "vitest run",
+    "prebuild": "node scripts/clean.mjs",
+    "build": "tsc && node scripts/ensure-cli-executable.mjs",
+    "prepack": "npm run build",
+    "dev": "tsx src/cli.ts"
+  },
+  "keywords": [
+    "coding-agents",
+    "local-first",
+    "mcp",
+    "project-status"
+  ],
+  "author": "RuntimeBrief Contributors",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "better-sqlite3": "^12.11.1",
+    "fastify": "^5.10.0",
+    "yaml": "^2.9.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^26.1.1",
+    "tsx": "^4.23.0",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.10"
+  },
+  "bin": {
+    "runtimebriefd": "dist/bin.js"
+  },
+  "files": [
+    "dist",
+    "templates",
+    "scripts"
+  ]
+}

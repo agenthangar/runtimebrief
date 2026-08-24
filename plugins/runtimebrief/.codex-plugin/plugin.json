@@ -1,0 +1,35 @@
+{
+  "name": "runtimebrief",
+  "version": "0.1.0+codex.20260824082651",
+  "description": "Evidence-backed attention and decisions across local coding agents",
+  "author": {
+    "name": "RuntimeBrief Contributors"
+  },
+  "license": "MIT",
+  "keywords": [
+    "agents",
+    "portfolio",
+    "evidence",
+    "voice",
+    "mcp"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "RuntimeBrief",
+    "shortDescription": "See what needs attention across coding agents.",
+    "longDescription": "Use RuntimeBrief's local, evidence-backed project briefs and review explicitly proposed decisions from ChatGPT and Codex.",
+    "developerName": "RuntimeBrief Contributors",
+    "category": "Productivity",
+    "capabilities": [
+      "Agent portfolio",
+      "Evidence lookup",
+      "Decision recording"
+    ],
+    "defaultPrompt": [
+      "What needs my attention across every agent?",
+      "Show the evidence for my most urgent project.",
+      "Which RuntimeBrief decisions are waiting for me?"
+    ]
+  },
+  "mcpServers": "./.mcp.json"
+}

@@ -1,0 +1,72 @@
+# XcodeGen project definition — run `xcodegen generate` in this directory,
+# then open RuntimeBrief.xcodeproj. See ios/README.md.
+name: RuntimeBrief
+options:
+  bundleIdPrefix: com.runtimebrief
+  deploymentTarget:
+    iOS: "26.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    SWIFT_STRICT_CONCURRENCY: complete
+    CODE_SIGN_STYLE: Automatic
+    CURRENT_PROJECT_VERSION: 13
+    MARKETING_VERSION: 0.1.0
+targets:
+  RuntimeBrief:
+    type: application
+    platform: iOS
+    sources:
+      - RuntimeBrief
+    settings:
+      base:
+        # Preserve the existing App Store Connect/TestFlight identity while the
+        # product name and source targets use RuntimeBrief.
+        PRODUCT_BUNDLE_IDENTIFIER: com.backbrief.app
+        TARGETED_DEVICE_FAMILY: "1"
+        INFOPLIST_KEY_UILaunchScreen_Generation: true
+        INFOPLIST_KEY_NSAppTransportSecurity_NSAllowsLocalNetworking: true
+        # The daemon speaks plain HTTP on loopback/Tailscale; ATS exceptions
+        # for local networking are set via Info.plist keys below.
+    info:
+      path: RuntimeBrief/Info.plist
+      properties:
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        UILaunchScreen: {}
+        NSLocalNetworkUsageDescription: >-
+          RuntimeBrief connects to the runtimebriefd daemon on your Mac to read
+          project status.
+        ITSAppUsesNonExemptEncryption: false
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
+  RuntimeBriefTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - RuntimeBriefTests
+    dependencies:
+      - target: RuntimeBrief
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.runtimebrief.app.tests
+        GENERATE_INFOPLIST_FILE: true
+        TEST_HOST: $(BUILT_PRODUCTS_DIR)/RuntimeBrief.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)RuntimeBrief
+        BUNDLE_LOADER: $(TEST_HOST)
+  RuntimeBriefUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - RuntimeBriefUITests
+    dependencies:
+      - target: RuntimeBrief
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.runtimebrief.app.uitests
+    info:
+      path: RuntimeBriefUITests/Info.plist
+      properties:
+        RUNTIMEBRIEF_E2E_SERVER_URL: $(RUNTIMEBRIEF_E2E_SERVER_URL)
+        RUNTIMEBRIEF_E2E_TOKEN: $(RUNTIMEBRIEF_E2E_TOKEN)
+        RUNTIMEBRIEF_E2E_PROJECT_ID: $(RUNTIMEBRIEF_E2E_PROJECT_ID)

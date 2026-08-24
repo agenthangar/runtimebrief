@@ -1,0 +1,4 @@
+interface:
+  display_name: "RuntimeBrief Portfolio"
+  short_description: "Review evidence-backed agent attention"
+  default_prompt: "Use $runtimebrief-portfolio to tell me what needs attention across every agent."
