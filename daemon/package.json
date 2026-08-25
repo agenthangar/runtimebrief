@@ -1,6 +1,6 @@
 {
   "name": "runtimebriefd",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "RuntimeBrief daemon — evidence-backed project state for AI agent fleets",
   "homepage": "https://github.com/agenthangar/runtimebrief#readme",
   "bugs": {

@@ -2,18 +2,68 @@ name: Bug report
 description: Report a reproducible RuntimeBrief problem
 title: "[Bug]: "
 body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve RuntimeBrief. Before submitting, remove
+        daemon tokens, private source or transcript content, personal paths,
+        Tailnet addresses, account details, and signing material.
+
   - type: textarea
+    id: behavior
     attributes:
       label: What happened?
-      description: Do not include tokens, private code, or transcript content.
+      description: Describe the actual behavior and what you expected instead.
+      placeholder: RuntimeBrief did ... I expected ...
     validations:
       required: true
+
   - type: textarea
+    id: reproduction
     attributes:
       label: Reproduction steps
+      description: Provide the smallest repeatable sequence using sanitized example names and values.
+      placeholder: |
+        1. Configure ...
+        2. Run ...
+        3. Observe ...
     validations:
       required: true
+
+  - type: dropdown
+    id: component
+    attributes:
+      label: Affected component
+      options:
+        - macOS daemon or CLI
+        - iOS app or Siri
+        - MCP server or Codex plugin
+        - Codex analyst integration
+        - Documentation or setup
+        - Other
+    validations:
+      required: true
+
   - type: input
+    id: environment
     attributes:
       label: Environment
-      description: RuntimeBrief version, macOS/iOS version, and Node version.
+      description: RuntimeBrief version or commit, macOS or iOS version, Node version, and Codex CLI version if relevant.
+      placeholder: RuntimeBrief 1.0.0; macOS 26.0; Node 22.x; Codex CLI 0.144.1
+    validations:
+      required: true
+
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Sanitized diagnostics
+      description: Paste only the minimal relevant error or log lines after removing sensitive and identifying data.
+      render: shell
+
+  - type: checkboxes
+    id: privacy_check
+    attributes:
+      label: Privacy check
+      options:
+        - label: I removed tokens, credentials, private source and transcripts, personal paths, network addresses, account details, and signing material.
+          required: true

@@ -4,6 +4,7 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { tmpdir } from "./helpers.js";
+import { VERSION } from "../src/version.js";
 
 describe("installed CLI entrypoint", () => {
   const roots: string[] = [];
@@ -12,6 +13,14 @@ describe("installed CLI entrypoint", () => {
     for (const root of roots.splice(0)) {
       fs.rmSync(root, { recursive: true, force: true });
     }
+  });
+
+  it("keeps the package and runtime versions aligned", () => {
+    const daemonRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+    const packageJson = JSON.parse(
+      fs.readFileSync(path.join(daemonRoot, "package.json"), "utf8"),
+    ) as { version: string };
+    expect(packageJson.version).toBe(VERSION);
   });
 
   it("executes the built bin wrapper through an npm-style symlink", () => {
@@ -37,7 +46,7 @@ describe("installed CLI entrypoint", () => {
 
     expect(result.error).toBeUndefined();
     expect(result.status).toBe(1);
-    expect(result.stdout).toContain("runtimebriefd 0.1.0");
+    expect(result.stdout).toContain(`runtimebriefd ${VERSION}`);
     expect(result.stdout).toContain("Usage:");
   });
 });

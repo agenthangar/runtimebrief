@@ -33,8 +33,14 @@ npm install --global @openai/codex@0.144.1
 codex --version  # must print: codex-cli 0.144.1
 codex login
 runtimebriefd init
-runtimebriefd start
+runtimebriefd install-service
 ```
+
+`install-service` is the normal macOS setup: it starts RuntimeBrief as a
+non-blocking per-user launchd service and keeps it running after the terminal
+closes. For foreground development, unload that job first, run
+`runtimebriefd start`, and press **Ctrl-C** when finished. Re-run
+`runtimebriefd install-service` to restore the background service.
 
 When Codex stores its login in `auth.json`, RuntimeBrief validates only the
 regular file's ownership, permissions, and link metadata and creates a

@@ -13,6 +13,7 @@ import type {
   AnalystBackendRunner,
 } from "../src/analyst/codexCli.js";
 import { DecisionStore } from "../src/decisions/store.js";
+import { VERSION } from "../src/version.js";
 import { authHeaders, git, makeFixtureRepo, testConfig, tmpdir, TEST_TOKEN } from "./helpers.js";
 
 /**
@@ -106,7 +107,7 @@ describe("daemon integration", () => {
     const res = await fetch(`${base}/v1/health`, { headers: authHeaders() });
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body.version).toBe("0.1.0");
+    expect(body.version).toBe(VERSION);
   });
 
   it("GET /v1/projects and /v1/projects/:id", async () => {

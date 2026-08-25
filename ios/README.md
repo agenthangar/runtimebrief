@@ -15,29 +15,35 @@ xcodegen generate
 open RuntimeBrief.xcodeproj
 ```
 
-Select the `RuntimeBrief` scheme, pick your iPhone, build and run.
-For a physical device or archive, select your own development team in Xcode;
-team identifiers are intentionally not stored in the repository.
+Select the `RuntimeBrief` scheme, pick a simulator, build and run. A simulator
+needs no Apple team or bundle-identifier change.
 Requires Xcode 26+ (Swift 6, iOS 26 SDK). Run the unit tests with **⌘U**
 (they use Swift Testing and a mocked transport — no daemon needed).
 
-RuntimeBrief intentionally keeps the existing `com.backbrief.app` bundle
-identifier so updates continue through the established App Store Connect and
-TestFlight record. The product name, targets, daemon, and plugin use the
-RuntimeBrief name; do not create a second Apple app record for this rename.
+Maintainer TestFlight and App Store builds intentionally keep the existing
+`com.backbrief.app` bundle identifier so updates continue through the
+established App Store Connect record. The rename does not require maintainers
+to create a second Apple app record.
+
+External contributors cannot sign that production identifier. To run on your
+own physical device, select your Apple development team and replace
+`PRODUCT_BUNDLE_IDENTIFIER` in your local `project.yml` with a unique
+reverse-DNS identifier you control (for example,
+`com.example.runtimebrief.dev`), then run `xcodegen generate` again. Keep that
+personal signing change local; do not commit it or change the production
+`com.backbrief.app` identity in a contribution.
 
 ## Connect to your Mac
 
 1. On the Mac: install Codex CLI separately and run `codex login` with ChatGPT
    if you want optional analyst answers. Then run `runtimebriefd init` (copy the
-   token it prints once), add projects, and keep the daemon on its default
-   `127.0.0.1` bind. RuntimeBrief does not read or copy the Codex CLI's saved
-   login.
+   token it prints once), add projects, and run `runtimebriefd install-service`.
+   This starts the non-blocking launchd service on its default `127.0.0.1`
+   bind. RuntimeBrief does not read or copy the Codex CLI's saved login.
 2. Install Tailscale on the Mac and iPhone, connect both to the same tailnet,
    then publish the loopback daemon privately over HTTPS:
 
    ```sh
-   runtimebriefd install-service
    tailscale serve --bg 8484
    tailscale serve status
    ```

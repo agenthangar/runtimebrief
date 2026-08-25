@@ -16,6 +16,7 @@ import path from "node:path";
 import type { Readable, Writable } from "node:stream";
 import { StringDecoder } from "node:string_decoder";
 import { z } from "zod";
+import { VERSION } from "../version.js";
 
 const DEFAULT_MAX_STDOUT_BYTES = 2 * 1_024 * 1_024;
 const DEFAULT_MAX_STDERR_BYTES = 256 * 1_024;
@@ -1459,7 +1460,7 @@ function runCodexAppServer(
             !initialized.userAgent.startsWith(
               `runtimebrief/${SUPPORTED_CODEX_CLI_VERSION} `,
             ) ||
-            !initialized.userAgent.endsWith(" (runtimebrief; 0.1.0)") ||
+            !initialized.userAgent.endsWith(` (runtimebrief; ${VERSION})`) ||
             path.normalize(initialized.codexHome) !== request.isolatedCodexHome
           ) {
             throw new Error("unverified app server");
@@ -1849,7 +1850,7 @@ function runCodexAppServer(
         clientInfo: {
           name: "runtimebrief",
           title: "RuntimeBrief",
-          version: "0.1.0",
+          version: VERSION,
         },
         capabilities: {
           experimentalApi: true,

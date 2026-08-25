@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import type { FastifyInstance } from "fastify";
-import { assertBindAllowed, buildServer, resolveBindHost } from "../src/server.js";
+import { assertBindAllowed, buildServer, resolveBindHost, VERSION } from "../src/server.js";
 import { authHeaders, testConfig } from "./helpers.js";
 
 function makeApp(): FastifyInstance {
@@ -48,7 +48,7 @@ describe("auth middleware", () => {
     });
     expect(res.statusCode).toBe(200);
     const body = res.json();
-    expect(body.version).toBe("0.1.0");
+    expect(body.version).toBe(VERSION);
     expect(typeof body.uptime).toBe("number");
   });
 });

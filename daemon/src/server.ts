@@ -11,8 +11,9 @@ import { registerDecisionRoutes } from "./routes/decisions.js";
 import type { AnalystService } from "./analyst/service.js";
 import type { IosReleaseProvider } from "./iosRelease.js";
 import type { DecisionStore } from "./decisions/store.js";
+import { VERSION } from "./version.js";
 
-export const VERSION = "0.1.0";
+export { VERSION };
 
 export interface ServerDeps {
   config: RuntimeBriefConfig;

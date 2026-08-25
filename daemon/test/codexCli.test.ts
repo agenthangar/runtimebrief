@@ -16,6 +16,7 @@ import {
   type AnalystRunParams,
   type CodexChildProcess,
 } from "../src/analyst/codexCli.js";
+import { VERSION } from "../src/version.js";
 
 const PERMISSION_PROFILE = "runtimebrief-analyst-fixture";
 const CHATGPT_CODEX_BASE_URL = "https://chatgpt.com/backend-api/codex";
@@ -481,7 +482,7 @@ function wireSuccessfulProtocol(
             id: 0,
             result: {
               userAgent:
-                "runtimebrief/0.144.1 (macos; arm64) (runtimebrief; 0.1.0)",
+                `runtimebrief/0.144.1 (macos; arm64) (runtimebrief; ${VERSION})`,
               codexHome,
               platformFamily: "unix",
               platformOs: "macos",

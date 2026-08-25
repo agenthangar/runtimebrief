@@ -10,8 +10,8 @@ in progress, and what needs your attention.
 > *"The shopping-list work landed this morning and all 12 tests pass. A Codex
 > session is still working on export; nothing is waiting for you."*
 
-RuntimeBrief is an early developer release. The daemon, iOS app, and plugin are
-currently built from source.
+RuntimeBrief 1.0 is the first public developer release. The daemon, iOS app,
+and plugin are currently built from source.
 
 ## What you get
 
@@ -26,14 +26,16 @@ currently built from source.
 ## How it works
 
 ```text
-iPhone or MCP client                   Mac
-┌────────────────────┐             ┌────────────────────────────┐
-│ RuntimeBrief / Siri│ HTTP +     │ runtimebriefd              │
-│ ChatGPT / Codex    │ bearer     │ REST + buffered SSE        │
-│                     │ token       │ Git/session/iOS adapters   │
-│                     │────────────▶│ local evidence filtering   │
-└────────────────────┘             │ per-request app-server     │
-                                    └────────────────────────────┘
+                                      Mac
+iPhone / Siri ── tailnet-only HTTPS + bearer ─▶ Tailscale Serve
+                                                   │ loopback HTTP
+                                                   ▼
+                                          runtimebriefd REST/SSE
+
+ChatGPT / Codex ──── local MCP over stdio ─────▶ runtimebriefd mcp
+                                                   │
+                                                   ▼
+                                      Git/session/iOS evidence
 ```
 
 RuntimeBrief owns evidence collection. On macOS, each analyst query launches
@@ -85,8 +87,13 @@ runtimebriefd init
 runtimebriefd add-project-root ~/dev
 # Or register one project explicitly:
 runtimebriefd add-project ~/work/sample-tracker --name "Sample Tracker App"
-runtimebriefd start
+runtimebriefd install-service
 ```
+
+`install-service` installs or reloads the macOS launchd job, starts the daemon,
+and returns to the shell. This is the normal first-run path and keeps
+RuntimeBrief available after the terminal closes. The job is
+`com.runtimebrief.daemon`; logs stay under `~/.runtimebrief/logs/`.
 
 `codex login` opens the ChatGPT OAuth flow and saves authentication for Codex
 CLI. When the login is stored in `~/.codex/auth.json`, RuntimeBrief validates
@@ -113,7 +120,6 @@ The daemon binds to `127.0.0.1` by default. To reach it from an iPhone, install
 loopback, and publish it privately to your tailnet with Tailscale Serve:
 
 ```sh
-runtimebriefd install-service
 tailscale serve --bg 8484
 tailscale serve status
 ```
@@ -132,14 +138,17 @@ the server address and daemon token in Settings, then try:
 - *"Ask RuntimeBrief about **<project>."***
 - *"What are my projects up to in RuntimeBrief?"*
 
-### 3. Keep the daemon running (optional)
+### 3. Run in the foreground for development (optional)
 
 ```sh
-runtimebriefd install-service
+launchctl unload "$HOME/Library/LaunchAgents/com.runtimebrief.daemon.plist"
+runtimebriefd start
 ```
 
-The launchd job is `com.runtimebrief.daemon`; logs stay under
-`~/.runtimebrief/logs/`.
+`start` is the foreground development and debugging mode. It occupies the
+current terminal and stops on **Ctrl-C**; do not run it alongside the launchd
+job on the same port. When finished, run `runtimebriefd install-service` again
+to restore the normal background service.
 
 ### 4. Connect ChatGPT or Codex
 
