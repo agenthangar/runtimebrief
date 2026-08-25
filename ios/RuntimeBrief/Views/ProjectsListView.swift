@@ -7,6 +7,7 @@ struct ProjectsListView: View {
     @State private var showSettings = false
     @State private var showingSavedBrief = false
     @State private var lastSavedAt: Date?
+    @State private var isDemoMode = RuntimeBriefModeStore.isDemoEnabled
 
     var body: some View {
         NavigationStack {
@@ -20,12 +21,19 @@ struct ProjectsListView: View {
             .navigationTitle("RuntimeBrief")
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        showSettings = true
-                    } label: {
-                        Image(systemName: "gearshape")
+                    if isDemoMode {
+                        Button("Exit Demo") {
+                            exitDemo()
+                        }
+                        .accessibilityIdentifier("exit-demo")
+                    } else {
+                        Button {
+                            showSettings = true
+                        } label: {
+                            Image(systemName: "gearshape")
+                        }
+                        .accessibilityLabel("Settings")
                     }
-                    .accessibilityLabel("Settings")
                 }
             }
             .sheet(isPresented: $showSettings, onDismiss: { Task { await refresh() } }) {
@@ -38,6 +46,16 @@ struct ProjectsListView: View {
 
     private var list: some View {
         List {
+            if isDemoMode {
+                Label(
+                    "Demo Data — every project, path, commit, and response is fictional.",
+                    systemImage: "sparkles"
+                )
+                .font(.callout.weight(.semibold))
+                .foregroundStyle(.indigo)
+                .listRowSeparator(.hidden)
+                .accessibilityIdentifier("demo-data-banner")
+            }
             if showingSavedBrief, let lastSavedAt {
                 Label {
                     Text("Mac unavailable — showing the brief saved \(lastSavedAt.formatted(.relative(presentation: .named))).")
@@ -73,7 +91,13 @@ struct ProjectsListView: View {
         } description: {
             Text(errorMessage ?? "Connect to your Mac in Settings, then add projects with `runtimebriefd add-project`.")
         } actions: {
-            Button("Open Settings") { showSettings = true }
+            VStack(spacing: 10) {
+                Button("Explore Demo") { enterDemo() }
+                    .buttonStyle(.borderedProminent)
+                    .accessibilityIdentifier("explore-demo")
+                Button("Connect Your Mac") { showSettings = true }
+                    .accessibilityIdentifier("connect-your-mac")
+            }
         }
     }
 
@@ -105,6 +129,29 @@ struct ProjectsListView: View {
             lastSavedAt = snapshot.fetchedAt
         }
         await refresh()
+    }
+
+    private func enterDemo() {
+        RuntimeBriefModeStore.setDemoEnabled(true)
+        isDemoMode = true
+        projects = DemoData.projects
+        errorMessage = nil
+        showingSavedBrief = false
+        lastSavedAt = nil
+        Task { await ProjectsStore.shared.invalidate() }
+    }
+
+    private func exitDemo() {
+        RuntimeBriefModeStore.setDemoEnabled(false)
+        isDemoMode = false
+        projects = []
+        errorMessage = nil
+        showingSavedBrief = false
+        lastSavedAt = nil
+        Task {
+            await ProjectsStore.shared.invalidate()
+            await loadSavedThenRefresh()
+        }
     }
 }
 

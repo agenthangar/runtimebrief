@@ -21,7 +21,7 @@ struct AskProjectIntent: AppIntent {
 
     func perform() async throws -> some IntentResult & ProvidesDialog {
         do {
-            let answer = try await RuntimeBriefClient(timeout: 20)
+            let answer = try await RuntimeBriefDataSourceFactory.current(timeout: 20)
                 .ask(projectID: project.id, question: question)
             return .result(dialog: IntentDialog(stringLiteral: answer.spokenAnswer))
         } catch {

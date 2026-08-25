@@ -20,6 +20,11 @@ needs no Apple team or bundle-identifier change.
 Requires Xcode 26+ (Swift 6, iOS 26 SDK). Run the unit tests with **⌘U**
 (they use Swift Testing and a mocked transport — no daemon needed).
 
+On an unconfigured install, **Explore Demo** opens a bundled, fully offline
+portfolio made only from hand-authored fictional data. Demo mode never reads
+the saved server URL or Keychain token, contacts a network service, or writes
+into the live project cache. Use **Exit Demo** before connecting a Mac.
+
 Maintainer TestFlight and App Store builds intentionally keep the existing
 `com.backbrief.app` bundle identifier so updates continue through the
 established App Store Connect record. The rename does not require maintainers

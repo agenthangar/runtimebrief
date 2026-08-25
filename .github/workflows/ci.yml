@@ -29,7 +29,9 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - run: brew install xcodegen
+      - run: brew install gitleaks xcodegen
+      - name: Verify release privacy
+        run: /bin/bash scripts/verify-release-privacy.sh
       - run: xcodegen generate
         working-directory: ios
       - name: Build and test without signing

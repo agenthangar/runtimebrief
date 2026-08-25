@@ -70,6 +70,12 @@ actor ProjectsStore {
     private var fetchedAt: Date?
     private let ttl: TimeInterval = 60
 
+    #if DEBUG
+    nonisolated static func resetPersistedSnapshotForUITesting() {
+        UserDefaults.standard.removeObject(forKey: snapshotKey)
+    }
+    #endif
+
     init() {
         let defaults = UserDefaults.standard
         if let data = defaults.data(forKey: Self.snapshotKey),
@@ -82,12 +88,15 @@ actor ProjectsStore {
         }
     }
 
-    func projects(client: RuntimeBriefClient? = nil) async throws -> [ProjectSummary] {
+    func projects(dataSource: (any RuntimeBriefDataSource)? = nil) async throws -> [ProjectSummary] {
+        if RuntimeBriefModeStore.isDemoEnabled {
+            return try await (dataSource ?? DemoRuntimeBriefDataSource()).projects()
+        }
         if let fetchedAt, Date().timeIntervalSince(fetchedAt) < ttl, !cached.isEmpty {
             return cached
         }
         do {
-            return try await refresh(client: client)
+            return try await refresh(dataSource: dataSource)
         } catch {
             // Siri and Shortcuts should still resolve project names while the
             // Mac is temporarily offline.
@@ -96,8 +105,12 @@ actor ProjectsStore {
         }
     }
 
-    func refresh(client: RuntimeBriefClient? = nil) async throws -> [ProjectSummary] {
-        let fresh = try await (client ?? RuntimeBriefClient()).projects()
+    func refresh(dataSource: (any RuntimeBriefDataSource)? = nil) async throws -> [ProjectSummary] {
+        let isDemo = RuntimeBriefModeStore.isDemoEnabled
+        let fresh = try await (dataSource ?? RuntimeBriefDataSourceFactory.current()).projects()
+        if isDemo {
+            return fresh
+        }
         cached = fresh
         fetchedAt = Date()
         persist()
@@ -109,7 +122,10 @@ actor ProjectsStore {
     }
 
     func cachedSnapshot() -> (projects: [ProjectSummary], fetchedAt: Date?) {
-        (cached, fetchedAt)
+        if RuntimeBriefModeStore.isDemoEnabled {
+            return (DemoData.projects, nil)
+        }
+        return (cached, fetchedAt)
     }
 
     func invalidate() {

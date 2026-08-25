@@ -22,7 +22,8 @@ struct GetProjectStatusIntent: AppIntent {
         // as it generates instead of waiting for the full response.
         // if #available(iOS 27, *) { ... }
         do {
-            let answer = try await RuntimeBriefClient(timeout: 20).status(projectID: project.id)
+            let answer = try await RuntimeBriefDataSourceFactory.current(timeout: 20)
+                .status(projectID: project.id)
             return .result(dialog: IntentDialog(stringLiteral: answer.spokenAnswer))
         } catch {
             let message = unreachableMessage(for: error)

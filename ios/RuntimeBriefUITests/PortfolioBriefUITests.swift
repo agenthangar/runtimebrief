@@ -30,6 +30,7 @@ final class PortfolioBriefUITests: XCTestCase {
 
         continueAfterFailure = false
         let app = XCUIApplication()
+        app.launchEnvironment["RUNTIMEBRIEF_E2E_CLEAR_STATE"] = "1"
         app.launchEnvironment["RUNTIMEBRIEF_E2E_SERVER_URL"] = serverURL
         app.launchEnvironment["RUNTIMEBRIEF_E2E_TOKEN"] = token
         app.launch()
@@ -102,6 +103,7 @@ final class PortfolioBriefUITests: XCTestCase {
         }
 
         let app = XCUIApplication()
+        app.launchEnvironment["RUNTIMEBRIEF_E2E_CLEAR_STATE"] = "1"
         app.launchEnvironment["RUNTIMEBRIEF_E2E_SERVER_URL"] = serverURL
         app.launchEnvironment["RUNTIMEBRIEF_E2E_TOKEN"] = token
         app.launch()

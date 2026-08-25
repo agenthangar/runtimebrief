@@ -45,6 +45,13 @@ struct ServerSettings: Sendable {
         }
     }
 
+    #if DEBUG
+    static func resetForUITesting() {
+        UserDefaults.standard.removeObject(forKey: urlKey)
+        Keychain.delete(account: tokenAccount)
+    }
+    #endif
+
     /// Bare Tailscale DNS names use Serve's HTTPS/443 endpoint. Other bare
     /// hosts retain the local-development HTTP/8484 default.
     static func normalizeURL(_ input: String) -> URL? {

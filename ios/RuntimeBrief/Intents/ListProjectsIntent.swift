@@ -11,7 +11,7 @@ struct ListProjectsIntent: AppIntent {
 
     func perform() async throws -> some IntentResult & ProvidesDialog {
         do {
-            let projects = try await RuntimeBriefClient(timeout: 20).projects()
+            let projects = try await RuntimeBriefDataSourceFactory.current(timeout: 20).projects()
             guard !projects.isEmpty else {
                 let none = "No projects are registered yet. Run runtimebriefd add-project on your Mac."
                 return .result(dialog: IntentDialog(stringLiteral: none))

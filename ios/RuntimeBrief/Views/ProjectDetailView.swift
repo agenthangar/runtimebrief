@@ -31,6 +31,15 @@ struct ProjectDetailView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
+                if RuntimeBriefModeStore.isDemoEnabled {
+                    Label(
+                        "Demo Data — this screen contains fictional information only.",
+                        systemImage: "sparkles"
+                    )
+                    .font(.callout.weight(.semibold))
+                    .foregroundStyle(.indigo)
+                    .accessibilityIdentifier("demo-detail-banner")
+                }
                 briefSection
                 if let error = errorMessage {
                     ErrorBanner(message: error)
@@ -285,7 +294,8 @@ struct ProjectDetailView: View {
         errorMessage = nil
         defer { requestingStatus = false }
         do {
-            for try await event in RuntimeBriefClient().streamStatus(projectID: project.id) {
+            for try await event in RuntimeBriefDataSourceFactory.current()
+                .streamStatus(projectID: project.id) {
                 switch event {
                 case .chunk(let text):
                     statusText += text
@@ -304,7 +314,11 @@ struct ProjectDetailView: View {
     private func analystMetadata(_ answer: AnalystAnswer) -> some View {
         HStack(spacing: 10) {
             if answer.cached {
-                Label("Cached", systemImage: "clock.arrow.circlepath")
+                if RuntimeBriefModeStore.isDemoEnabled {
+                    Label("Demo response", systemImage: "sparkles")
+                } else {
+                    Label("Cached", systemImage: "clock.arrow.circlepath")
+                }
             } else {
                 Label("Codex CLI", systemImage: "terminal")
             }
@@ -333,6 +347,7 @@ struct ProjectDetailView: View {
                         .textFieldStyle(.roundedBorder)
                         .focused($questionFocused)
                         .onSubmit { submit() }
+                        .accessibilityIdentifier("demo-question-field")
                     Button {
                         submit()
                     } label: {
@@ -340,6 +355,7 @@ struct ProjectDetailView: View {
                             .font(.title2)
                     }
                     .disabled(question.trimmingCharacters(in: .whitespaces).isEmpty || asking)
+                    .accessibilityIdentifier("submit-project-question")
                 }
                 ForEach(thread.reversed()) { entry in
                     VStack(alignment: .leading, spacing: 6) {
@@ -349,10 +365,15 @@ struct ProjectDetailView: View {
                             .font(.subheadline)
                             .lineSpacing(3)
                             .textSelection(.enabled)
+                            .accessibilityIdentifier("project-answer")
                         if entry.done {
                             HStack(spacing: 10) {
                                 if entry.cached {
-                                    Label("Cached", systemImage: "clock.arrow.circlepath")
+                                    if RuntimeBriefModeStore.isDemoEnabled {
+                                        Label("Demo response", systemImage: "sparkles")
+                                    } else {
+                                        Label("Cached", systemImage: "clock.arrow.circlepath")
+                                    }
                                 } else {
                                     Label("Codex CLI", systemImage: "terminal")
                                 }
@@ -384,7 +405,8 @@ struct ProjectDetailView: View {
         Task {
             defer { asking = false }
             do {
-                for try await event in RuntimeBriefClient().streamAsk(projectID: project.id, question: q) {
+                for try await event in RuntimeBriefDataSourceFactory.current()
+                    .streamAsk(projectID: project.id, question: q) {
                     switch event {
                     case .chunk(let text):
                         thread[index].answer += text
@@ -507,7 +529,7 @@ struct ProjectDetailView: View {
 
     private func loadCard() async {
         do {
-            card = try await RuntimeBriefClient().project(id: project.id)
+            card = try await RuntimeBriefDataSourceFactory.current().project(id: project.id)
         } catch {
             errorMessage = (error as? RuntimeBriefError)?.errorDescription ?? error.localizedDescription
         }

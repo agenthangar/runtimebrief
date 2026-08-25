@@ -11,8 +11,8 @@ settings:
     SWIFT_VERSION: "6.0"
     SWIFT_STRICT_CONCURRENCY: complete
     CODE_SIGN_STYLE: Automatic
-    CURRENT_PROJECT_VERSION: 13
-    MARKETING_VERSION: 1.0.0
+    CURRENT_PROJECT_VERSION: 14
+    MARKETING_VERSION: "1.0"
 targets:
   RuntimeBrief:
     type: application
