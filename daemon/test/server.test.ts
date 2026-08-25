@@ -80,14 +80,14 @@ describe("rate limiting", () => {
     await app.close();
   });
 
-  it("rate-limits unauthenticated requests before token verification", async () => {
+  it("rate-limits unknown URLs before token verification", async () => {
     const app = makeApp();
     for (let i = 0; i < 30; i++) {
-      const rejected = await app.inject({ method: "GET", url: "/v1/health" });
+      const rejected = await app.inject({ method: "GET", url: "/missing" });
       expect(rejected.statusCode).toBe(401);
     }
 
-    const limited = await app.inject({ method: "GET", url: "/v1/health" });
+    const limited = await app.inject({ method: "GET", url: "/missing" });
     expect(limited.statusCode).toBe(429);
     expect(limited.json()).toMatchObject({ error: "rate_limited" });
     await app.close();

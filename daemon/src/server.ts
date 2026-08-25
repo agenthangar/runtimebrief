@@ -30,31 +30,33 @@ export interface ServerDeps {
 export function buildServer(deps: ServerDeps): FastifyInstance {
   const app = Fastify({ logger: false, trustProxy: false });
 
-  app.register(async function api(api) {
-    // Boot the limiter before declaring routes: it installs an onRoute hook.
-    // Auth runs in the next lifecycle phase, so unauthenticated hammering is
-    // rejected before token verification can burn scrypt CPU.
-    await api.register(rateLimit, {
-      global: true,
-      max: 30,
-      timeWindow: 60_000,
-      cache: 1_000,
-      hook: "onRequest",
-      errorResponseBuilder: (_request, context) => ({
-        statusCode: context.statusCode,
-        error: "rate_limited",
-        message: "Rate limit exceeded",
-      }),
-    });
-    api.addHook("preParsing", makeAuthHook(deps.config.auth.token_hash));
+  app.register(rateLimit, {
+    global: true,
+    max: 30,
+    timeWindow: 60_000,
+    cache: 1_000,
+    hook: "onRequest",
+    errorResponseBuilder: (_request, context) => ({
+      statusCode: context.statusCode,
+      error: "rate_limited",
+      message: "Rate limit exceeded",
+    }),
+  });
 
-    registerHealthRoutes(api, VERSION);
-    registerProjectRoutes(api, deps);
-    registerAnalystRoutes(api, deps);
-    registerDecisionRoutes(api, deps);
+  app.after(() => {
+    // The plugin installs its onRoute hook during boot, so declare routes only
+    // after it is ready. The root hook also covers unknown URLs; the plugin's
+    // per-request guard prevents known routes from being counted twice.
+    app.addHook("onRequest", app.rateLimit());
+    app.addHook("preParsing", makeAuthHook(deps.config.auth.token_hash));
+
+    registerHealthRoutes(app, VERSION);
+    registerProjectRoutes(app, deps);
+    registerAnalystRoutes(app, deps);
+    registerDecisionRoutes(app, deps);
 
     if (deps.decisions) {
-      api.addHook("onClose", async () => {
+      app.addHook("onClose", async () => {
         deps.decisions?.close();
       });
     }
