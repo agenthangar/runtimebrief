@@ -50,7 +50,8 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
 
 /**
  * Guard against accidental exposure: an all-interfaces bind requires the
- * explicit --i-know-what-im-doing flag. Docs steer users to a Tailscale IP.
+ * explicit --i-know-what-im-doing flag. Remote access uses Tailscale Serve in
+ * front of the default loopback bind.
  */
 export function assertBindAllowed(host: string, override: boolean): void {
   const canonicalHost = canonicalizeHostLiteral(host);
@@ -60,7 +61,8 @@ export function assertBindAllowed(host: string, override: boolean): void {
   if (isWildcardHost(canonicalHost) && !override) {
     throw new Error(
       `Refusing to bind to ${host}: this exposes the daemon on every interface. ` +
-        `Bind to 127.0.0.1 or your Tailscale IP instead, or pass --i-know-what-im-doing.`,
+        `Bind to 127.0.0.1 and use Tailscale Serve for remote access, ` +
+        `or pass --i-know-what-im-doing.`,
     );
   }
 }

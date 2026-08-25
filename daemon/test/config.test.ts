@@ -68,7 +68,7 @@ describe("config load/save", () => {
     expect(loaded.project_roots).toEqual([]);
     expect(loaded.projects[0]?.id).toBe("demo");
     expect(loaded.projects[0]?.allowed_actions).toEqual([]);
-    expect(loaded.analyst.model).toBe("gpt-5.6-sol");
+    expect(loaded.analyst.model).toBe("gpt-5.6-luna");
     expect(loaded.analyst.cache_ttl_minutes).toBe(10);
   });
 

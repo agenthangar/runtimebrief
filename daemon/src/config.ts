@@ -59,13 +59,13 @@ export const configSchema = z.object({
   projects: z.array(projectSchema).default([]),
   analyst: z
     .object({
-      model: z.string().default("gpt-5.6-sol"),
+      model: z.string().default("gpt-5.6-luna"),
       cache_ttl_minutes: z.number().nonnegative().default(10),
       /** Max recent transcripts fed to the analyst per query. */
       max_transcripts: z.number().int().positive().default(5),
     })
     .default({
-      model: "gpt-5.6-sol",
+      model: "gpt-5.6-luna",
       cache_ttl_minutes: 10,
       max_transcripts: 5,
     }),

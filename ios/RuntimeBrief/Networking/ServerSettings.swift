@@ -45,14 +45,24 @@ struct ServerSettings: Sendable {
         }
     }
 
-    /// Accepts "100.x.y.z:8484", "http://mini.tail1234.ts.net:8484", etc.
+    /// Bare Tailscale DNS names use Serve's HTTPS/443 endpoint. Other bare
+    /// hosts retain the local-development HTTP/8484 default.
     static func normalizeURL(_ input: String) -> URL? {
-        guard !input.isEmpty else { return nil }
-        let withScheme = input.contains("://") ? input : "http://\(input)"
+        let trimmed = input.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        let hasExplicitScheme = trimmed.contains("://")
+        let withScheme = hasExplicitScheme ? trimmed : "http://\(trimmed)"
         guard var components = URLComponents(string: withScheme),
               let host = components.host, !host.isEmpty
         else { return nil }
-        if components.port == nil { components.port = 8484 }
+        if !hasExplicitScheme,
+           host.lowercased().trimmingCharacters(in: CharacterSet(charactersIn: "."))
+               .hasSuffix(".ts.net") {
+            components.scheme = "https"
+        }
+        if components.port == nil {
+            components.port = components.scheme?.lowercased() == "https" ? 443 : 8484
+        }
         components.path = ""
         return components.url
     }

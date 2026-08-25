@@ -109,18 +109,21 @@ different path.
 ### 2. Connect an iPhone (optional)
 
 The daemon binds to `127.0.0.1` by default. To reach it from an iPhone, install
-[Tailscale](https://tailscale.com/) on both devices and bind to the Mac's
-Tailscale address:
+[Tailscale](https://tailscale.com/) on both devices, leave RuntimeBrief on
+loopback, and publish it privately to your tailnet with Tailscale Serve:
 
-```yaml
-server:
-  host: 100.x.y.z
-  port: 8484
+```sh
+runtimebriefd install-service
+tailscale serve --bg 8484
+tailscale serve status
 ```
 
-RuntimeBrief rejects wildcard addresses and hostnames that resolve to them
-unless `runtimebriefd start --i-know-what-im-doing` is used. Do not expose its
-plain-HTTP server to the public internet.
+Enter the HTTPS URL printed by `tailscale serve` (for example,
+`https://your-mac.example.ts.net`) and the daemon token in RuntimeBrief
+Settings. Older builds that add port 8484 to a URL without a port should use
+the same URL with `:443` appended. Serve remains private to your tailnet and
+supplies the certificate required by iOS App Transport Security. Do not use
+Tailscale Funnel or expose the daemon directly to the public internet.
 
 See [ios/README.md](ios/README.md) to generate and build the iOS project. Enter
 the server address and daemon token in Settings, then try:
@@ -209,7 +212,7 @@ projects:
     #   - type: codex
     #     root: /custom/codex/home
 analyst:
-  model: gpt-5.6-sol
+  model: gpt-5.6-luna
   cache_ttl_minutes: 10
   max_transcripts: 5
 ```

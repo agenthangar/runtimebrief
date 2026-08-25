@@ -65,9 +65,10 @@ RuntimeBrief is designed for a user-controlled Mac and private network:
 - Repository paths that commonly contain credentials are filtered before
   context is constructed. Filtering reduces risk but is not a substitute for
   reviewing which repositories and transcripts are made available.
-- Plain HTTP must be used only over loopback or a trusted encrypted overlay
-  such as Tailscale. Never expose the daemon directly to the public internet or
-  an untrusted network.
+- Plain HTTP must be used only over loopback or a trusted local network. For
+  iOS access over Tailscale, keep the daemon on loopback and use Tailscale
+  Serve for tailnet-only HTTPS. Never use Funnel or expose the daemon directly
+  to the public internet or an untrusted network.
 
 The Codex CLI sends selected repository and agent-session context to its remote
 service when analysis is requested. Processing follows the permissions and

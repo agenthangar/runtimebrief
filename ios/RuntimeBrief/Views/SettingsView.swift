@@ -22,7 +22,7 @@ struct SettingsView: View {
         NavigationStack {
             Form {
                 Section {
-                    TextField("100.x.y.z:8484 or mini.tailnet.ts.net:8484", text: $serverURL)
+                    TextField("https://your-mac.tailnet.ts.net", text: $serverURL)
                         .keyboardType(.URL)
                         .textContentType(.URL)
                         .autocorrectionDisabled()
@@ -32,7 +32,7 @@ struct SettingsView: View {
                 } header: {
                     Text("Server")
                 } footer: {
-                    Text("The address of runtimebriefd on your Mac — usually its Tailscale IP or MagicDNS name.")
+                    Text("Use the private HTTPS URL printed by `tailscale serve --bg 8484`.")
                 }
 
                 Section {

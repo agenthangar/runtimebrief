@@ -40,6 +40,7 @@ describe("cli", () => {
     expect(raw).toContain("token_hash: scrypt:");
     const config = loadConfig();
     expect(config.server.host).toBe("127.0.0.1");
+    expect(config.analyst.model).toBe("gpt-5.6-luna");
   });
 
   it("init refuses to overwrite an existing config", async () => {

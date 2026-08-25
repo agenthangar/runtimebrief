@@ -196,8 +196,9 @@ struct APIClientTests {
 @Suite("ServerSettings")
 struct ServerSettingsTests {
     @Test func normalizesBareHostPort() {
-        #expect(ServerSettings.normalizeURL("100.64.0.5:8484")?.absoluteString == "http://100.64.0.5:8484")
-        #expect(ServerSettings.normalizeURL("mini.tail1234.ts.net")?.absoluteString == "http://mini.tail1234.ts.net:8484")
+        #expect(ServerSettings.normalizeURL("192.168.1.5:8484")?.absoluteString == "http://192.168.1.5:8484")
+        #expect(ServerSettings.normalizeURL("mini.tail1234.ts.net")?.absoluteString == "https://mini.tail1234.ts.net:443")
+        #expect(ServerSettings.normalizeURL("https://mini.tail1234.ts.net")?.absoluteString == "https://mini.tail1234.ts.net:443")
         #expect(ServerSettings.normalizeURL("https://mini.example.com:9000")?.absoluteString == "https://mini.example.com:9000")
         #expect(ServerSettings.normalizeURL("") == nil)
         #expect(ServerSettings.normalizeURL("   ") == nil)

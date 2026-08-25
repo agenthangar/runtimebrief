@@ -27,8 +27,8 @@ targets:
         TARGETED_DEVICE_FAMILY: "1"
         INFOPLIST_KEY_UILaunchScreen_Generation: true
         INFOPLIST_KEY_NSAppTransportSecurity_NSAllowsLocalNetworking: true
-        # The daemon speaks plain HTTP on loopback/Tailscale; ATS exceptions
-        # for local networking are set via Info.plist keys below.
+        # Local-network HTTP remains available for trusted LAN development.
+        # Remote Tailscale clients should use tailnet-only HTTPS via Serve.
     info:
       path: RuntimeBrief/Info.plist
       properties:
