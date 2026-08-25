@@ -76,6 +76,21 @@ describe("trusted project roots", () => {
     expect(first[1]?.id).toMatch(/^shared-[a-f0-9]{8}$/);
   });
 
+  it("derives bounded ids from discovered repository names", () => {
+    const root = makeRoot();
+    makeRepo(root, "---Sample_APP!!");
+    makeRepo(root, "___");
+    const longName = `${"a".repeat(45)}-tail`;
+    makeRepo(root, longName);
+
+    const projects = projectsForConfig(testConfig({ project_roots: [root] }));
+    expect(projects.find((project) => project.name === "---Sample_APP!!")?.id)
+      .toBe("sample-app");
+    expect(projects.find((project) => project.name === "___")?.id).toBe("project");
+    expect(projects.find((project) => project.name === longName)?.id)
+      .toBe("a".repeat(40));
+  });
+
   it("ignores missing or unreadable roots without failing the registry", () => {
     const configured = {
       id: "known",

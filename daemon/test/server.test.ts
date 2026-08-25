@@ -54,18 +54,42 @@ describe("auth middleware", () => {
 });
 
 describe("rate limiting", () => {
-  it("returns 429 after 30 requests in a minute", async () => {
+  it("returns a bounded 429 response and retry metadata after 30 requests", async () => {
     const app = makeApp();
-    let limited = 0;
-    for (let i = 0; i < 35; i++) {
-      const res = await app.inject({
+    for (let i = 0; i < 30; i++) {
+      const allowed = await app.inject({
         method: "GET",
         url: "/v1/health",
         headers: authHeaders(),
       });
-      if (res.statusCode === 429) limited++;
+      expect(allowed.statusCode).toBe(200);
     }
-    expect(limited).toBe(5);
+
+    const limited = await app.inject({
+      method: "GET",
+      url: "/v1/health",
+      headers: authHeaders(),
+    });
+    expect(limited.statusCode).toBe(429);
+    expect(limited.json()).toEqual({
+      statusCode: 429,
+      error: "rate_limited",
+      message: "Rate limit exceeded",
+    });
+    expect(Number(limited.headers["retry-after"])).toBeGreaterThan(0);
+    await app.close();
+  });
+
+  it("rate-limits unauthenticated requests before token verification", async () => {
+    const app = makeApp();
+    for (let i = 0; i < 30; i++) {
+      const rejected = await app.inject({ method: "GET", url: "/v1/health" });
+      expect(rejected.statusCode).toBe(401);
+    }
+
+    const limited = await app.inject({ method: "GET", url: "/v1/health" });
+    expect(limited.statusCode).toBe(429);
+    expect(limited.json()).toMatchObject({ error: "rate_limited" });
     await app.close();
   });
 });

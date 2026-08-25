@@ -1,9 +1,9 @@
 import Fastify, { type FastifyInstance } from "fastify";
+import rateLimit from "@fastify/rate-limit";
 import { lookup } from "node:dns/promises";
 import type { RuntimeBriefConfig } from "./config.js";
 import type { RuntimeAdapter } from "./types.js";
 import { makeAuthHook } from "./auth.js";
-import { makeRateLimitHook } from "./rateLimit.js";
 import { registerHealthRoutes } from "./routes/health.js";
 import { registerProjectRoutes } from "./routes/projects.js";
 import { registerAnalystRoutes } from "./routes/analyst.js";
@@ -30,21 +30,35 @@ export interface ServerDeps {
 export function buildServer(deps: ServerDeps): FastifyInstance {
   const app = Fastify({ logger: false, trustProxy: false });
 
-  // Every endpoint requires auth; rate limit runs first so unauthenticated
-  // hammering can't burn scrypt CPU.
-  app.addHook("onRequest", makeRateLimitHook(30));
-  app.addHook("onRequest", makeAuthHook(deps.config.auth.token_hash));
-
-  registerHealthRoutes(app, VERSION);
-  registerProjectRoutes(app, deps);
-  registerAnalystRoutes(app, deps);
-  registerDecisionRoutes(app, deps);
-
-  if (deps.decisions) {
-    app.addHook("onClose", async () => {
-      deps.decisions?.close();
+  app.register(async function api(api) {
+    // Boot the limiter before declaring routes: it installs an onRoute hook.
+    // Auth runs in the next lifecycle phase, so unauthenticated hammering is
+    // rejected before token verification can burn scrypt CPU.
+    await api.register(rateLimit, {
+      global: true,
+      max: 30,
+      timeWindow: 60_000,
+      cache: 1_000,
+      hook: "onRequest",
+      errorResponseBuilder: (_request, context) => ({
+        statusCode: context.statusCode,
+        error: "rate_limited",
+        message: "Rate limit exceeded",
+      }),
     });
-  }
+    api.addHook("preParsing", makeAuthHook(deps.config.auth.token_hash));
+
+    registerHealthRoutes(api, VERSION);
+    registerProjectRoutes(api, deps);
+    registerAnalystRoutes(api, deps);
+    registerDecisionRoutes(api, deps);
+
+    if (deps.decisions) {
+      api.addHook("onClose", async () => {
+        deps.decisions?.close();
+      });
+    }
+  });
 
   return app;
 }

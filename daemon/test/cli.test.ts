@@ -216,6 +216,22 @@ describe("cli", () => {
     expect(errors.join("\n")).toMatch(/already exists|already registered/);
   });
 
+  it("derives safe, stable ids from punctuation-heavy directory names", async () => {
+    await main(["init"]);
+    const namedProject = path.join(dir, "---Sample_APP!!");
+    const punctuationOnlyProject = path.join(dir, "___");
+    fs.mkdirSync(namedProject);
+    fs.mkdirSync(punctuationOnlyProject);
+
+    await main(["add-project", namedProject]);
+    await main(["add-project", punctuationOnlyProject]);
+
+    expect(loadConfig().projects).toMatchObject([
+      { id: "sample-app", name: "---Sample_APP!!" },
+      { id: "project", name: "___" },
+    ]);
+  });
+
   it("add-project honors --id and --name", async () => {
     await main(["init"]);
     const projectDir = path.join(dir, "some-dir");
