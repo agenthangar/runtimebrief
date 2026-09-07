@@ -11,7 +11,7 @@ settings:
     SWIFT_VERSION: "6.0"
     SWIFT_STRICT_CONCURRENCY: complete
     CODE_SIGN_STYLE: Automatic
-    CURRENT_PROJECT_VERSION: 14
+    CURRENT_PROJECT_VERSION: 15
     MARKETING_VERSION: "1.0"
 targets:
   RuntimeBrief:
@@ -37,7 +37,7 @@ targets:
         UILaunchScreen: {}
         NSLocalNetworkUsageDescription: >-
           RuntimeBrief connects to the runtimebriefd daemon on your Mac to read
-          project status.
+          project status and start Claude Code tasks you request.
         ITSAppUsesNonExemptEncryption: false
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true
@@ -70,3 +70,4 @@ targets:
         RUNTIMEBRIEF_E2E_SERVER_URL: $(RUNTIMEBRIEF_E2E_SERVER_URL)
         RUNTIMEBRIEF_E2E_TOKEN: $(RUNTIMEBRIEF_E2E_TOKEN)
         RUNTIMEBRIEF_E2E_PROJECT_ID: $(RUNTIMEBRIEF_E2E_PROJECT_ID)
+        RUNTIMEBRIEF_E2E_CLAUDE_LIVE: $(RUNTIMEBRIEF_E2E_CLAUDE_LIVE)

@@ -19,9 +19,10 @@ and plugin are currently built from source.
   claim.
 - Optional on-demand analysis of a single project's locally collected evidence.
 - Read-only summaries of Git, Claude Code, Codex, and Cursor activity.
+- Opt-in native Claude Code tasks with takeover in Claude Desktop on your Mac.
 - Local Xcode metadata plus optional read-only App Store Connect status.
 - Siri access through the iOS app and local MCP tools for ChatGPT and Codex.
-- No RuntimeBrief account, hosted relay, analytics SDK, or action executor.
+- No RuntimeBrief account, hosted relay, or analytics SDK.
 
 ## How it works
 
@@ -61,6 +62,9 @@ model text, and removes all per-request process state afterward.
 Project observation is read-only. The optional decision inbox records an
 approve/reject choice in a private local database; RuntimeBrief does not execute
 the proposed action.
+
+Separately, projects can opt in to starting native Claude Code tasks from iOS.
+Claude owns the conversation, working environment, and tool permissions.
 
 ## Set it up
 
@@ -138,7 +142,36 @@ the server address and daemon token in Settings, then try:
 - *"Ask RuntimeBrief about **<project>."***
 - *"What are my projects up to in RuntimeBrief?"*
 
-### 3. Run in the foreground for development (optional)
+### 3. Start Claude Code tasks (optional)
+
+Install Claude Code and Claude Desktop on your Mac and sign in to both. The
+integration requires native background sessions (`claude --bg`, tested with
+Claude Code 2.1.263). Enable each project explicitly:
+
+```sh
+claude auth login
+runtimebriefd enable-claude <project-id>
+runtimebriefd install-service
+```
+
+This lets clients paired with your daemon token launch tasks for that project.
+In the iOS project screen, tap **New Claude task**, describe the work, and start
+it. Claude runs in Manual permission mode and may create its own worktree.
+Tool requests and workspace trust are handled in Claude on your Mac.
+
+Tap **Open in Claude Desktop** to stop the background response and move its
+saved conversation to Desktop through Claude's native `/desktop` command. Send
+a follow-up there to continue interrupted work. Later taps open the app; choose
+the RuntimeBrief task in its sidebar. RuntimeBrief never resumes a conversation
+again after handing it to Desktop. The Mac must be awake and Desktop usable.
+
+To revoke launches and handoff requests, run `runtimebriefd disable-claude
+<project-id>` and reinstall the service. Existing Claude tasks keep running.
+Launch prompts go directly to the local Claude process; RuntimeBrief stores
+delivery receipts and a request fingerprint, not another copy of the prompt.
+See [session control](docs/session-control.md) for recovery and takeover details.
+
+### 4. Run in the foreground for development (optional)
 
 ```sh
 launchctl unload "$HOME/Library/LaunchAgents/com.runtimebrief.daemon.plist"
@@ -150,7 +183,7 @@ current terminal and stops on **Ctrl-C**; do not run it alongside the launchd
 job on the same port. When finished, run `runtimebriefd install-service` again
 to restore the normal background service.
 
-### 4. Connect ChatGPT or Codex
+### 5. Connect ChatGPT or Codex
 
 The repository includes a local RuntimeBrief plugin and MCP server. Build and
 link the daemon first, then install the repository marketplace:
@@ -170,8 +203,8 @@ Start a new ChatGPT desktop or Codex thread after installation. Example asks:
 The MCP tools are `list_attention`, `get_project_evidence`,
 `list_pending_decisions`, and `resolve_decision`. Resolution records the user's
 choice but never executes it. Another authenticated local client must
-explicitly propose an allowlisted action through REST; no proposal generator or
-executor ships in this repository.
+explicitly propose an allowlisted action through REST. Native Claude launches
+use separate opt-in REST routes; MCP decision resolution does not launch tasks.
 
 ## API
 
@@ -188,6 +221,9 @@ All endpoints require `Authorization: Bearer <token>` and are rate-limited to
 | `POST /v1/projects/:id/actions` | Propose an allowlisted decision; never executes it |
 | `GET /v1/actions` | Unexpired pending decisions |
 | `POST /v1/actions/:id/decision` | Idempotently record approve/reject |
+| `GET /v1/projects/:id/claude-launches` | Claude capability and recent delivery receipts |
+| `POST /v1/projects/:id/claude-launches` | Start a native task with `{ requestId, prompt }` |
+| `POST /v1/projects/:id/claude-launches/:launchId/open` | Hand the saved session to Claude Desktop |
 
 `/status` and `/ask` can return buffered Server-Sent Events (`chunk`, `done`,
 `error`) or JSON `{ answer, costUsd, cached, truncated, evidence }`. The

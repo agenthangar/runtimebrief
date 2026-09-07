@@ -10,6 +10,7 @@ enum RuntimeBriefError: Error, LocalizedError, Equatable {
     case decoding(String)
     case network(String)
     case timeout
+    case launch(String)
 
     var errorDescription: String? {
         switch self {
@@ -31,6 +32,8 @@ enum RuntimeBriefError: Error, LocalizedError, Equatable {
             return "Couldn't reach your Mac: \(detail)"
         case .timeout:
             return "Couldn't reach your Mac — the request timed out."
+        case .launch(let message):
+            return message
         }
     }
 }
@@ -63,6 +66,7 @@ extension URLSession: HTTPTransport {
 
 /// Async/await client for the runtimebriefd /v1 API.
 struct RuntimeBriefClient: Sendable {
+    private struct LaunchFailure: Decodable { let message: String? }
     let settings: ServerSettings
     let transport: any HTTPTransport
     let timeout: TimeInterval
@@ -81,6 +85,34 @@ struct RuntimeBriefClient: Sendable {
 
     func health() async throws -> HealthInfo {
         try await getJSON("/v1/health")
+    }
+
+    func claudeLaunches(projectID: String) async throws -> ClaudeLaunchList {
+        try await getJSON("/v1/projects/\(escape(projectID))/claude-launches")
+    }
+
+    func startClaude(projectID: String, request: ClaudeLaunchRequest) async throws -> ClaudeLaunch {
+        try await launchRequest(path: "/v1/projects/\(escape(projectID))/claude-launches", body: JSONEncoder().encode(request))
+    }
+
+    func openClaude(projectID: String, launchID: String) async throws -> ClaudeLaunch {
+        try await launchRequest(path: "/v1/projects/\(escape(projectID))/claude-launches/\(escape(launchID))/open", body: Data("{}".utf8))
+    }
+
+    private func launchRequest<T: Decodable>(path: String, body: Data) async throws -> T {
+        var request = try makeRequest(path: path)
+        request.httpMethod = "POST"
+        request.timeoutInterval = max(timeout, 45)
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = body
+        let (data, response) = try await perform(request)
+        if let http = response as? HTTPURLResponse, [400, 403, 409, 503].contains(http.statusCode) {
+            if let failure = try? JSONDecoder().decode(LaunchFailure.self, from: data), let message = failure.message {
+                throw RuntimeBriefError.launch(message)
+            }
+        }
+        try check(response)
+        return try decode(data)
     }
 
     func projects() async throws -> [ProjectSummary] {

@@ -277,6 +277,23 @@ enum DemoData {
 }
 
 struct DemoRuntimeBriefDataSource: RuntimeBriefDataSource {
+    func claudeLaunches(projectID: String) async throws -> ClaudeLaunchList {
+        _ = try DemoData.card(id: projectID)
+        return await DemoClaudeTasks.shared.list(projectID: projectID)
+    }
+
+    func startClaude(projectID: String, request: ClaudeLaunchRequest) async throws -> ClaudeLaunch {
+        _ = try DemoData.card(id: projectID)
+        return await DemoClaudeTasks.shared.start(projectID: projectID, requestID: request.requestId)
+    }
+
+    func openClaude(projectID: String, launchID: String) async throws -> ClaudeLaunch {
+        _ = try DemoData.card(id: projectID)
+        guard let launch = await DemoClaudeTasks.shared.list(projectID: projectID).launches.first(where: { $0.id == launchID }) else {
+            throw RuntimeBriefError.notFound
+        }
+        return launch
+    }
     func projects() async throws -> [ProjectSummary] {
         DemoData.projects
     }

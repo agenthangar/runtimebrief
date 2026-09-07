@@ -41,6 +41,7 @@ struct ProjectDetailView: View {
                     .accessibilityIdentifier("demo-detail-banner")
                 }
                 briefSection
+                ClaudeLaunchView(project: project)
                 if let error = errorMessage {
                     ErrorBanner(message: error)
                 }

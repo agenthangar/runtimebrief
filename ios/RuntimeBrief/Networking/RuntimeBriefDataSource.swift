@@ -7,6 +7,9 @@ protocol RuntimeBriefDataSource: Sendable {
     func project(id: String) async throws -> ProjectCard
     func status(projectID: String) async throws -> AnalystAnswer
     func ask(projectID: String, question: String) async throws -> AnalystAnswer
+    func claudeLaunches(projectID: String) async throws -> ClaudeLaunchList
+    func startClaude(projectID: String, request: ClaudeLaunchRequest) async throws -> ClaudeLaunch
+    func openClaude(projectID: String, launchID: String) async throws -> ClaudeLaunch
     func streamStatus(projectID: String) -> AsyncThrowingStream<AnalystStreamEvent, Error>
     func streamAsk(
         projectID: String,
@@ -27,6 +30,18 @@ struct LiveRuntimeBriefDataSource: RuntimeBriefDataSource {
 
     func projects() async throws -> [ProjectSummary] {
         try await client.projects()
+    }
+
+    func claudeLaunches(projectID: String) async throws -> ClaudeLaunchList {
+        try await client.claudeLaunches(projectID: projectID)
+    }
+
+    func startClaude(projectID: String, request: ClaudeLaunchRequest) async throws -> ClaudeLaunch {
+        try await client.startClaude(projectID: projectID, request: request)
+    }
+
+    func openClaude(projectID: String, launchID: String) async throws -> ClaudeLaunch {
+        try await client.openClaude(projectID: projectID, launchID: launchID)
     }
 
     func project(id: String) async throws -> ProjectCard {

@@ -2,12 +2,6 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>RUNTIMEBRIEF_E2E_SERVER_URL</key>
-	<string>$(RUNTIMEBRIEF_E2E_SERVER_URL)</string>
-	<key>RUNTIMEBRIEF_E2E_TOKEN</key>
-	<string>$(RUNTIMEBRIEF_E2E_TOKEN)</string>
-	<key>RUNTIMEBRIEF_E2E_PROJECT_ID</key>
-	<string>$(RUNTIMEBRIEF_E2E_PROJECT_ID)</string>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleExecutable</key>
@@ -24,5 +18,13 @@
 	<string>1.0</string>
 	<key>CFBundleVersion</key>
 	<string>1</string>
+	<key>RUNTIMEBRIEF_E2E_CLAUDE_LIVE</key>
+	<string>$(RUNTIMEBRIEF_E2E_CLAUDE_LIVE)</string>
+	<key>RUNTIMEBRIEF_E2E_PROJECT_ID</key>
+	<string>$(RUNTIMEBRIEF_E2E_PROJECT_ID)</string>
+	<key>RUNTIMEBRIEF_E2E_SERVER_URL</key>
+	<string>$(RUNTIMEBRIEF_E2E_SERVER_URL)</string>
+	<key>RUNTIMEBRIEF_E2E_TOKEN</key>
+	<string>$(RUNTIMEBRIEF_E2E_TOKEN)</string>
 </dict>
 </plist>

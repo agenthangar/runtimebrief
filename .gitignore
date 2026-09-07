@@ -19,6 +19,8 @@ dist/
 !.xcconfig.example
 .runtimebrief/
 .claude/
+.revyl/
+build/
 
 # Xcode / XcodeGen output
 ios/*.xcodeproj

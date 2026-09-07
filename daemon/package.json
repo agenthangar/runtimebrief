@@ -19,7 +19,8 @@
     "pretest": "npm run build",
     "test": "vitest run",
     "prebuild": "node scripts/clean.mjs",
-    "build": "tsc && node scripts/ensure-cli-executable.mjs",
+    "build": "tsc && node scripts/ensure-cli-executable.mjs && node scripts/ensure-native-helpers.mjs",
+    "postinstall": "node scripts/ensure-native-helpers.mjs",
     "prepack": "npm run build",
     "dev": "tsx src/cli.ts"
   },
@@ -40,6 +41,7 @@
     "@modelcontextprotocol/sdk": "^1.30.0",
     "better-sqlite3": "^12.11.1",
     "fastify": "^5.10.0",
+    "node-pty": "^1.1.0",
     "yaml": "^2.9.0",
     "zod": "^4.4.3"
   },

@@ -8,6 +8,8 @@ import { registerHealthRoutes } from "./routes/health.js";
 import { registerProjectRoutes } from "./routes/projects.js";
 import { registerAnalystRoutes } from "./routes/analyst.js";
 import { registerDecisionRoutes } from "./routes/decisions.js";
+import { registerLaunchRoutes } from "./routes/launches.js";
+import type { LaunchService } from "./launches/service.js";
 import type { AnalystService } from "./analyst/service.js";
 import type { IosReleaseProvider } from "./iosRelease.js";
 import type { DecisionStore } from "./decisions/store.js";
@@ -21,6 +23,7 @@ export interface ServerDeps {
   analyst: AnalystService;
   iosReleases?: IosReleaseProvider;
   decisions?: DecisionStore;
+  launches?: LaunchService;
 }
 
 /**
@@ -54,6 +57,8 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
     registerProjectRoutes(app, deps);
     registerAnalystRoutes(app, deps);
     registerDecisionRoutes(app, deps);
+    registerLaunchRoutes(app, deps);
+    if (deps.launches) app.addHook("onClose", async () => { deps.launches?.close(); });
 
     if (deps.decisions) {
       app.addHook("onClose", async () => {

@@ -17,7 +17,7 @@ fail() {
 
 if command -v gitleaks >/dev/null 2>&1; then
   debug "gitleaks"
-  if [[ -d "$scan_root/.git" ]]; then
+  if git -C "$scan_root" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
     if ! gitleaks git "$scan_root" --log-opts=-1 --redact --no-banner \
       --exit-code 1 >/dev/null; then
       fail "gitleaks found credential-like content in the current commit"
@@ -43,7 +43,7 @@ scan_private_term() {
   local label="$1"
   local term="$2"
   if [[ ${#term} -ge 4 ]] && rg -l -F --hidden \
-    -g '!**/.git/**' -g '!**/node_modules/**' -g '!**/dist/**' \
+    -g '!**/.git/**' -g '!**/.git' -g '!**/node_modules/**' -g '!**/dist/**' \
     -g '!**/*.xcodeproj/**' -g '!**/DerivedData/**' \
     -g '!scripts/verify-release-privacy.sh' \
     -- "$term" "$scan_root" >/dev/null 2>&1; then
@@ -73,7 +73,7 @@ scan_private_term "local computer name" "$(scutil --get ComputerName 2>/dev/null
 scan_private_term "local Bonjour hostname" "$(scutil --get LocalHostName 2>/dev/null || true)"
 
 debug "generic paths"
-if rg -l --hidden -g '!**/.git/**' -g '!**/node_modules/**' \
+if rg -l --hidden -g '!**/.git/**' -g '!**/.git' -g '!**/node_modules/**' \
   -g '!**/dist/**' -g '!**/*.xcodeproj/**' \
   -g '!scripts/verify-release-privacy.sh' \
   -g '!ios/RuntimeBriefTests/DemoDataTests.swift' \
@@ -82,7 +82,7 @@ if rg -l --hidden -g '!**/.git/**' -g '!**/node_modules/**' \
   fail "a non-fictional absolute macOS user path is present"
 fi
 
-if rg -l --hidden -g '!**/.git/**' -g '!**/node_modules/**' \
+if rg -l --hidden -g '!**/.git/**' -g '!**/.git' -g '!**/node_modules/**' \
   -g '!**/dist/**' -g '!**/*.xcodeproj/**' \
   -g '!scripts/verify-release-privacy.sh' \
   -g '!ios/RuntimeBriefTests/DemoDataTests.swift' \
@@ -91,7 +91,7 @@ if rg -l --hidden -g '!**/.git/**' -g '!**/node_modules/**' \
   fail "a non-fictional absolute Linux user path is present"
 fi
 
-if rg -l --hidden -g '!**/.git/**' -g '!**/node_modules/**' \
+if rg -l --hidden -g '!**/.git/**' -g '!**/.git' -g '!**/node_modules/**' \
   -g '!**/dist/**' -g '!**/*.xcodeproj/**' \
   -g '!scripts/verify-release-privacy.sh' \
   -g '!ios/RuntimeBriefTests/DemoDataTests.swift' \

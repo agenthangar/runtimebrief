@@ -21,6 +21,9 @@ import { IosReleaseService } from "./iosRelease.js";
 import { projectsForConfig } from "./projectRegistry.js";
 import { DecisionStore } from "./decisions/store.js";
 import { runRuntimeBriefMcpStdio } from "./mcp/server.js";
+import { LaunchService, CLAUDE_LAUNCH_ACTION } from "./launches/service.js";
+import { LaunchStore } from "./launches/store.js";
+import { NativeClaudeProvider } from "./launches/claude.js";
 
 const commandNames = [
   "init",
@@ -29,12 +32,16 @@ const commandNames = [
   "add-project",
   "add-project-root",
   "install-service",
+  "enable-claude",
+  "disable-claude",
   "mcp",
 ] as const;
 
 type CommandName = (typeof commandNames)[number];
 
 const commandHelp: Record<CommandName, string> = {
+  "enable-claude": `Usage: runtimebriefd enable-claude <project-id>\n\nAllow paired clients to start native Claude Code tasks in this project.\nClaude handles tool permissions. Restart the daemon after changing this setting.`,
+  "disable-claude": `Usage: runtimebriefd disable-claude <project-id>\n\nRevoke new Claude launches and takeover requests for this project.\nExisting native Claude sessions keep running. Restart the daemon afterwards.`,
   init: `Usage:
   runtimebriefd init
 
@@ -88,6 +95,8 @@ Usage:
   runtimebriefd add-project-root <path> Trust a directory and auto-discover its
                                        direct child Git repositories
   runtimebriefd install-service        Install a launchd service (macOS)
+  runtimebriefd enable-claude <id>      Allow native Claude launches for a project
+  runtimebriefd disable-claude <id>     Revoke launch access for a project
   runtimebriefd mcp                    Serve RuntimeBrief tools over MCP stdio
 
 Options:
@@ -228,8 +237,9 @@ async function cmdStart(allowAll: boolean): Promise<void> {
   const iosReleases = new IosReleaseService();
   const analyst = createAnalystService(config, adapters, { iosReleases });
   const decisions = new DecisionStore();
+  const launches = new LaunchService(config, new NativeClaudeProvider(), new LaunchStore());
   const app = await startServer(
-    { config, adapters, analyst, iosReleases, decisions },
+    { config, adapters, analyst, iosReleases, decisions, launches },
     { allowAllInterfaces: allowAll },
   );
   console.log(
@@ -412,6 +422,23 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<void
     case "install-service":
       rejectUnexpected(command, rest);
       return cmdInstallService();
+    case "enable-claude":
+    case "disable-claude": {
+      if (rest.length !== 1) throw new Error(commandHelp[command]);
+      const config = loadConfig();
+      const project = projectsForConfig(config).find(p => p.id === rest[0]);
+      if (!project) throw new Error("Unknown project. Register the project first.");
+      let explicit = config.projects.find(p => p.id === project.id);
+      if (!explicit) {
+        explicit = { id: project.id, name: project.name, path: fs.realpathSync(project.path), allowed_actions: [] };
+        config.projects.push(explicit);
+      }
+      explicit.allowed_actions = explicit.allowed_actions.filter(action => action !== CLAUDE_LAUNCH_ACTION);
+      if (command === "enable-claude") explicit.allowed_actions.push(CLAUDE_LAUNCH_ACTION);
+      saveConfig(config);
+      console.log(`Claude launches ${command === "enable-claude" ? "enabled" : "disabled"} for ${project.id}. Restart the daemon to apply.`);
+      return;
+    }
     case "mcp":
       rejectUnexpected(command, rest);
       return cmdMcp();

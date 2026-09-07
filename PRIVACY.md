@@ -27,6 +27,26 @@ app preferences. That snapshot can include project identifiers and names,
 branches, briefs, attention state, and evidence labels. It stores the daemon
 bearer token in the iOS Keychain. Siri and App Shortcuts may receive project
 names needed to resolve RuntimeBrief requests under Apple's platform behavior.
+For Claude launches, app preferences also keep an opaque request ID indexed by
+a fingerprint of the server, project, and task, so a retry can avoid duplicate
+dispatch. The app does not persist the task text in this retry record.
+
+## Native Claude tasks
+
+When a project explicitly enables Claude launches, a paired iOS client can send
+a task description to the Mac daemon. RuntimeBrief passes it to the local
+Claude Code process using the user's existing Claude login and normal project
+configuration. Claude can process the prompt and project contents through its
+own services and tools, subject to Claude's account policies and tool
+permissions. This is a coding session with Manual permission mode, separate
+from RuntimeBrief's isolated evidence analyst.
+
+RuntimeBrief stores a launch receipt, native session identifiers, working
+directory, status, and a request fingerprint. It does not retain the prompt or
+subprocess output in its launch database or logs. Claude retains its own native
+conversation and authentication. RuntimeBrief checks only Claude's sign-in
+status and reads session metadata, including the Desktop catalog, to confirm
+identity. Takeover uses Claude's native CLI-to-Desktop handoff.
 
 ## Codex analyst requests
 
@@ -103,6 +123,9 @@ RuntimeBrief data remains until it is manually removed:
 - `~/.runtimebrief/decisions.db` and sidecars contain proposal descriptions,
   parameters, status, and resolution data. Expiry changes whether a proposal is
   actionable; it does not delete the row.
+- `~/.runtimebrief/launches.db` and sidecars contain native task receipts and
+  request fingerprints. Removing these records also removes duplicate-request
+  protection; it does not stop or delete Claude's own sessions.
 - `~/.runtimebrief/logs/` contains launchd stdout and stderr.
 - Codex CLI owns its saved ChatGPT OAuth login outside the RuntimeBrief data
   directory. When `auth.json` storage is used, RuntimeBrief validates only the
@@ -114,8 +137,8 @@ RuntimeBrief data remains until it is manually removed:
   retain or log account metadata, email addresses, or tokens and requests no
   auth token field. The link and isolated homes are removed after every request.
 
-Removing a project from configuration does not purge cached answers or decision
-rows. Uninstalling the npm package or daemon does not delete
+Removing a project from configuration does not purge cached answers, decision
+rows, or launch receipts. Uninstalling the npm package or daemon does not delete
 `~/.runtimebrief`.
 
 To remove local daemon data, stop and unload the service, then delete the
@@ -136,6 +159,9 @@ may stop it at any time. Trusting a project root opts in every current and
 future non-hidden direct child Git repository under that root. Users also
 choose whether to install and sign in to Codex CLI, configure App Store Connect
 access, use an iOS client or Tailscale, or connect an MCP client.
+Claude launches require a separate per-project opt-in. Revoking that grant
+blocks new launches and handoff requests after daemon restart; it does not stop
+existing native Claude tasks or delete their history.
 
 ## Changes
 

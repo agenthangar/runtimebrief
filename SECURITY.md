@@ -61,7 +61,19 @@ RuntimeBrief is designed for a user-controlled Mac and private network:
   plugin still requires trusting the package and plugin source.
 - Action proposals are denied unless their kind is allowlisted for the project.
   Resolving a decision is idempotent, expires with the proposal, and only
-  updates RuntimeBrief's local decision database. No action executor exists.
+  updates RuntimeBrief's local decision database. It does not execute proposals.
+- Native Claude launches require an explicit `launch-claude` grant for each
+  project, plus the existing authenticated daemon client. Discovered projects
+  never receive this grant automatically. All paired clients share its scope.
+  Claude uses Manual permission mode and its normal project configuration;
+  native tool permissions, hooks, and workspace trust belong to Claude.
+  This execution path is separate from the isolated evidence analyst.
+- Launch commands use argument arrays, with task text after `--`. A durable
+  receipt precedes dispatch, and an uncertain result is reconciled without
+  replaying the prompt. Handoff stops the exact native background session,
+  honors native writer locks, and uses `/desktop`; RuntimeBrief never writes
+  native transcripts or forwards tool approvals. After handoff it only opens
+  Desktop, even if the native catalog entry later disappears.
 - Repository paths that commonly contain credentials are filtered before
   context is constructed. Filtering reduces risk but is not a substitute for
   reviewing which repositories and transcripts are made available.
