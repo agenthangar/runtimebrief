@@ -1,6 +1,6 @@
 # RuntimeBrief App Store listing
 
-This file is listing copy for iOS 1.0 build 16 or newer. Repository edits do
+This file is listing copy for iOS 1.0.1 build 17. Repository edits do
 not update App Store Connect or replace a submitted build; use this copy only
 with a compatible binary and verify its review/release state separately.
 Do not paste live
@@ -14,7 +14,7 @@ App Store Connect.
 - Primary category: Developer Tools
 - Secondary category: Productivity
 - Price: Free
-- Availability: All eligible storefronts
+- Availability: Preserve the configured storefronts; China mainland is excluded
 - Privacy policy: <https://github.com/agenthangar/runtimebrief/blob/main/PRIVACY.md>
 - Support: <https://github.com/agenthangar/runtimebrief/issues>
 - Marketing: <https://github.com/agenthangar/runtimebrief>
@@ -50,11 +50,26 @@ A Mac running runtimebriefd is required for live project data. The in-app demo
 can be explored without installing or configuring anything. Native tasks also
 require Claude Code and Claude Desktop installed and signed in on that Mac.
 
+## What's new in 1.0.1
+
+Start Claude Code tasks from any registered project on your Mac. Choose a
+model and permission mode, then take over the same conversation in Claude
+Desktop. Check the permission mode in Desktop before continuing.
+
+Connection checks now verify project data, the app refreshes when reopened,
+and saved briefs show refresh errors. Project briefs prioritize current work
+and keep older stopped-session notices out of your way.
+
+Update runtimebriefd on your Mac to use these improvements.
+
 ## Keywords
 
 `coding agents,developer tools,git,projects,status,workflow,Siri,local`
 
 ## Review notes
+
+Version 1.0.1 (build 17) adds native Claude task launch with model and
+permission choices. China mainland remains excluded from availability.
 
 RuntimeBrief is a companion to the user-operated runtimebriefd daemon. App
 Review does not need network access, an account, credentials, another device,

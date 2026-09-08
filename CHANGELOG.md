@@ -1,6 +1,12 @@
 # Release notes
 
-## Unreleased
+## 1.0.1 (17) — 2026-09-08
+
+- Bring the Claude task launch and connection improvements from TestFlight
+  build 16 to the App Store: start tasks in registered projects by default,
+  select a model and permission mode, and take over in Claude Desktop.
+- Verify project data during connection checks, refresh on return to the app,
+  and show refresh errors alongside saved briefs.
 
 - Order brief evidence by session time instead of adapter discovery order.
   Prioritize current changes and completed work over stopped-session notices,
