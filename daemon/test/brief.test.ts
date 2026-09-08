@@ -77,8 +77,8 @@ describe("deterministic project briefs", () => {
 
   it("does not mark stale work or a dirty tree as attention", () => {
     const old = session({
-      startedAt: new Date("2026-07-29T10:00:00.000Z"),
-      endedAt: new Date("2026-07-29T10:30:00.000Z"),
+      startedAt: new Date("2026-07-30T10:00:00.000Z"),
+      endedAt: new Date("2026-07-30T10:30:00.000Z"),
     });
     const brief = buildProjectBrief("RuntimeBrief", git({ dirty: true, dirtyFileCount: 2 }), [old], now);
     expect(brief.state).toBe("recent");
@@ -158,6 +158,77 @@ describe("deterministic project briefs", () => {
     expect(brief.claims.map((claim) => claim.text).join(" ")).not.toContain(
       "Older Codex CLI task",
     );
+  });
+
+  it.each(["cursor", "codex", "claude-code"])(
+    "does not repeat weeks-old %s stops ahead of current changes",
+    (source) => {
+      const stopped = session({
+        source, state: "interrupted",
+        startedAt: new Date("2026-07-16T10:00:00Z"),
+        endedAt: new Date("2026-07-16T10:30:00Z"),
+      });
+      const brief = buildProjectBrief("Fixture", git(), [stopped], now);
+      expect(brief.state).toBe("recent");
+      expect(brief.claims[0]?.text).toBe("Latest commit: Add portfolio brief.");
+      expect(brief.claims.some((claim) => claim.id.startsWith("interrupted-"))).toBe(false);
+      expect(brief.headlineEvidence[0]?.kind).toBe("commit");
+      expect(brief.headlineEvidence[0]?.timestamp).toBe(git().lastCommitAt);
+    },
+  );
+
+  it.each(["interrupted", "active"] as const)(
+    "expires %s lifecycle notices after 24 hours on subsequent scans",
+    (state) => {
+      const recorded = session({ state });
+      const recent = buildProjectBrief("Fixture", null, [recorded], now);
+      expect(recent.claims[0]?.id).toMatch(/^(interrupted|active)-/);
+      const later = buildProjectBrief(
+        "Fixture", null, [recorded], new Date("2026-07-31T20:00:00Z"),
+      );
+      expect(later.state).toBe("quiet");
+      expect(later.claims[0]?.text).toContain("Earlier sessions are available in session history");
+      expect(later.claims.some((claim) => /^(interrupted|stale)-/.test(claim.id))).toBe(false);
+      expect(recorded.state).toBe(state);
+    },
+  );
+
+  it("puts meaningful work ahead of recent stopped-session context", () => {
+    const stopped = session({ source: "cursor", state: "interrupted" });
+    const finished = session({
+      id: "finished", state: "completed", endedAt: new Date("2026-07-30T19:59:00Z"),
+    });
+    const brief = buildProjectBrief("Fixture", git({ dirty: true, dirtyFileCount: 2 }), [stopped, finished], now);
+    expect(brief.claims.map((claim) => claim.id)).toEqual([
+      "dirty-working-tree", "completed-codex-finished", `commit-${"a".repeat(40)}`,
+      "interrupted-cursor-session-123",
+    ]);
+    expect(brief.headlineEvidence[0]?.id).toBe("session-codex-finished");
+  });
+
+  it("chooses the newest completed session even when input is unordered", () => {
+    const older = session({ id: "older", state: "completed", endedAt: new Date("2026-07-30T19:00:00Z") });
+    const newer = session({ id: "newer", state: "completed" });
+    const sessions = [older, newer];
+    const brief = buildProjectBrief("Fixture", git(), sessions, now);
+    expect(brief.claims[0]?.id).toBe("completed-codex-newer");
+    expect(brief.headlineEvidence[0]?.id).toBe("session-codex-newer");
+    expect(sessions).toEqual([older, newer]);
+  });
+
+  it("does not expire unresolved input requests along with old stops", () => {
+    const waiting = session({ state: "waiting", endedAt: new Date("2026-07-16T10:30:00Z") });
+    const brief = buildProjectBrief("Fixture", git(), [waiting], now);
+    expect(brief.state).toBe("attention");
+    expect(brief.claims[0]?.category).toBe("attention");
+  });
+
+  it("does not present undated or future-dated stops as recent events", () => {
+    const brief = buildProjectBrief("Fixture", git(), [
+      session({ state: "interrupted", startedAt: undefined, endedAt: undefined }),
+      session({ id: "future", state: "interrupted", endedAt: new Date("2026-08-01T10:00:00Z") }),
+    ], now);
+    expect(brief.claims.some((claim) => claim.id.startsWith("interrupted-"))).toBe(false);
   });
 
   it("returns an evidence-backed unavailable state for unreadable projects", () => {

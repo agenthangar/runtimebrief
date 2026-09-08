@@ -67,6 +67,31 @@ describe("PortfolioService", () => {
     expect(result?.unknownEvidenceIds).toEqual(["missing-evidence"]);
   });
 
+  it("omits old stopped notices from the portfolio while retaining session history and evidence", async () => {
+    const stopped: TranscriptRef = {
+      source: "cursor", id: "old-stop", path: "/private/old-stop.jsonl",
+      state: "interrupted", stateReason: "The user stopped the turn.",
+      endedAt: new Date("2026-07-16T10:00:00Z"),
+    };
+    const adapter: RuntimeAdapter = {
+      id: "fixture-sessions", discover: async () => true,
+      recentActivity: async () => [], transcriptPaths: async () => [stopped],
+    };
+    const portfolio = new PortfolioService(
+      () => [{ id: "fixture", name: "Fixture", path: "/fixture" }],
+      [adapter], () => new Date("2026-07-31T12:00:00Z"),
+    );
+    const entries = await portfolio.listProjects();
+    const card = await portfolio.getProject("fixture");
+    expect(entries[0]?.brief.state).toBe("quiet");
+    expect(entries[0]?.brief.claims[0]?.text).not.toContain("stopped session");
+    expect(card?.brief).toEqual(entries[0]?.brief);
+    expect(card?.sessions).toContainEqual(expect.objectContaining({ id: "old-stop", state: "interrupted" }));
+    expect((await portfolio.getProjectEvidence("fixture", ["session-cursor-old-stop"]))?.evidence)
+      .toContainEqual(expect.objectContaining({ id: "session-cursor-old-stop" }));
+    expect(await portfolio.listAttention()).toEqual([]);
+  });
+
   it("reads the project provider again on every registry read", async () => {
     repo = makeFixtureRepo();
     const projects: ProjectConfig[] = [];

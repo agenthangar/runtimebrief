@@ -138,20 +138,29 @@ export function buildProjectBrief(
 ): ProjectBrief {
   const available = git !== null || sessions.length > 0;
   const latest = latestTimestamp(git, sessions);
-  const latestObservedSession = latestSession(sessions);
-  const active = sessions.filter(
+  // Adapters need not return sessions in timestamp order. Never let an older
+  // record win simply because its source was scanned first.
+  const orderedSessions = [...sessions].sort(
+    (a, b) => (sessionTimestamp(b)?.getTime() ?? 0) - (sessionTimestamp(a)?.getTime() ?? 0),
+  );
+  const latestObservedSession = latestSession(orderedSessions);
+  const active = orderedSessions.filter(
     (session) =>
       session.state === "active" &&
       isWithin(sessionTimestamp(session), now, ACTIVE_WINDOW_MS),
   );
-  const staleActive = sessions.filter(
+  const staleActive = orderedSessions.filter(
     (session) =>
       session.state === "active" &&
-      !isWithin(sessionTimestamp(session), now, ACTIVE_WINDOW_MS),
+      !isWithin(sessionTimestamp(session), now, ACTIVE_WINDOW_MS) &&
+      isWithin(sessionTimestamp(session), now, RECENT_WINDOW_MS),
   );
-  const waiting = sessions.filter((session) => session.state === "waiting");
-  const interrupted = sessions.filter((session) => session.state === "interrupted");
-  const completed = sessions.filter((session) => session.state === "completed");
+  const waiting = orderedSessions.filter((session) => session.state === "waiting");
+  const interrupted = orderedSessions.filter(
+    (session) => session.state === "interrupted" &&
+      isWithin(sessionTimestamp(session), now, RECENT_WINDOW_MS),
+  );
+  const completed = orderedSessions.filter((session) => session.state === "completed");
   const claims: BriefClaim[] = [];
 
   for (const session of waiting.slice(0, 2)) {
@@ -174,24 +183,6 @@ export function buildProjectBrief(
     });
   }
 
-  for (const session of interrupted.slice(0, 1)) {
-    claims.push({
-      id: `interrupted-${session.source}-${session.id}`,
-      category: "context",
-      text: `${sourceName(session.source)} recorded a stopped session.`,
-      evidence: [sessionEvidence(session)],
-    });
-  }
-
-  for (const session of staleActive.slice(0, 1)) {
-    claims.push({
-      id: `stale-${session.source}-${session.id}`,
-      category: "context",
-      text: `${sourceName(session.source)} has no completion event after its last recorded activity.`,
-      evidence: [sessionEvidence(session)],
-    });
-  }
-
   if (git?.dirty) {
     claims.push({
       id: "dirty-working-tree",
@@ -201,7 +192,6 @@ export function buildProjectBrief(
     });
   }
 
-  const latestCompleted = completed[0];
   const completedSources = new Set<string>();
   for (const session of completed) {
     if (completedSources.has(session.source)) continue;
@@ -225,12 +215,34 @@ export function buildProjectBrief(
     });
   }
 
+  // The portfolio uses the first claim as its preview. Lifecycle notices are
+  // short-lived context, below work and results; full sessions stay in history.
+  for (const session of interrupted.slice(0, 1)) {
+    claims.push({
+      id: `interrupted-${session.source}-${session.id}`,
+      category: "context",
+      text: `${sourceName(session.source)} recorded a stopped session.`,
+      evidence: [sessionEvidence(session)],
+    });
+  }
+
+  for (const session of staleActive.slice(0, 1)) {
+    claims.push({
+      id: `stale-${session.source}-${session.id}`,
+      category: "context",
+      text: `${sourceName(session.source)} has no completion event after its last recorded activity.`,
+      evidence: [sessionEvidence(session)],
+    });
+  }
+
   if (claims.length === 0) {
     claims.push({
       id: available ? "quiet-scan" : "unavailable-scan",
       category: "context",
       text: available
-        ? "No commits or agent sessions were found in the current scan."
+        ? sessions.length > 0
+          ? "No recent agent activity. Earlier sessions are available in session history."
+          : "No commits or agent sessions were found in the current scan."
         : "Project data could not be read.",
       evidence: [scanEvidence(projectName, available)],
     });
@@ -239,6 +251,14 @@ export function buildProjectBrief(
   let state: ProjectBriefState;
   let headline: string;
   let headlineEvidence: EvidenceRef[];
+  const latestSessionTime = latestObservedSession
+    ? sessionTimestamp(latestObservedSession)?.getTime() ?? Number.NEGATIVE_INFINITY
+    : Number.NEGATIVE_INFINITY;
+  const latestActivityEvidence = latestCommit && Date.parse(latestCommit.timestamp) >= latestSessionTime
+    ? commitEvidence(latestCommit)
+    : latestObservedSession
+      ? sessionEvidence(latestObservedSession)
+      : scanEvidence(projectName, available);
   if (!available) {
     state = "unavailable";
     headline = "Project data is unavailable";
@@ -254,23 +274,11 @@ export function buildProjectBrief(
   } else if (isWithin(latest, now, RECENT_WINDOW_MS)) {
     state = "recent";
     headline = "Recent work is ready to review";
-    headlineEvidence = latestCompleted
-      ? [sessionEvidence(latestCompleted)]
-      : latestObservedSession
-        ? [sessionEvidence(latestObservedSession)]
-        : latestCommit
-          ? [commitEvidence(latestCommit)]
-          : [scanEvidence(projectName, true)];
+    headlineEvidence = [latestActivityEvidence];
   } else {
     state = "quiet";
     headline = "No recent agent activity";
-    headlineEvidence = latestCompleted
-      ? [sessionEvidence(latestCompleted)]
-      : latestObservedSession
-        ? [sessionEvidence(latestObservedSession)]
-        : latestCommit
-          ? [commitEvidence(latestCommit)]
-          : [scanEvidence(projectName, true)];
+    headlineEvidence = [latestActivityEvidence];
   }
 
   return {
