@@ -63,7 +63,7 @@ Project observation is read-only. The optional decision inbox records an
 approve/reject choice in a private local database; RuntimeBrief does not execute
 the proposed action.
 
-Separately, projects can opt in to starting native Claude Code tasks from iOS.
+Paired iOS clients can start native Claude Code tasks in registered projects by default.
 Claude owns the conversation, working environment, and tool permissions.
 
 ## Set it up
@@ -146,27 +146,35 @@ the server address and daemon token in Settings, then try:
 
 Install Claude Code and Claude Desktop on your Mac and sign in to both. The
 integration requires native background sessions (`claude --bg`, tested with
-Claude Code 2.1.263). Enable each project explicitly:
+Claude Code 2.1.263). Registered and discovered projects allow launches by
+default; no per-project setup is needed:
 
 ```sh
 claude auth login
-runtimebriefd enable-claude <project-id>
 runtimebriefd install-service
 ```
 
-This lets clients paired with your daemon token launch tasks for that project.
-In the iOS project screen, tap **New Claude task**, describe the work, and start
-it. Claude runs in Manual permission mode and may create its own worktree.
-Tool requests and workspace trust are handled in Claude on your Mac.
+Clients paired with your daemon token can launch tasks in any registered
+project. In the iOS project screen, tap **New Claude task**, choose the model
+and permissions, describe the work, and start it. Models include your Claude
+default, Fable, Opus, Sonnet, and Haiku. Permissions include Manual (the default),
+Auto, Accept Edits, Plan, Bypass, and Pre-approved Only. Availability depends on
+your Claude version, account, and model. Bypass skips tool permission checks;
+choose it only for trusted work. Claude may create its own worktree and handles
+workspace trust and any tool requests on your Mac.
 
 Tap **Open in Claude Desktop** to stop the background response and move its
 saved conversation to Desktop through Claude's native `/desktop` command. Send
-a follow-up there to continue interrupted work. Later taps open the app; choose
-the RuntimeBrief task in its sidebar. RuntimeBrief never resumes a conversation
+a follow-up there to continue interrupted work. Check Desktop's permission
+mode before continuing: native handoff can apply its own setting even though
+the saved model is restored. The phone receipt shows the original launch
+settings. Later taps open the app; choose the RuntimeBrief task in its sidebar. RuntimeBrief never resumes a conversation
 again after handing it to Desktop. The Mac must be awake and Desktop usable.
 
 To revoke launches and handoff requests, run `runtimebriefd disable-claude
-<project-id>` and reinstall the service. Existing Claude tasks keep running.
+<project-id>` and reinstall the service. This sets `claude_launch_enabled:
+false` in the local project config. Use `enable-claude` to restore launches.
+Existing Claude tasks keep running.
 Launch prompts go directly to the local Claude process; RuntimeBrief stores
 delivery receipts and a request fingerprint, not another copy of the prompt.
 See [session control](docs/session-control.md) for recovery and takeover details.
@@ -204,7 +212,7 @@ The MCP tools are `list_attention`, `get_project_evidence`,
 `list_pending_decisions`, and `resolve_decision`. Resolution records the user's
 choice but never executes it. Another authenticated local client must
 explicitly propose an allowlisted action through REST. Native Claude launches
-use separate opt-in REST routes; MCP decision resolution does not launch tasks.
+use separate authenticated REST routes; MCP decision resolution does not launch tasks.
 
 ## API
 

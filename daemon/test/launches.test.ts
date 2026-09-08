@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
+import { CLAUDE_PERMISSION_MODES } from "../src/launches/types.js";
 import { buildServer } from "../src/server.js";
 import { LaunchStore } from "../src/launches/store.js";
 import { LaunchService } from "../src/launches/service.js";
@@ -16,7 +17,7 @@ afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) awai
 function setup(enabled = true) {
   const dir = tmpdir("claude-launch");
   cleanups.push(() => fs.rmSync(dir, { recursive: true, force: true }));
-  const config = testConfig({ projects: [{ id: "fixture", name: "Fixture", path: dir, allowed_actions: enabled ? ["launch-claude"] : [] }] });
+  const config = testConfig({ projects: [{ id: "fixture", name: "Fixture", path: dir, allowed_actions: [], ...(enabled ? {} : { claude_launch_enabled: false }) }] });
   let native: NativeClaudeSession[] = [];
   const provider: ClaudeProvider = {
     capability: vi.fn(async () => ({ available: true, message: "Ready" })),
@@ -35,6 +36,40 @@ function setup(enabled = true) {
 }
 
 describe("native Claude launch lifecycle", () => {
+  it("allows registered and newly discovered projects by default, but keeps explicit opt-out", async () => {
+    const { service, config, dir, provider } = setup();
+    config.project_roots = [dir];
+    fs.mkdirSync(path.join(dir, "new-project", ".git"), { recursive: true });
+    expect((await service.list("new-project")).capability.available).toBe(true);
+    expect((await service.start("new-project", randomUUID(), "Inspect the new fictional project")).nativeId).toBe("1234abcd");
+    expect(provider.start).toHaveBeenCalledTimes(1);
+    config.projects.push({ id: "new-project", name: "New project", path: path.join(dir, "new-project"), allowed_actions: [], claude_launch_enabled: false });
+    expect((await service.list("new-project")).capability.available).toBe(false);
+    await expect(service.start("new-project", randomUUID(), "Inspect the new fictional project")).rejects.toMatchObject({ statusCode: 403 });
+  });
+
+  it("includes model and permissions in dispatch, receipts, and duplicate detection", async () => {
+    const { service, provider } = setup();
+    const requestId = randomUUID();
+    const options = { model: "sonnet", permissionMode: "bypassPermissions" } as const;
+    const first = await service.start("fixture", requestId, "Fix the fictional export test", options);
+    expect(first).toMatchObject(options);
+    expect(provider.start).toHaveBeenLastCalledWith(first.cwd, first.name, "Fix the fictional export test", options);
+    await service.start("fixture", requestId, "Fix the fictional export test", options);
+    await expect(service.start("fixture", requestId, "Fix the fictional export test", { ...options, permissionMode: "auto" })).rejects.toMatchObject({ statusCode: 409 });
+    await expect(service.start("fixture", requestId, "Fix the fictional export test", { ...options, model: "fable" })).rejects.toMatchObject({ statusCode: 409 });
+    expect(provider.start).toHaveBeenCalledTimes(1);
+  });
+
+  it("recognizes a build-15 default request after upgrading without dispatching again", async () => {
+    const { service, store, provider, dir } = setup();
+    const requestId = randomUUID();
+    const prompt = "Inspect the fictional project";
+    const fingerprint = createHash("sha256").update(JSON.stringify(["fixture", prompt])).digest("hex");
+    store.insert(requestId, fingerprint, { id: randomUUID(), projectId: "fixture", name: "Legacy task", createdAt: new Date().toISOString(), state: "unknown", message: "Check status", nativeId: null, sessionId: null, cwd: dir, openedAt: null });
+    expect((await service.start("fixture", requestId, prompt, { model: "default", permissionMode: "manual" })).name).toBe("Legacy task");
+    expect(provider.start).not.toHaveBeenCalled();
+  });
   it("sends one native task for concurrent duplicate requests and rejects changed payloads", async () => {
     const { service, provider } = setup();
     const id = randomUUID();
@@ -72,7 +107,7 @@ describe("native Claude launch lifecycle", () => {
     const { service, provider, config } = setup(false);
     await expect(service.start("fixture", randomUUID(), "Fix the export test")).rejects.toMatchObject({ statusCode: 403 });
     await expect(service.start("unknown", randomUUID(), "Fix the export test")).rejects.toMatchObject({ statusCode: 404 });
-    config.projects[0]!.allowed_actions.push("launch-claude");
+    config.projects[0]!.claude_launch_enabled = true;
     vi.mocked(provider.capability).mockResolvedValue({ available: false, message: "Sign in to Claude Code." });
     expect(await service.start("fixture", randomUUID(), "Fix the export test")).toMatchObject({ state: "failed", message: "Sign in to Claude Code." });
     expect(provider.start).not.toHaveBeenCalled();
@@ -96,7 +131,7 @@ describe("native Claude launch lifecycle", () => {
     config.projects.push({ id: "other", name: "Other", path: dir, allowed_actions: ["launch-claude"] });
     const receipt = await service.start("fixture", randomUUID(), "Fix the export test");
     await expect(service.open("other", receipt.id)).rejects.toMatchObject({ statusCode: 404 });
-    config.projects[0]!.allowed_actions = [];
+    config.projects[0]!.claude_launch_enabled = false;
     await expect(service.open("fixture", receipt.id)).rejects.toMatchObject({ statusCode: 403 });
     expect(provider.open).not.toHaveBeenCalled();
   });
@@ -115,6 +150,9 @@ describe("Claude launch API", () => {
     for (const prompt of ["", "/desktop", "x".repeat(8_001), "bad\u001bcontrol characters"]) {
       expect((await app.inject({ method: "POST", url, headers: authHeaders(), payload: { requestId: randomUUID(), prompt } })).statusCode).toBe(400);
     }
+    for (const options of [{ model: "--unsafe" }, { permissionMode: "auto; echo bad" }, { model: "unknown-model" }]) {
+      expect((await app.inject({ method: "POST", url, headers: authHeaders(), payload: { requestId: randomUUID(), prompt: "Inspect this project", ...options } })).statusCode).toBe(400);
+    }
     expect(provider.start).not.toHaveBeenCalled();
     const accepted = await app.inject({ method: "POST", url, headers: authHeaders(), payload: { requestId: randomUUID(), prompt: "Inspect the fictional export" } });
     expect(accepted.statusCode).toBe(202);
@@ -123,6 +161,12 @@ describe("Claude launch API", () => {
 });
 
 describe("native command boundary", () => {
+  it.each(CLAUDE_PERMISSION_MODES)("passes the chosen %s permissions and model to Claude", async permissionMode => {
+    const command = vi.fn(async () => "backgrounded · abcdef12 · task");
+    const provider = new NativeClaudeProvider("claude", command);
+    await provider.start("/tmp/fixture", "Fixture", "Inspect the fictional project", { model: "haiku", permissionMode });
+    expect(command).toHaveBeenCalledExactlyOnceWith("claude", ["--bg", "--permission-mode", permissionMode, "--model", "haiku", "--name", "Fixture", "--", "Inspect the fictional project"], "/tmp/fixture");
+  });
   it("passes hostile text as a single prompt argument and uses the acknowledged native ID", async () => {
     const command = vi.fn(async () => "Starting background service…\nbackgrounded · abcdef12 · task\n");
     const provider = new NativeClaudeProvider("/usr/local/bin/claude", command);
@@ -143,7 +187,7 @@ describe("native command boundary", () => {
     const provider = new NativeClaudeProvider("claude", command, handoff, () => desktop);
     await provider.open(receipt);
     expect(command).toHaveBeenCalledWith("claude", ["stop", receipt.nativeId]);
-    expect(handoff).toHaveBeenCalledWith("claude", receipt.sessionId, receipt.cwd);
+    expect(handoff).toHaveBeenCalledWith("claude", receipt.sessionId, receipt.cwd, "manual");
     await provider.open(receipt);
     expect(handoff).toHaveBeenCalledTimes(1);
     expect(command).toHaveBeenLastCalledWith("/usr/bin/open", ["-a", "Claude"]);

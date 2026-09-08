@@ -62,11 +62,14 @@ RuntimeBrief is designed for a user-controlled Mac and private network:
 - Action proposals are denied unless their kind is allowlisted for the project.
   Resolving a decision is idempotent, expires with the proposal, and only
   updates RuntimeBrief's local decision database. It does not execute proposals.
-- Native Claude launches require an explicit `launch-claude` grant for each
-  project, plus the existing authenticated daemon client. Discovered projects
-  never receive this grant automatically. All paired clients share its scope.
-  Claude uses Manual permission mode and its normal project configuration;
-  native tool permissions, hooks, and workspace trust belong to Claude.
+- Native Claude launches require an authenticated daemon client and a registered
+  project. Configured and discovered projects allow launches by default;
+  `claude_launch_enabled: false` explicitly disables launches and handoff for a
+  project. All paired clients share this scope. Clients choose a supported model
+  and native permission mode, defaulting to the configured Claude model and
+  Manual. Bypass explicitly skips tool permission checks. Native permissions,
+  hooks, and workspace trust belong to Claude. Desktop handoff may apply
+  Desktop's own permission setting; the receipt records launch choices only.
   This execution path is separate from the isolated evidence analyst.
 - Launch commands use argument arrays, with task text after `--`. A durable
   receipt precedes dispatch, and an uncertain result is reconciled without

@@ -40,7 +40,7 @@ const commandNames = [
 type CommandName = (typeof commandNames)[number];
 
 const commandHelp: Record<CommandName, string> = {
-  "enable-claude": `Usage: runtimebriefd enable-claude <project-id>\n\nAllow paired clients to start native Claude Code tasks in this project.\nClaude handles tool permissions. Restart the daemon after changing this setting.`,
+  "enable-claude": `Usage: runtimebriefd enable-claude <project-id>\n\nRestore native Claude tasks for a project that was disabled. Launches are enabled by default.\nClaude handles tool permissions. Restart the daemon after changing this setting.`,
   "disable-claude": `Usage: runtimebriefd disable-claude <project-id>\n\nRevoke new Claude launches and takeover requests for this project.\nExisting native Claude sessions keep running. Restart the daemon afterwards.`,
   init: `Usage:
   runtimebriefd init
@@ -95,7 +95,7 @@ Usage:
   runtimebriefd add-project-root <path> Trust a directory and auto-discover its
                                        direct child Git repositories
   runtimebriefd install-service        Install a launchd service (macOS)
-  runtimebriefd enable-claude <id>      Allow native Claude launches for a project
+  runtimebriefd enable-claude <id>      Restore native Claude launches for a project
   runtimebriefd disable-claude <id>     Revoke launch access for a project
   runtimebriefd mcp                    Serve RuntimeBrief tools over MCP stdio
 
@@ -434,7 +434,7 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<void
         config.projects.push(explicit);
       }
       explicit.allowed_actions = explicit.allowed_actions.filter(action => action !== CLAUDE_LAUNCH_ACTION);
-      if (command === "enable-claude") explicit.allowed_actions.push(CLAUDE_LAUNCH_ACTION);
+      explicit.claude_launch_enabled = command === "enable-claude";
       saveConfig(config);
       console.log(`Claude launches ${command === "enable-claude" ? "enabled" : "disabled"} for ${project.id}. Restart the daemon to apply.`);
       return;

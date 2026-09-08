@@ -119,8 +119,8 @@ struct SettingsView: View {
             }
             let settings = ServerSettings(baseURL: url, token: token)
             do {
-                let health = try await RuntimeBriefClient(settings: settings, timeout: 8).health()
-                testResult = .success("Connected — runtimebriefd \(health.version)")
+                let result = try await RuntimeBriefClient(settings: settings).checkConnection()
+                testResult = .success("Connected — \(result.projectCount) projects loaded. Tap Save to use this connection.")
             } catch {
                 testResult = .failure(
                     (error as? RuntimeBriefError)?.errorDescription ?? error.localizedDescription)

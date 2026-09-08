@@ -2,6 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { spawn } from "node-pty";
+import type { ClaudeLaunchOptions } from "./types.js";
 
 /** Read-only confirmation of Claude's own Desktop catalog, also used by our observer. */
 export function desktopHasSession(
@@ -28,11 +29,13 @@ export function desktopHasSession(
   return false;
 }
 
-export type DesktopHandoff = (binary: string, sessionID: string, cwd: string) => Promise<void>;
+export type DesktopHandoff = (binary: string, sessionID: string, cwd: string, permissionMode: ClaudeLaunchOptions["permissionMode"]) => Promise<void>;
 
 /** A terminal is required for the native /desktop command. No keystrokes or approvals are synthesized. */
-export const handoffToDesktop: DesktopHandoff = (binary, sessionID, cwd) => new Promise((resolve, reject) => {
-  const child = spawn(binary, ["--resume", sessionID, "--permission-mode", "manual", "/desktop"], {
+export const handoffToDesktop: DesktopHandoff = (binary, sessionID, cwd, permissionMode) => new Promise((resolve, reject) => {
+  // Native resume restores the saved model. Pass the launch mode to the CLI,
+  // but Desktop may apply its own permission mode after transfer.
+  const child = spawn(binary, ["--resume", sessionID, "--permission-mode", permissionMode, "/desktop"], {
     name: "xterm-256color", cols: 120, rows: 32, cwd,
     env: { ...process.env, NO_COLOR: "1" },
   });

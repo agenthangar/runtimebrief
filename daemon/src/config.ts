@@ -34,6 +34,7 @@ const actionKindSchema = z
   .regex(/^[a-z0-9][a-z0-9-_]*$/, "action kind must be lower-case with - or _");
 
 const projectSchema = z.object({
+  claude_launch_enabled: z.boolean().optional(),
   id: z
     .string()
     .regex(/^[a-z0-9][a-z0-9-_]*$/i, "project id must be alphanumeric with - or _"),

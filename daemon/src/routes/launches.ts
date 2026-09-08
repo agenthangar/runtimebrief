@@ -1,10 +1,12 @@
 import { z } from "zod";
 import type { FastifyInstance } from "fastify";
 import type { ServerDeps } from "../server.js";
-import { LaunchError } from "../launches/types.js";
+import { CLAUDE_MODELS, CLAUDE_PERMISSION_MODES, LaunchError } from "../launches/types.js";
 
 const startSchema = z.object({
   requestId: z.uuid().transform(value => value.toLowerCase()),
+  model: z.enum(CLAUDE_MODELS).default("default"),
+  permissionMode: z.enum(CLAUDE_PERMISSION_MODES).default("manual"),
   prompt: z.string().trim().min(10).max(8_000)
     .refine(value => !value.startsWith("/"), "Describe a task instead of a slash command.")
     .refine(value => !/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(value), "The prompt contains unsupported control characters."),
@@ -28,7 +30,9 @@ export function registerLaunchRoutes(app: FastifyInstance, deps: ServerDeps): vo
       if (!deps.launches) return reply.code(503).send({ error: "launch_unavailable" });
       const body = startSchema.safeParse(req.body);
       if (!body.success) return reply.code(400).send({ error: "invalid_request", message: "Use a task description between 10 and 8,000 characters and a unique request ID." });
-      const receipt = await deps.launches.start(req.params.id, body.data.requestId, body.data.prompt);
+      const receipt = await deps.launches.start(req.params.id, body.data.requestId, body.data.prompt, {
+        model: body.data.model, permissionMode: body.data.permissionMode,
+      });
       return reply.code(202).send(receipt);
     });
     routes.post<{ Params: { id: string; launchId: string } }>("/v1/projects/:id/claude-launches/:launchId/open", async (req, reply) => {

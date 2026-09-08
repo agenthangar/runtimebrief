@@ -33,20 +33,23 @@ dispatch. The app does not persist the task text in this retry record.
 
 ## Native Claude tasks
 
-When a project explicitly enables Claude launches, a paired iOS client can send
-a task description to the Mac daemon. RuntimeBrief passes it to the local
+A paired iOS client can send a task description to the Mac daemon for any
+registered project, including discovered projects, unless launches are explicitly
+disabled for that project. RuntimeBrief passes it to the local
 Claude Code process using the user's existing Claude login and normal project
 configuration. Claude can process the prompt and project contents through its
 own services and tools, subject to Claude's account policies and tool
-permissions. This is a coding session with Manual permission mode, separate
-from RuntimeBrief's isolated evidence analyst.
+permissions. The client chooses the model and permission mode, with Manual as
+the default. Bypass skips tool permission checks when selected. This coding
+session is separate from RuntimeBrief's isolated evidence analyst.
 
 RuntimeBrief stores a launch receipt, native session identifiers, working
-directory, status, and a request fingerprint. It does not retain the prompt or
+directory, requested model and permission mode, status, and a request fingerprint. It does not retain the prompt or
 subprocess output in its launch database or logs. Claude retains its own native
 conversation and authentication. RuntimeBrief checks only Claude's sign-in
 status and reads session metadata, including the Desktop catalog, to confirm
-identity. Takeover uses Claude's native CLI-to-Desktop handoff.
+identity. Takeover uses Claude's native CLI-to-Desktop handoff. Desktop may
+apply its own permission mode when the conversation is transferred.
 
 ## Codex analyst requests
 
@@ -159,8 +162,9 @@ may stop it at any time. Trusting a project root opts in every current and
 future non-hidden direct child Git repository under that root. Users also
 choose whether to install and sign in to Codex CLI, configure App Store Connect
 access, use an iOS client or Tailscale, or connect an MCP client.
-Claude launches require a separate per-project opt-in. Revoking that grant
-blocks new launches and handoff requests after daemon restart; it does not stop
+Claude launches are enabled by default for these registered projects. Setting
+`claude_launch_enabled: false` for a project blocks new launches and handoff
+requests after daemon restart; it does not stop
 existing native Claude tasks or delete their history.
 
 ## Changes

@@ -1,5 +1,13 @@
 export type LaunchState = "starting" | "running" | "needs_input" | "completed" | "failed" | "stopped" | "unknown" | "in_desktop";
 
+export const CLAUDE_MODELS = ["default", "fable", "opus", "sonnet", "haiku"] as const;
+export const CLAUDE_PERMISSION_MODES = ["manual", "auto", "acceptEdits", "plan", "bypassPermissions", "dontAsk"] as const;
+export interface ClaudeLaunchOptions {
+  model: typeof CLAUDE_MODELS[number];
+  permissionMode: typeof CLAUDE_PERMISSION_MODES[number];
+}
+export const DEFAULT_LAUNCH_OPTIONS: ClaudeLaunchOptions = { model: "default", permissionMode: "manual" };
+
 export interface ClaudeLaunch {
   id: string;
   projectId: string;
@@ -11,6 +19,8 @@ export interface ClaudeLaunch {
   sessionId: string | null;
   cwd: string;
   openedAt: string | null;
+  model?: ClaudeLaunchOptions["model"];
+  permissionMode?: ClaudeLaunchOptions["permissionMode"];
 }
 
 export interface LaunchCapability {
@@ -31,7 +41,7 @@ export interface NativeClaudeSession {
 
 export interface ClaudeProvider {
   capability(): Promise<LaunchCapability>;
-  start(cwd: string, name: string, prompt: string): Promise<string>;
+  start(cwd: string, name: string, prompt: string, options?: ClaudeLaunchOptions): Promise<string>;
   sessions(): Promise<NativeClaudeSession[]>;
   desktopHas(sessionID: string): boolean;
   open(launch: ClaudeLaunch): Promise<void>;

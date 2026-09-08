@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct ProjectsListView: View {
+    @Environment(\.scenePhase) private var scenePhase
     @State private var projects: [ProjectSummary] = []
     @State private var errorMessage: String?
     @State private var isLoading = false
@@ -40,6 +41,9 @@ struct ProjectsListView: View {
                 SettingsView()
             }
             .task { await loadSavedThenRefresh() }
+            .onChange(of: scenePhase) { _, phase in
+                if phase == .active { Task { await refresh() } }
+            }
             .refreshable { await refresh() }
         }
     }
@@ -58,7 +62,7 @@ struct ProjectsListView: View {
             }
             if showingSavedBrief, let lastSavedAt {
                 Label {
-                    Text("Mac unavailable — showing the brief saved \(lastSavedAt.formatted(.relative(presentation: .named))).")
+                    Text("Showing the brief saved \(lastSavedAt.formatted(.relative(presentation: .named))).")
                 } icon: {
                     Image(systemName: "externaldrive.badge.exclamationmark")
                 }
@@ -102,6 +106,7 @@ struct ProjectsListView: View {
     }
 
     private func refresh() async {
+        guard !isLoading else { return }
         isLoading = true
         defer { isLoading = false }
         do {
@@ -116,9 +121,7 @@ struct ProjectsListView: View {
             if projects.isEmpty { projects = snapshot.projects }
             lastSavedAt = snapshot.fetchedAt
             showingSavedBrief = !projects.isEmpty
-            errorMessage = showingSavedBrief
-                ? nil
-                : ((error as? RuntimeBriefError)?.errorDescription ?? error.localizedDescription)
+            errorMessage = (error as? RuntimeBriefError)?.errorDescription ?? error.localizedDescription
         }
     }
 

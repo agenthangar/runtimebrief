@@ -3,6 +3,8 @@
  */
 
 export interface ProjectConfig {
+  /** Native launches are enabled unless explicitly disabled for this project. */
+  claude_launch_enabled?: boolean | undefined;
   id: string;
   name: string;
   path: string;

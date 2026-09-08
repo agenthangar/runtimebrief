@@ -13,6 +13,10 @@ struct ClaudeLaunchTests {
         #expect(first.requestId == retry.requestId)
         #expect(ClaudeLaunchDraft.request(projectID: "other", scope: "local", prompt: "Fix the export", defaults: defaults).requestId != first.requestId)
         #expect(ClaudeLaunchDraft.request(projectID: "fixture", scope: "another-mac", prompt: "Fix the export", defaults: defaults).requestId != first.requestId)
+        let configured = ClaudeLaunchDraft.request(projectID: "fixture", scope: "local", prompt: "Fix the export", model: .sonnet, permissionMode: .bypassPermissions, defaults: defaults)
+        #expect(configured.requestId != first.requestId)
+        #expect(ClaudeLaunchDraft.request(projectID: "fixture", scope: "local", prompt: "Fix the export", model: .sonnet, permissionMode: .bypassPermissions, defaults: defaults).requestId == configured.requestId)
+        #expect(ClaudeLaunchDraft.request(projectID: "fixture", scope: "local", prompt: "Fix the export", model: .sonnet, permissionMode: .auto, defaults: defaults).requestId != configured.requestId)
         #expect(!String(describing: defaults.dictionaryRepresentation()).contains("Fix the export"))
         ClaudeLaunchDraft.clear(projectID: "fixture", scope: "local", prompt: "Fix the export", defaults: defaults)
         #expect(ClaudeLaunchDraft.request(projectID: "fixture", scope: "local", prompt: "Fix the export", defaults: defaults).requestId != first.requestId)
@@ -22,7 +26,7 @@ struct ClaudeLaunchTests {
         let transport = MockTransport(stubs: ["/claude-launches": .init(status: 202, body: Data(Self.receipt.utf8))])
         let client = RuntimeBriefClient(settings: .mock, transport: transport)
         let requestID = UUID().uuidString
-        let result = try await client.startClaude(projectID: "fixture", request: ClaudeLaunchRequest(requestId: requestID, prompt: "Investigate export validation"))
+        let result = try await client.startClaude(projectID: "fixture", request: ClaudeLaunchRequest(requestId: requestID, prompt: "Investigate export validation", model: .fable, permissionMode: .auto))
         #expect(result.nativeId == "1234abcd")
         let request = try #require(transport.recorder.requests.first)
         #expect(request.httpMethod == "POST")
@@ -31,6 +35,8 @@ struct ClaudeLaunchTests {
         let body = try #require(JSONSerialization.jsonObject(with: data) as? [String: String])
         #expect(body["requestId"] == requestID)
         #expect(body["prompt"] == "Investigate export validation")
+        #expect(body["model"] == "fable")
+        #expect(body["permissionMode"] == "auto")
     }
 
     @Test func showsActionablePermissionFailure() async throws {
@@ -44,12 +50,13 @@ struct ClaudeLaunchTests {
     @Test func demoLaunchAndTakeoverStayFictional() async throws {
         let source = RuntimeBriefDataSourceFactory.make(isDemo: true)
         let id = UUID().uuidString
-        let task = ClaudeLaunchRequest(requestId: id, prompt: "Never sent to a Mac")
+        let task = ClaudeLaunchRequest(requestId: id, prompt: "Never sent to a Mac", model: .haiku, permissionMode: .bypassPermissions)
         let first = try await source.startClaude(projectID: DemoData.projectID, request: task)
         let retry = try await source.startClaude(projectID: DemoData.projectID, request: task)
         #expect(first == retry)
         #expect(first.message.contains("Demo"))
         #expect(first.sessionId == nil)
+        #expect(first.settingsLabel == "Haiku · Bypass")
         #expect(try await source.openClaude(projectID: DemoData.projectID, launchID: first.id) == first)
     }
 

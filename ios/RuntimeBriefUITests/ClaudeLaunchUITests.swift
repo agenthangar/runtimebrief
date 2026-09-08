@@ -26,19 +26,31 @@ final class ClaudeLaunchUITests: XCTestCase {
         let newTask = app.buttons["new-claude-task"]
         for _ in 0..<4 where !newTask.isHittable { app.swipeUp() }
         XCTAssertTrue(newTask.waitForExistence(timeout: 15))
+        let cards = app.otherElements.matching(NSPredicate(format: "identifier BEGINSWITH %@", "claude-launch-"))
+        let existingIDs = Set(cards.allElementsBoundByIndex.map(\.identifier))
         newTask.tap()
+        app.buttons["claude-model-picker"].tap()
+        app.buttons["Fable"].tap()
+        app.buttons["claude-permissions-picker"].tap()
+        app.buttons["Auto"].tap()
         let prompt = app.textFields["claude-task-prompt"]
         XCTAssertTrue(prompt.waitForExistence(timeout: 5))
         prompt.tap()
         prompt.typeText("Read README.md and reply IOS-NATIVE-HANDOFF-READY. Do not modify files or run commands.")
         app.buttons["start-claude-task"].tap()
         XCTAssertTrue(newTask.waitForExistence(timeout: 50))
-        let ready = app.staticTexts["Ready to review"].firstMatch
-        XCTAssertTrue(ready.waitForExistence(timeout: 90))
-        let takeover = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "take-over-claude-")).firstMatch
+        let newCard = cards.matching(NSPredicate(format: "NOT (identifier IN %@)", Array(existingIDs))).firstMatch
+        XCTAssertTrue(newCard.waitForExistence(timeout: 30))
+        let newID = String(newCard.identifier.dropFirst("claude-launch-".count))
+        let card = app.otherElements["claude-launch-\(newID)"]
+        for _ in 0..<4 where !card.isHittable { app.swipeUp() }
+        XCTAssertTrue(card.staticTexts["Ready to review"].waitForExistence(timeout: 90))
+        let takeover = app.buttons["take-over-claude-\(newID)"]
+        for _ in 0..<4 where !takeover.isHittable { app.swipeUp() }
         XCTAssertTrue(takeover.waitForExistence(timeout: 10))
         takeover.tap()
-        XCTAssertTrue(app.staticTexts["In Claude Desktop"].firstMatch.waitForExistence(timeout: 50))
+        XCTAssertTrue(card.staticTexts["In Claude Desktop"].waitForExistence(timeout: 50))
+        XCTAssertTrue(card.staticTexts["Started with Fable · Auto"].exists)
         let screenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
         screenshot.name = "Live native Claude Desktop handoff"
         screenshot.lifetime = .keepAlways
@@ -61,6 +73,12 @@ final class ClaudeLaunchUITests: XCTestCase {
         let start = app.buttons["start-claude-task"]
         XCTAssertTrue(start.waitForExistence(timeout: 5))
         XCTAssertFalse(start.isEnabled)
+        app.buttons["claude-model-picker"].tap()
+        app.buttons["Sonnet"].tap()
+        app.buttons["claude-permissions-picker"].tap()
+        app.buttons["Auto"].tap()
+        app.buttons["claude-permissions-picker"].tap()
+        app.buttons["Bypass"].tap()
         let prompt = app.textFields["claude-task-prompt"]
         XCTAssertTrue(prompt.exists)
         prompt.tap()
@@ -69,6 +87,7 @@ final class ClaudeLaunchUITests: XCTestCase {
         start.tap()
         XCTAssertTrue(newTask.waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["Demo task ready to review. No work was sent to a Mac."].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Started with Sonnet · Bypass"].exists)
         let screenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
         screenshot.name = "Claude task receipt"
         screenshot.lifetime = .keepAlways

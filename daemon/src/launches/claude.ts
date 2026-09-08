@@ -4,7 +4,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { z } from "zod";
-import type { ClaudeLaunch, ClaudeProvider, LaunchCapability } from "./types.js";
+import { DEFAULT_LAUNCH_OPTIONS, type ClaudeLaunchOptions, type ClaudeLaunch, type ClaudeProvider, type LaunchCapability } from "./types.js";
 import { desktopHasSession, handoffToDesktop, type DesktopHandoff } from "./desktop.js";
 
 const exec = promisify(execFile);
@@ -70,11 +70,12 @@ export class NativeClaudeProvider implements ClaudeProvider {
     return { available: false, message: "Sign in to Claude Code on your Mac with claude auth login, then refresh." };
   }
 
-  async start(cwd: string, name: string, prompt: string): Promise<string> {
+  async start(cwd: string, name: string, prompt: string, options: ClaudeLaunchOptions = DEFAULT_LAUNCH_OPTIONS): Promise<string> {
     // --bg assigns the session ID itself; --session-id is ignored by Claude.
     // argv + -- ensures prompts cannot become shell syntax or CLI flags.
     const output = await this.command(this.binary,
-      ["--bg", "--permission-mode", "manual", "--name", name, "--", prompt], cwd);
+      ["--bg", "--permission-mode", options.permissionMode,
+        ...(options.model === "default" ? [] : ["--model", options.model]), "--name", name, "--", prompt], cwd);
     const id = /backgrounded\s*·\s*([a-f0-9]{8})\b/.exec(output)?.[1];
     if (!id) throw new Error("Claude did not acknowledge a background session");
     return id;
@@ -100,7 +101,7 @@ export class NativeClaudeProvider implements ClaudeProvider {
     // Native stop saves the conversation; normal --resume honors Claude's writer lock.
     // Never use --bg --resume here, because Claude can fork a still-running session.
     await this.command(this.binary, ["stop", launch.nativeId]);
-    await this.handoff(this.binary, launch.sessionId, native.cwd);
+    await this.handoff(this.binary, launch.sessionId, native.cwd, launch.permissionMode ?? "manual");
     if (!this.desktopHas(launch.sessionId)) throw new Error("Desktop has not confirmed the conversation");
   }
 }

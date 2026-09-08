@@ -284,7 +284,7 @@ struct DemoRuntimeBriefDataSource: RuntimeBriefDataSource {
 
     func startClaude(projectID: String, request: ClaudeLaunchRequest) async throws -> ClaudeLaunch {
         _ = try DemoData.card(id: projectID)
-        return await DemoClaudeTasks.shared.start(projectID: projectID, requestID: request.requestId)
+        return await DemoClaudeTasks.shared.start(projectID: projectID, requestID: request.requestId, model: request.model, permissionMode: request.permissionMode)
     }
 
     func openClaude(projectID: String, launchID: String) async throws -> ClaudeLaunch {

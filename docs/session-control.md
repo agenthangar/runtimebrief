@@ -5,35 +5,45 @@ Codex, Cursor, and control of pre-existing Desktop sessions remain research.
 
 ## Implemented Claude flow
 
-Each project requires an explicit local `launch-claude` grant. The authenticated
-iOS client submits a task and a stable request UUID. The daemon reserves a
-private SQLite receipt before launching `claude --bg --permission-mode manual
---name <receipt-name> -- <prompt>`. It records the native short ID from Claude's
-acknowledgment and the conversation UUID from `claude agents --json --all`.
+Registered projects, including automatic discoveries, allow Claude launches by
+default. `claude_launch_enabled: false` is an explicit per-project opt-out. The
+authenticated iOS client submits a task, model, permission mode, and stable
+request UUID. The daemon reserves a private SQLite receipt before launching
+`claude --bg --permission-mode <mode> [--model <alias>] --name <receipt-name>
+-- <prompt>`. The model defaults to Claude's configured model and permissions
+default to Manual; Bypass must be selected explicitly. The daemon records the
+native short ID from Claude's acknowledgment and the conversation UUID from `claude agents --json --all`.
 Claude ignores a supplied `--session-id` in background mode, so RuntimeBrief
 never invents that identity. Prompts are not retained in the receipt database.
 
 Claude owns execution and may create its own worktree. RuntimeBrief follows the
 native working directory and shows running, needs-attention, completed, stopped,
 failed, or uncertain status. A lost HTTP response, daemon restart, or repeated
-request ID does not replay the prompt. Uncertain dispatch is reconciled by the
-unique native task name before any manual retry with a new request ID.
+request ID does not replay the prompt. Model and permission choices participate
+in request identity; changing them cannot silently reuse an existing task.
+Default settings preserve retry compatibility with build 15. Uncertain dispatch
+is reconciled by the unique native task name before any manual retry with a new request ID.
 
 **Open in Claude Desktop** stops the exact background owner and uses normal
-`claude --resume <conversation-uuid> --permission-mode manual /desktop` in a
+`claude --resume <conversation-uuid> --permission-mode <launch-mode> /desktop` in a
 terminal. This honors native writer locks and avoids background resume's
 possible fork behavior. Claude's own Desktop catalog is read only to verify the
 same conversation ID. Once handed off, RuntimeBrief only opens Desktop; it
 never resumes the saved CLI conversation again, including after archiving.
 The user selects the task in Desktop and sends a follow-up to continue work
-interrupted by the handoff. Tool approvals remain in Claude.
+interrupted by the handoff. Native resume restores the saved model. Verified
+with Claude Code 2.1.263 and the installed Desktop app: initial Auto and Bypass
+tasks perform the requested writes, but Desktop handoff can reset Bypass to
+Desktop's own permission mode. The receipt labels settings as the original
+launch choices, and the UI asks the user to check Desktop's mode before a
+follow-up. Tool approvals and mode changes remain in Claude.
 
 Verified with Claude Code 2.1.263: actual initial prompt and response; iOS launch
 through a local daemon followed by exact-session Desktop takeover; a follow-up
 retaining prior conversation context; and a Write tool approval in Desktop
 creating the expected fictional file in Claude's worktree. Signed-out behavior,
-duplicate requests, reconnect recovery, uncertain dispatch, permission
-revocation, writer ownership, and read-only catalog validation have automated
+duplicate requests, reconnect recovery, uncertain dispatch, project
+opt-out, writer ownership, and read-only catalog validation have automated
 coverage. A paired physical iPhone reaching the Mac requires separate testing.
 
 Claude Code and Desktop must be installed and signed in, and workspace trust
@@ -96,9 +106,10 @@ directory, execution owner/connection, effective permission profile, operation
 ID, launch outcome, observed runtime state, and verified desktop handoff target. Distinguish a
 runtime conversation ID from a process ID and from an app-specific sidebar ID.
 
-Use per-project control grants and explicitly authorized clients. Preserve the
-existing observation behavior for clients without those grants. Native runtime
-permissions determine what the agent can edit, execute, or access. Bind any
+Use registered project scope and authenticated clients, with an explicit
+per-project opt-out for Claude launches. Disabling launches preserves project
+observation. All paired clients share this scope. Native runtime permissions
+determine what the agent can edit, execute, or access. Bind any
 approval to its exact runtime request and session; the current decision inbox
 only records a choice and does not deliver it to an executing agent.
 

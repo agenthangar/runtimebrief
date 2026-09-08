@@ -11,6 +11,7 @@ enum RuntimeBriefError: Error, LocalizedError, Equatable {
     case network(String)
     case timeout
     case launch(String)
+    case projectRefresh(String)
 
     var errorDescription: String? {
         switch self {
@@ -34,6 +35,8 @@ enum RuntimeBriefError: Error, LocalizedError, Equatable {
             return "Couldn't reach your Mac — the request timed out."
         case .launch(let message):
             return message
+        case .projectRefresh(let detail):
+            return "Connected to your Mac, but project data couldn't load. \(detail)"
         }
     }
 }
@@ -85,6 +88,13 @@ struct RuntimeBriefClient: Sendable {
 
     func health() async throws -> HealthInfo {
         try await getJSON("/v1/health")
+    }
+
+    /// A healthy process alone does not prove that the project list is usable.
+    func checkConnection() async throws -> (health: HealthInfo, projectCount: Int) {
+        let health = try await health()
+        do { return (health, try await projects().count) }
+        catch { throw RuntimeBriefError.projectRefresh(error.localizedDescription) }
     }
 
     func claudeLaunches(projectID: String) async throws -> ClaudeLaunchList {
@@ -163,6 +173,7 @@ struct RuntimeBriefClient: Sendable {
             throw RuntimeBriefError.invalidServerURL
         }
         var request = URLRequest(url: url)
+        request.cachePolicy = .reloadIgnoringLocalCacheData
         request.timeoutInterval = timeout
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         return request

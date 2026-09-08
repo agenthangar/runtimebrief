@@ -3,7 +3,7 @@ import fs from "node:fs";
 import type { RuntimeBriefConfig } from "../config.js";
 import { projectsForConfig } from "../projectRegistry.js";
 import { LaunchStore } from "./store.js";
-import { LaunchError, type ClaudeLaunch, type ClaudeProvider, type NativeClaudeSession } from "./types.js";
+import { DEFAULT_LAUNCH_OPTIONS, LaunchError, type ClaudeLaunchOptions, type ClaudeLaunch, type ClaudeProvider, type NativeClaudeSession } from "./types.js";
 
 export const CLAUDE_LAUNCH_ACTION = "launch-claude";
 
@@ -20,9 +20,8 @@ export class LaunchService {
   private project(id: string, requireWrite: boolean) {
     const project = projectsForConfig(this.config).find(p => p.id === id);
     if (!project) throw new LaunchError(404, "not_found", "This project is no longer registered on your Mac.");
-    // Only explicit entries grant writes. Auto-discovery never grants execution.
-    if (requireWrite && !this.config.projects.some(p => p.id === id && p.allowed_actions?.includes(CLAUDE_LAUNCH_ACTION))) {
-      throw new LaunchError(403, "launch_disabled", "Enable Claude launches for this project on your Mac first.");
+    if (requireWrite && project.claude_launch_enabled === false) {
+      throw new LaunchError(403, "launch_disabled", "Claude launches were disabled for this project on your Mac.");
     }
     return project;
   }
@@ -43,9 +42,12 @@ export class LaunchService {
     return { capability, launches };
   }
 
-  async start(projectId: string, requestId: string, prompt: string): Promise<ClaudeLaunch> {
+  async start(projectId: string, requestId: string, prompt: string, options: ClaudeLaunchOptions = DEFAULT_LAUNCH_OPTIONS): Promise<ClaudeLaunch> {
     const project = this.project(projectId, true);
-    const fingerprint = createHash("sha256").update(JSON.stringify([projectId, prompt])).digest("hex");
+    // Preserve request identity for retries from older clients using the defaults.
+    const identity: unknown[] = [projectId, prompt];
+    if (options.model !== "default" || options.permissionMode !== "manual") identity.push(options.model, options.permissionMode);
+    const fingerprint = createHash("sha256").update(JSON.stringify(identity)).digest("hex");
     const previous = this.store.byRequest(requestId, fingerprint);
     if (previous) return this.pending.get(requestId) ?? previous;
     // The synchronous reservation prevents two in-flight requests from dispatching twice.
@@ -61,6 +63,7 @@ export class LaunchService {
       id, projectId, name: `RuntimeBrief ${project.name} ${id}`,
       createdAt: new Date().toISOString(), cwd, nativeId: null, sessionId: null, openedAt: null,
       state: "starting", message: "Checking Claude Code on your Mac…",
+      ...options,
     };
     this.store.insert(requestId, fingerprint, receipt);
     const task = this.dispatch(receipt, prompt);
@@ -78,7 +81,9 @@ export class LaunchService {
     }
     // Never persist the prompt or include subprocess output in API errors/logs.
     try {
-      receipt.nativeId = await this.provider.start(receipt.cwd, receipt.name, prompt);
+      receipt.nativeId = await this.provider.start(receipt.cwd, receipt.name, prompt, {
+        model: receipt.model ?? "default", permissionMode: receipt.permissionMode ?? "manual",
+      });
       receipt.message = "Claude accepted the task. Waiting for session status…";
       this.store.save(receipt);
       return this.reconcile(receipt, await this.provider.sessions());
