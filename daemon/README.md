@@ -51,5 +51,51 @@ responses and does not retain or log account metadata, email addresses, or
 tokens. Requests follow the policies of the
 ChatGPT workspace selected during sign-in.
 
+## Native Claude tasks
+
+Claude tasks use a separate execution path from the isolated analyst. Install
+Claude Code and Claude Desktop on the Mac, sign in to both, and complete any
+workspace-trust setup there. Native background sessions are required; the
+integration was verified with Claude Code 2.1.263.
+
+Registered projects, including new repositories discovered under trusted
+roots, allow launches by default. Every authenticated client paired with the
+daemon token shares this scope. No `enable-claude` step is needed for a new
+project. To disable or restore a specific project:
+
+```sh
+runtimebriefd disable-claude <project-id>
+# To restore it later:
+runtimebriefd enable-claude <project-id>
+# Apply either change to the running service:
+runtimebriefd install-service
+```
+
+Run the disable and restore commands as alternatives, not both at once.
+These commands write the optional `claude_launch_enabled` project setting.
+Only `false` disables launches and Desktop handoff; observation and existing
+Claude sessions remain available. The decision inbox's `allowed_actions`
+setting does not control Claude launches.
+
+The authenticated launch API accepts a task, stable request UUID, optional
+model alias, and optional permission mode. Defaults are the Mac's configured
+Claude model and Manual permissions. The iOS composer offers Fable, Opus,
+Sonnet, Haiku, Auto, Bypass, and the other supported choices. Claude controls
+model availability, tools, account policy, and workspace trust.
+
+Delivery receipts record launch settings and native identity without storing
+the prompt. Desktop takeover transfers the saved conversation; Desktop can
+apply its own permission mode afterward. See the
+[request contract and handoff limits](../docs/session-control.md#claude-launch-api).
+
+## Brief freshness
+
+Briefs sort sessions by their recorded activity time and select the newest
+evidence for the headline. Current changes and completed work appear before
+stopped-session context. Stopped and stale-active notices expire after
+24 hours; earlier sessions and their evidence remain accessible in history.
+Unresolved requests for user input are not expired by that rule and continue
+to appear as attention items.
+
 MIT licensed. Third-party services and data formats remain subject to their own
 terms and policies.

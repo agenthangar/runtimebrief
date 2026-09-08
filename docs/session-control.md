@@ -1,6 +1,7 @@
 # Native session launch and takeover
 
-Status: Claude Code launch and native Desktop takeover implemented, 2026-09-07.
+Status: Claude Code launch and native Desktop takeover implemented. Build 16
+adds default project access and model/permission selectors (2026-09-07).
 Codex, Cursor, and control of pre-existing Desktop sessions remain research.
 
 ## Implemented Claude flow
@@ -12,7 +13,8 @@ request UUID. The daemon reserves a private SQLite receipt before launching
 `claude --bg --permission-mode <mode> [--model <alias>] --name <receipt-name>
 -- <prompt>`. The model defaults to Claude's configured model and permissions
 default to Manual; Bypass must be selected explicitly. The daemon records the
-native short ID from Claude's acknowledgment and the conversation UUID from `claude agents --json --all`.
+native short ID from Claude's acknowledgment and the conversation UUID from
+`claude agents --json --all`.
 Claude ignores a supplied `--session-id` in background mode, so RuntimeBrief
 never invents that identity. Prompts are not retained in the receipt database.
 
@@ -22,7 +24,8 @@ failed, or uncertain status. A lost HTTP response, daemon restart, or repeated
 request ID does not replay the prompt. Model and permission choices participate
 in request identity; changing them cannot silently reuse an existing task.
 Default settings preserve retry compatibility with build 15. Uncertain dispatch
-is reconciled by the unique native task name before any manual retry with a new request ID.
+is reconciled by the unique native task name before any manual retry with a
+new request ID.
 
 **Open in Claude Desktop** stops the exact background owner and uses normal
 `claude --resume <conversation-uuid> --permission-mode <launch-mode> /desktop` in a
@@ -44,12 +47,91 @@ retaining prior conversation context; and a Write tool approval in Desktop
 creating the expected fictional file in Claude's worktree. Signed-out behavior,
 duplicate requests, reconnect recovery, uncertain dispatch, project
 opt-out, writer ownership, and read-only catalog validation have automated
-coverage. A paired physical iPhone reaching the Mac requires separate testing.
+coverage. A paired physical iPhone was confirmed to show the enabled task
+button after the backend update. Full physical-phone task creation and
+takeover were not part of that confirmation; those flows were verified using
+the simulator, a local daemon, and native Claude Desktop. Cloud-device checks
+exercise the fictional demo composer and receipt without contacting a Mac.
 
 Claude Code and Desktop must be installed and signed in, and workspace trust
 must be completed on the Mac. Native CLI or catalog changes can make capability
 or handoff unavailable. The UI reports this without reconstructing history,
 silently replaying a task, or bypassing an approval.
+
+## Upgrade from build 15
+
+Update the daemon and restart its service first. Configured and discovered
+projects now allow launches even when `allowed_actions` has no `launch-claude`
+entry. That older grant is no longer required. To retain an intentional
+restriction, set `claude_launch_enabled: false` on the explicit project entry,
+or run `runtimebriefd disable-claude <project-id>` with the updated daemon.
+Run `runtimebriefd install-service` to apply a config change.
+
+An existing build-15 iOS app can use the new default access after refreshing
+the Claude section. Build 16 is required for the model and permission menus.
+Old request bodies and receipts remain readable: omitted choices mean the
+configured Claude model and Manual permissions. Default request fingerprints
+remain compatible so an uncertain old request is not dispatched again after
+an upgrade.
+
+## Claude launch API
+
+Every route uses the existing daemon bearer authentication and registered
+project scope. `GET /v1/projects/:id/claude-launches` returns
+`{ capability: { available, message }, launches: [...] }`. Use the capability
+message to explain installation, sign-in, or explicit project opt-out issues.
+
+Send `POST /v1/projects/:id/claude-launches` with JSON such as:
+
+```json
+{
+  "requestId": "11111111-1111-4111-8111-111111111111",
+  "prompt": "Review the fictional export workflow and describe the next step.",
+  "model": "fable",
+  "permissionMode": "auto"
+}
+```
+
+Generate a fresh UUID for each new task; the UUID above is only an example.
+Prompts are trimmed and must contain 10–8,000 characters. Slash commands,
+unsupported control characters, unknown fields, and unsupported option values
+are rejected with HTTP 400.
+
+| iOS model label | `model` value | Behavior |
+| --- | --- | --- |
+| Claude default | `default` (or omitted) | Uses the Mac's configured Claude model; no model override is passed. |
+| Fable | `fable` | Uses Claude's Fable alias. |
+| Opus | `opus` | Uses Claude's Opus alias. |
+| Sonnet | `sonnet` | Uses Claude's Sonnet alias. |
+| Haiku | `haiku` | Uses Claude's Haiku alias. |
+
+| iOS permission label | `permissionMode` value | Behavior |
+| --- | --- | --- |
+| Manual | `manual` (or omitted) | Asks in Claude when an action needs permission. |
+| Auto | `auto` | Claude checks actions automatically; availability depends on the model and account. |
+| Accept Edits | `acceptEdits` | Allows file edits and asks for other actions that need permission. |
+| Plan | `plan` | Explores and plans before changes. |
+| Bypass | `bypassPermissions` | Skips tool permission prompts; select only for trusted work. |
+| Pre-approved Only | `dontAsk` | Denies actions that would require approval. |
+
+HTTP 202 returns a durable receipt, not a guarantee of completed execution.
+The receipt includes `id`, `projectId`, `name`, `createdAt`, `state`, `message`,
+`nativeId`, `sessionId`, `cwd`, `openedAt`, and the original `model` and
+`permissionMode` choices. Native IDs can be null until acknowledged. States
+include `starting`, `running`, `needs_input`, `completed`, `stopped`, `failed`,
+`unknown`, and `in_desktop`.
+
+Retry the same task/settings with the same `requestId`. Reusing an ID with a
+different prompt, project, model, or permission mode returns HTTP 409
+`request_conflict`. A disabled project returns HTTP 403 `launch_disabled`;
+an unregistered project returns HTTP 404. Refresh uncertain receipts before
+deciding to create a new request.
+
+`POST /v1/projects/:id/claude-launches/:launchId/open` transfers a confirmed
+conversation to Desktop and returns the updated receipt. It does not accept a
+new prompt or new launch choices. `model` and `permissionMode` always describe
+the launch, not Desktop's current settings. Once handed off, later requests
+only open Desktop and never resume or replay the old CLI conversation.
 
 ## First milestone
 

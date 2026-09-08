@@ -10,8 +10,9 @@ in progress, and what needs your attention.
 > *"The shopping-list work landed this morning and all 12 tests pass. A Codex
 > session is still working on export; nothing is waiting for you."*
 
-RuntimeBrief 1.0 is the first public developer release. The daemon, iOS app,
-and plugin are currently built from source.
+The daemon and plugin are built from source. The iOS app can also be built
+from source; maintainers distribute internal TestFlight builds. See the
+[release notes](CHANGELOG.md) for changes and build compatibility.
 
 ## What you get
 
@@ -19,7 +20,8 @@ and plugin are currently built from source.
   claim.
 - Optional on-demand analysis of a single project's locally collected evidence.
 - Read-only summaries of Git, Claude Code, Codex, and Cursor activity.
-- Opt-in native Claude Code tasks with takeover in Claude Desktop on your Mac.
+- Native Claude Code tasks in every registered project, with model and
+  permission choices and takeover in Claude Desktop on your Mac.
 - Local Xcode metadata plus optional read-only App Store Connect status.
 - Siri access through the iOS app and local MCP tools for ChatGPT and Codex.
 - No RuntimeBrief account, hosted relay, or analytics SDK.
@@ -63,8 +65,9 @@ Project observation is read-only. The optional decision inbox records an
 approve/reject choice in a private local database; RuntimeBrief does not execute
 the proposed action.
 
-Paired iOS clients can start native Claude Code tasks in registered projects by default.
-Claude owns the conversation, working environment, and tool permissions.
+Paired iOS clients can start native Claude Code tasks in registered projects
+by default. Claude owns the conversation, working environment, and tool
+permissions.
 
 ## Set it up
 
@@ -136,7 +139,12 @@ supplies the certificate required by iOS App Transport Security. Do not use
 Tailscale Funnel or expose the daemon directly to the public internet.
 
 See [ios/README.md](ios/README.md) to generate and build the iOS project. Enter
-the server address and daemon token in Settings, then try:
+the server address and daemon token in Settings. **Test Connection** verifies
+both daemon health and usable project data; tap **Save** after it succeeds.
+The app refreshes when it becomes active and supports pull to refresh. If a
+refresh fails, the saved brief stays visible with the error. See
+[connection troubleshooting](ios/README.md#connection-and-refresh-troubleshooting).
+Then try:
 
 - *"What's the state of **<project>** in RuntimeBrief?"*
 - *"Ask RuntimeBrief about **<project>."***
@@ -168,8 +176,9 @@ saved conversation to Desktop through Claude's native `/desktop` command. Send
 a follow-up there to continue interrupted work. Check Desktop's permission
 mode before continuing: native handoff can apply its own setting even though
 the saved model is restored. The phone receipt shows the original launch
-settings. Later taps open the app; choose the RuntimeBrief task in its sidebar. RuntimeBrief never resumes a conversation
-again after handing it to Desktop. The Mac must be awake and Desktop usable.
+settings. Later taps open the app; choose the RuntimeBrief task in its sidebar.
+RuntimeBrief never resumes a conversation again after handing it to Desktop.
+The Mac must be awake and Desktop usable.
 
 To revoke launches and handoff requests, run `runtimebriefd disable-claude
 <project-id>` and reinstall the service. This sets `claude_launch_enabled:
@@ -212,7 +221,8 @@ The MCP tools are `list_attention`, `get_project_evidence`,
 `list_pending_decisions`, and `resolve_decision`. Resolution records the user's
 choice but never executes it. Another authenticated local client must
 explicitly propose an allowlisted action through REST. Native Claude launches
-use separate authenticated REST routes; MCP decision resolution does not launch tasks.
+use separate authenticated REST routes; MCP decision resolution does not
+launch tasks.
 
 ## API
 
@@ -230,8 +240,11 @@ All endpoints require `Authorization: Bearer <token>` and are rate-limited to
 | `GET /v1/actions` | Unexpired pending decisions |
 | `POST /v1/actions/:id/decision` | Idempotently record approve/reject |
 | `GET /v1/projects/:id/claude-launches` | Claude capability and recent delivery receipts |
-| `POST /v1/projects/:id/claude-launches` | Start a native task with `{ requestId, prompt }` |
+| `POST /v1/projects/:id/claude-launches` | Start a native task with `{ requestId, prompt, model?, permissionMode? }` |
 | `POST /v1/projects/:id/claude-launches/:launchId/open` | Hand the saved session to Claude Desktop |
+
+See the [Claude launch API](docs/session-control.md#claude-launch-api) for
+model and permission values, defaults, receipts, and retry behavior.
 
 `/status` and `/ask` can return buffered Server-Sent Events (`chunk`, `done`,
 `error`) or JSON `{ answer, costUsd, cached, truncated, evidence }`. The
@@ -261,6 +274,7 @@ projects:
     name: "Sample Tracker App"
     path: /Users/developer/projects/sample-tracker
     allowed_actions: ["run-tests"]
+    # claude_launch_enabled: false  # optional: disable native Claude tasks
     # transcript_sources:       # optional and exhaustive when present
     #   - type: codex
     #     root: /custom/codex/home
@@ -273,7 +287,11 @@ analyst:
 Trusted roots are shallow. RuntimeBrief discovers only non-hidden direct child
 directories containing a `.git` directory or file. Explicit `projects` entries
 take precedence. A newly created repository under a trusted root appears on the
-next refresh.
+next refresh and allows Claude launches by default. Explicitly set
+`claude_launch_enabled: false` to disable launches and handoff for a project;
+the project remains visible for observation. `allowed_actions` controls the
+decision inbox, not native Claude launch access. All clients paired with the
+daemon token share the same project scope.
 
 ## Security and privacy
 

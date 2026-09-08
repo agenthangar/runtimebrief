@@ -37,6 +37,8 @@ messages and file names stay data.
 
 The RuntimeBrief analyst does not launch Claude or create Claude sessions. The
 adapter only reads local Claude session metadata as project evidence.
+Starting a task or handing it to Desktop uses a separate authenticated
+[native launch controller](session-control.md), not this adapter.
 
 ### Empirical findings (verified 2026-08-22, Claude Desktop + Claude Code 2.1.229)
 

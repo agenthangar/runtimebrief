@@ -1,6 +1,9 @@
 # RuntimeBrief App Store listing
 
-This file is the reviewed source for the public listing. Do not paste live
+This file is listing copy for iOS 1.0 build 16 or newer. Repository edits do
+not update App Store Connect or replace a submitted build; use this copy only
+with a compatible binary and verify its review/release state separately.
+Do not paste live
 daemon output, project names, repository data, hostnames, tokens, or logs into
 App Store Connect.
 
@@ -29,6 +32,8 @@ Features:
 
 - A concise portfolio brief across your registered projects
 - Evidence-backed project status and recent agent activity
+- Native Claude Code tasks in registered projects, with model and permission
+  choices and takeover in Claude Desktop on your Mac
 - Optional, on-demand analyst answers through your own Codex CLI login
 - Local Xcode, TestFlight, and App Store release summaries
 - Siri and Shortcuts access to project status
@@ -38,10 +43,12 @@ Features:
 RuntimeBrief has no hosted account, analytics SDK, advertising SDK, or public
 cloud relay. Live project data stays under your control on your Mac and private
 network. Optional analyst processing follows the data controls of the ChatGPT
-workspace selected in Codex CLI.
+workspace selected in Codex CLI. Native Claude tasks use your existing Claude
+login and follow Claude's account policies and the selected tool permissions.
 
 A Mac running runtimebriefd is required for live project data. The in-app demo
-can be explored without installing or configuring anything.
+can be explored without installing or configuring anything. Native tasks also
+require Claude Code and Claude Desktop installed and signed in on that Mac.
 
 ## Keywords
 
@@ -58,7 +65,10 @@ fully offline. Every displayed project, path, commit, session, release record,
 and analyst response is explicitly labeled fictional demo data. Reviewers can
 inspect the portfolio, open Sample Tracker, expand its evidence and release
 sections, generate a deterministic demo analyst update, and ask a demo
-question. No live service is contacted by any demo action.
+question. In Sample Tracker's Claude Code section, tap **New Claude task**,
+choose a model and permission mode, enter a fictional task, and start it to
+see a demo receipt. **Open in Claude Desktop** explains that no app is opened
+in demo mode. No live service is contacted by any demo action.
 
 For normal use, a user installs runtimebriefd on their own Mac and enters their
 private HTTPS address and bearer token. RuntimeBrief operates no hosted relay
