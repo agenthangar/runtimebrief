@@ -1,0 +1,488 @@
+{
+  "description": "Fictional independent payloads, not an execution sequence. Native identity, provider host, scopes and dispatch must be verified at runtime. example.com must fail a real native-host check.",
+  "valid": [
+    {
+      "name": "Startup input required before initial prompt acknowledgment",
+      "value": {
+        "version": 1,
+        "method": "sessions.get",
+        "ok": true,
+        "result": {
+          "id": "11111111-1111-4111-8111-111111111111",
+          "provider": "claude",
+          "projectRoot": "/workspaces/sample-app",
+          "nativeConversationId": null,
+          "createdAt": "2026-09-24T12:00:00Z",
+          "observedAt": "2026-09-24T12:00:00Z",
+          "workspace": {
+            "kind": "worktree",
+            "cwd": "/workspaces/worktrees/sample-app/task-1",
+            "branch": "task-1",
+            "baseCommit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "launchState": "starting",
+          "activity": "waiting_input",
+          "message": "Complete the native workspace trust dialog on your Mac.",
+          "requestedSettings": {},
+          "remoteControl": {
+            "state": "requires_setup",
+            "url": null,
+            "checkedAt": "2026-09-24T12:00:00Z",
+            "message": "Complete native setup before Remote Control can connect."
+          },
+          "terminal": {
+            "socketName": "agent-sessions",
+            "sessionName": "task-1",
+            "paneId": "%1"
+          }
+        }
+      }
+    },
+    {
+      "name": "Create defaults to Remote Control on",
+      "value": {
+        "version": 1,
+        "method": "sessions.create",
+        "params": {
+          "id": "11111111-1111-4111-8111-111111111111",
+          "provider": "claude",
+          "projectRoot": "/workspaces/sample-app",
+          "workspace": "worktree",
+          "prompt": "Review the sample export workflow."
+        }
+      }
+    },
+    {
+      "name": "Existing checkout with local-only opt-out",
+      "value": {
+        "version": 1,
+        "method": "sessions.create",
+        "params": {
+          "id": "11111111-1111-4111-8111-111111111111",
+          "provider": "claude",
+          "projectRoot": "/workspaces/sample-app",
+          "workspace": "existing",
+          "prompt": "Review the sample export workflow.",
+          "remoteControl": false
+        }
+      }
+    },
+    {
+      "name": "Explicit provider settings require runtime support",
+      "value": {
+        "version": 1,
+        "method": "sessions.create",
+        "params": {
+          "id": "11111111-1111-4111-8111-111111111111",
+          "provider": "claude",
+          "projectRoot": "/workspaces/sample-app",
+          "workspace": "worktree",
+          "prompt": "Review the sample export workflow.",
+          "settings": {"model":"example-model","permissionMode":"manual"}
+        }
+      }
+    },
+    {"name":"providers.list request","value":{"version":1,"method":"providers.list","params":{}}},
+    {
+      "name": "sessions.get request",
+      "value": {
+        "version": 1,
+        "method": "sessions.get",
+        "params": {"projectRoot":"/workspaces/sample-app","id":"11111111-1111-4111-8111-111111111111"}
+      }
+    },
+    {
+      "name": "sessions.list request",
+      "value": {"version":1,"method":"sessions.list","params":{"projectRoot":"/workspaces/sample-app"}}
+    },
+    {
+      "name": "Implemented provider discovery",
+      "value": {
+        "version": 1,
+        "method": "providers.list",
+        "ok": true,
+        "result": {
+          "providers": [
+            {
+              "id": "claude",
+              "availability": "ready",
+              "message": "Claude is available.",
+              "remoteControlSupported": true,
+              "models": ["example-model"],
+              "permissionModes": ["manual"]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Durable reservation before dispatch",
+      "value": {
+        "version": 1,
+        "method": "sessions.create",
+        "ok": true,
+        "result": {
+          "id": "11111111-1111-4111-8111-111111111111",
+          "provider": "claude",
+          "projectRoot": "/workspaces/sample-app",
+          "nativeConversationId": null,
+          "createdAt": "2026-09-24T12:00:00Z",
+          "observedAt": null,
+          "workspace": null,
+          "launchState": "starting",
+          "activity": "unknown",
+          "message": "Launch reserved.",
+          "requestedSettings": {},
+          "remoteControl": {"state":"unknown","url":null,"checkedAt":null,"message":null},
+          "terminal": null
+        }
+      }
+    },
+    {
+      "name": "Acknowledged launch with exact native link shape",
+      "value": {
+        "version": 1,
+        "method": "sessions.create",
+        "ok": true,
+        "result": {
+          "id": "11111111-1111-4111-8111-111111111111",
+          "provider": "claude",
+          "projectRoot": "/workspaces/sample-app",
+          "nativeConversationId": "conversation-1",
+          "createdAt": "2026-09-24T12:00:00Z",
+          "observedAt": "2026-09-24T12:00:00Z",
+          "workspace": {
+            "kind": "worktree",
+            "cwd": "/workspaces/worktrees/sample-app/task-1",
+            "branch": "task-1",
+            "baseCommit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "launchState": "started",
+          "activity": "busy",
+          "message": "The native agent accepted the initial prompt.",
+          "requestedSettings": {},
+          "remoteControl": {
+            "state": "ready",
+            "url": "https://example.com/session/1",
+            "checkedAt": "2026-09-24T12:00:00Z",
+            "message": null
+          },
+          "terminal": {"socketName":"agent-sessions","sessionName":"task-1","paneId":"%1"}
+        }
+      }
+    },
+    {
+      "name": "Refreshed session",
+      "value": {
+        "version": 1,
+        "method": "sessions.get",
+        "ok": true,
+        "result": {
+          "id": "11111111-1111-4111-8111-111111111111",
+          "provider": "claude",
+          "projectRoot": "/workspaces/sample-app",
+          "nativeConversationId": "conversation-1",
+          "createdAt": "2026-09-24T12:00:00Z",
+          "observedAt": "2026-09-24T12:00:00Z",
+          "workspace": {
+            "kind": "worktree",
+            "cwd": "/workspaces/worktrees/sample-app/task-1",
+            "branch": "task-1",
+            "baseCommit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "launchState": "started",
+          "activity": "busy",
+          "message": "The native agent accepted the initial prompt.",
+          "requestedSettings": {},
+          "remoteControl": {
+            "state": "ready",
+            "url": "https://example.com/session/1",
+            "checkedAt": "2026-09-24T12:00:00Z",
+            "message": null
+          },
+          "terminal": {"socketName":"agent-sessions","sessionName":"task-1","paneId":"%1"}
+        }
+      }
+    },
+    {
+      "name": "Empty project list",
+      "value": {"version":1,"method":"sessions.list","ok":true,"result":{"sessions":[]}}
+    },
+    {
+      "name": "Successful launch with remote requires_setup",
+      "value": {
+        "version": 1,
+        "method": "sessions.get",
+        "ok": true,
+        "result": {
+          "id": "11111111-1111-4111-8111-111111111111",
+          "provider": "claude",
+          "projectRoot": "/workspaces/sample-app",
+          "nativeConversationId": "conversation-1",
+          "createdAt": "2026-09-24T12:00:00Z",
+          "observedAt": "2026-09-24T12:00:00Z",
+          "workspace": {
+            "kind": "worktree",
+            "cwd": "/workspaces/worktrees/sample-app/task-1",
+            "branch": "task-1",
+            "baseCommit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "launchState": "started",
+          "activity": "busy",
+          "message": "The native agent accepted the initial prompt.",
+          "requestedSettings": {},
+          "remoteControl": {
+            "state": "requires_setup",
+            "url": null,
+            "checkedAt": "2026-09-24T12:00:00Z",
+            "message": "Remote status is requires_setup."
+          },
+          "terminal": {"socketName":"agent-sessions","sessionName":"task-1","paneId":"%1"}
+        }
+      }
+    },
+    {
+      "name": "Historical launch success with activity unknown",
+      "value": {
+        "version": 1,
+        "method": "sessions.get",
+        "ok": true,
+        "result": {
+          "id": "11111111-1111-4111-8111-111111111111",
+          "provider": "claude",
+          "projectRoot": "/workspaces/sample-app",
+          "nativeConversationId": "conversation-1",
+          "createdAt": "2026-09-24T12:00:00Z",
+          "observedAt": "2026-09-24T12:00:00Z",
+          "workspace": {
+            "kind": "worktree",
+            "cwd": "/workspaces/worktrees/sample-app/task-1",
+            "branch": "task-1",
+            "baseCommit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "launchState": "started",
+          "activity": "unknown",
+          "message": "The native agent accepted the initial prompt.",
+          "requestedSettings": {},
+          "remoteControl": {
+            "state": "unknown",
+            "url": null,
+            "checkedAt": "2026-09-24T12:00:00Z",
+            "message": "Refresh or check the native session."
+          },
+          "terminal": null
+        }
+      }
+    },
+    {
+      "name": "Durable failed launch receipt",
+      "value": {
+        "version": 1,
+        "method": "sessions.create",
+        "ok": true,
+        "result": {
+          "id": "11111111-1111-4111-8111-111111111111",
+          "provider": "claude",
+          "projectRoot": "/workspaces/sample-app",
+          "nativeConversationId": null,
+          "createdAt": "2026-09-24T12:00:00Z",
+          "observedAt": null,
+          "workspace": null,
+          "launchState": "failed",
+          "activity": "unknown",
+          "message": "Launch failed; no automatic replay.",
+          "requestedSettings": {},
+          "remoteControl": {"state":"unknown","url":null,"checkedAt":null,"message":null},
+          "terminal": null
+        }
+      }
+    },
+    {
+      "name": "Durable unknown launch receipt",
+      "value": {
+        "version": 1,
+        "method": "sessions.create",
+        "ok": true,
+        "result": {
+          "id": "11111111-1111-4111-8111-111111111111",
+          "provider": "claude",
+          "projectRoot": "/workspaces/sample-app",
+          "nativeConversationId": null,
+          "createdAt": "2026-09-24T12:00:00Z",
+          "observedAt": null,
+          "workspace": null,
+          "launchState": "unknown",
+          "activity": "unknown",
+          "message": "Launch unknown; no automatic replay.",
+          "requestedSettings": {},
+          "remoteControl": {"state":"unknown","url":null,"checkedAt":null,"message":null},
+          "terminal": null
+        }
+      }
+    },
+    {
+      "name": "Conflicting retry",
+      "value": {
+        "version": 1,
+        "ok": false,
+        "error": {"code":"request_conflict","message":"This ID belongs to different launch inputs."}
+      }
+    },
+    {
+      "name": "Unsupported protocol uses v1 error shape",
+      "value": {
+        "version": 1,
+        "ok": false,
+        "error": {"code":"unsupported_version","message":"This executable supports version 1."}
+      }
+    }
+  ],
+  "invalid": [
+    {
+      "name": "Workspace must be explicit",
+      "value": {
+        "version": 1,
+        "method": "sessions.create",
+        "params": {
+          "id": "11111111-1111-4111-8111-111111111111",
+          "provider": "claude",
+          "projectRoot": "/workspaces/sample-app",
+          "prompt": "Review the sample export workflow."
+        }
+      }
+    },
+    {
+      "name": "Project scope is required",
+      "value": {"version":1,"method":"sessions.get","params":{"id":"11111111-1111-4111-8111-111111111111"}}
+    },
+    {
+      "name": "Arbitrary shell setting",
+      "value": {
+        "version": 1,
+        "method": "sessions.create",
+        "params": {
+          "id": "11111111-1111-4111-8111-111111111111",
+          "provider": "claude",
+          "projectRoot": "/workspaces/sample-app",
+          "workspace": "worktree",
+          "prompt": "Review the sample export workflow.",
+          "settings": {"command":"echo example"}
+        }
+      }
+    },
+    {
+      "name": "Remote preference is a boolean",
+      "value": {
+        "version": 1,
+        "method": "sessions.create",
+        "params": {
+          "id": "11111111-1111-4111-8111-111111111111",
+          "provider": "claude",
+          "projectRoot": "/workspaces/sample-app",
+          "workspace": "worktree",
+          "prompt": "Review the sample export workflow.",
+          "remoteControl": "true"
+        }
+      }
+    },
+    {
+      "name": "Unavailable remote cannot expose a stale link",
+      "value": {
+        "version": 1,
+        "method": "sessions.get",
+        "ok": true,
+        "result": {
+          "id": "11111111-1111-4111-8111-111111111111",
+          "provider": "claude",
+          "projectRoot": "/workspaces/sample-app",
+          "nativeConversationId": "conversation-1",
+          "createdAt": "2026-09-24T12:00:00Z",
+          "observedAt": "2026-09-24T12:00:00Z",
+          "workspace": {
+            "kind": "worktree",
+            "cwd": "/workspaces/worktrees/sample-app/task-1",
+            "branch": "task-1",
+            "baseCommit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "launchState": "started",
+          "activity": "busy",
+          "message": "The native agent accepted the initial prompt.",
+          "requestedSettings": {},
+          "remoteControl": {
+            "state": "unavailable",
+            "url": "https://example.com/session/1",
+            "checkedAt": "2026-09-24T12:00:00Z",
+            "message": null
+          },
+          "terminal": {"socketName":"agent-sessions","sessionName":"task-1","paneId":"%1"}
+        }
+      }
+    },
+    {
+      "name": "Executable URL rejected",
+      "value": {
+        "version": 1,
+        "method": "sessions.get",
+        "ok": true,
+        "result": {
+          "id": "11111111-1111-4111-8111-111111111111",
+          "provider": "claude",
+          "projectRoot": "/workspaces/sample-app",
+          "nativeConversationId": "conversation-1",
+          "createdAt": "2026-09-24T12:00:00Z",
+          "observedAt": "2026-09-24T12:00:00Z",
+          "workspace": {
+            "kind": "worktree",
+            "cwd": "/workspaces/worktrees/sample-app/task-1",
+            "branch": "task-1",
+            "baseCommit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "launchState": "started",
+          "activity": "busy",
+          "message": "The native agent accepted the initial prompt.",
+          "requestedSettings": {},
+          "remoteControl": {"state":"ready","url":"javascript:alert(1)","checkedAt":"2026-09-24T12:00:00Z","message":null},
+          "terminal": {"socketName":"agent-sessions","sessionName":"task-1","paneId":"%1"}
+        }
+      }
+    },
+    {
+      "name": "Wrong result type for get",
+      "value": {"version":1,"method":"sessions.get","ok":true,"result":{"sessions":[]}}
+    },
+    {
+      "name": "Success cannot include error",
+      "value": {
+        "version": 1,
+        "method": "sessions.get",
+        "ok": true,
+        "result": {
+          "id": "11111111-1111-4111-8111-111111111111",
+          "provider": "claude",
+          "projectRoot": "/workspaces/sample-app",
+          "nativeConversationId": "conversation-1",
+          "createdAt": "2026-09-24T12:00:00Z",
+          "observedAt": "2026-09-24T12:00:00Z",
+          "workspace": {
+            "kind": "worktree",
+            "cwd": "/workspaces/worktrees/sample-app/task-1",
+            "branch": "task-1",
+            "baseCommit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "launchState": "started",
+          "activity": "busy",
+          "message": "The native agent accepted the initial prompt.",
+          "requestedSettings": {},
+          "remoteControl": {
+            "state": "ready",
+            "url": "https://example.com/session/1",
+            "checkedAt": "2026-09-24T12:00:00Z",
+            "message": null
+          },
+          "terminal": {"socketName":"agent-sessions","sessionName":"task-1","paneId":"%1"}
+        },
+        "error": {"code":"internal_error","message":"Example error."}
+      }
+    }
+  ]
+}

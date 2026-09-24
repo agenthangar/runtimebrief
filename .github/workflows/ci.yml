@@ -22,6 +22,8 @@ jobs:
           cache: npm
           cache-dependency-path: daemon/package-lock.json
       - run: npm ci
+      - name: Validate proposed session contract
+        run: node ../docs/session-manager/validate.cjs
       - run: npm test
       - run: npm run build
 

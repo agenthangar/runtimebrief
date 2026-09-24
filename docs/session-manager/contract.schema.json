@@ -1,0 +1,287 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "t machine interface - simplified v1 draft",
+  "description": "Four methods, one durable session record. Native identity, ownership, scope and delivery require runtime verification.",
+  "oneOf": [{"$ref":"#/$defs/Request"},{"$ref":"#/$defs/SuccessResponse"},{"$ref":"#/$defs/ErrorResponse"}],
+  "$defs": {
+    "Id": {"type":"string","format":"uuid","pattern":"^[0-9a-f-]{36}$(?![\\s\\S])"},
+    "Text": {"type":"string","minLength":1,"maxLength":2048},
+    "Name": {"type":"string","minLength":1,"maxLength":128,"pattern":"^[^\\u0000-\\u001f\\u007f]+$(?![\\s\\S])"},
+    "Timestamp": {"type":"string","format":"date-time"},
+    "Path": {"type":"string","minLength":1,"maxLength":4096,"pattern":"^/[^\\u0000]*$(?![\\s\\S])"},
+    "ProviderId": {"type":"string","enum":["claude","cursor","codex"]},
+    "Settings": {
+      "type": "object",
+      "properties": {"model":{"$ref":"#/$defs/Name"},"permissionMode":{"$ref":"#/$defs/Name"}},
+      "required": [],
+      "additionalProperties": false
+    },
+    "Provider": {
+      "type": "object",
+      "properties": {
+        "id": {"$ref":"#/$defs/ProviderId"},
+        "availability": {"type":"string","enum":["ready","requires_setup","unavailable"]},
+        "message": {"$ref":"#/$defs/Text"},
+        "remoteControlSupported": {"type":"boolean"},
+        "models": {"type":"array","items":{"$ref":"#/$defs/Name"},"maxItems":100,"uniqueItems":true},
+        "permissionModes": {"type":"array","items":{"$ref":"#/$defs/Name"},"maxItems":100,"uniqueItems":true}
+      },
+      "required": ["id","availability","message","remoteControlSupported","models","permissionModes"],
+      "additionalProperties": false
+    },
+    "Providers": {
+      "type": "object",
+      "properties": {"providers":{"type":"array","items":{"$ref":"#/$defs/Provider"},"maxItems":3}},
+      "required": ["providers"],
+      "additionalProperties": false
+    },
+    "Commit": {"type":"string","pattern":"^[0-9a-f]{40}([0-9a-f]{24})?$(?![\\s\\S])"},
+    "Workspace": {
+      "type": "object",
+      "properties": {
+        "kind": {"type":"string","enum":["worktree","existing"]},
+        "cwd": {"$ref":"#/$defs/Path"},
+        "branch": {"anyOf":[{"$ref":"#/$defs/Name"},{"type":"null"}]},
+        "baseCommit": {"anyOf":[{"$ref":"#/$defs/Commit"},{"type":"null"}]}
+      },
+      "required": ["kind","cwd","branch","baseCommit"],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {"properties":{"kind":{"const":"worktree"}},"type":"object"},
+          "then": {
+            "properties": {"branch":{"$ref":"#/$defs/Name"},"baseCommit":{"$ref":"#/$defs/Commit"}},
+            "type": "object"
+          }
+        }
+      ]
+    },
+    "HttpsUrl": {"type":"string","format":"uri","maxLength":4096,"pattern":"^https://[^\\s]+$(?![\\s\\S])"},
+    "RemoteControl": {
+      "type": "object",
+      "properties": {
+        "state": {"type":"string","enum":["connecting","ready","requires_setup","unavailable","disabled","unknown"]},
+        "url": {"anyOf":[{"$ref":"#/$defs/HttpsUrl"},{"type":"null"}]},
+        "checkedAt": {"anyOf":[{"$ref":"#/$defs/Timestamp"},{"type":"null"}]},
+        "message": {"anyOf":[{"$ref":"#/$defs/Text"},{"type":"null"}]}
+      },
+      "required": ["state","url","checkedAt","message"],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {"properties":{"state":{"const":"ready"}},"type":"object"},
+          "then": {
+            "properties": {"url":{"$ref":"#/$defs/HttpsUrl"},"checkedAt":{"$ref":"#/$defs/Timestamp"}},
+            "type": "object"
+          },
+          "else": {"properties":{"url":{"type":"null"}},"type":"object"}
+        }
+      ]
+    },
+    "Terminal": {
+      "type": "object",
+      "properties": {
+        "socketName": {"$ref":"#/$defs/Name"},
+        "sessionName": {"$ref":"#/$defs/Name"},
+        "paneId": {"type":"string","pattern":"^%[0-9]+$(?![\\s\\S])"}
+      },
+      "required": ["socketName","sessionName","paneId"],
+      "additionalProperties": false
+    },
+    "Session": {
+      "type": "object",
+      "properties": {
+        "id": {"$ref":"#/$defs/Id"},
+        "provider": {"$ref":"#/$defs/ProviderId"},
+        "projectRoot": {"$ref":"#/$defs/Path"},
+        "nativeConversationId": {"anyOf":[{"$ref":"#/$defs/Name"},{"type":"null"}]},
+        "createdAt": {"$ref":"#/$defs/Timestamp"},
+        "observedAt": {"anyOf":[{"$ref":"#/$defs/Timestamp"},{"type":"null"}]},
+        "workspace": {"anyOf":[{"$ref":"#/$defs/Workspace"},{"type":"null"}]},
+        "launchState": {"type":"string","enum":["starting","started","failed","unknown"]},
+        "activity": {"type":"string","enum":["busy","idle","waiting_input","waiting_approval","exited","unknown"]},
+        "message": {"$ref":"#/$defs/Text"},
+        "requestedSettings": {"$ref":"#/$defs/Settings"},
+        "remoteControl": {"$ref":"#/$defs/RemoteControl"},
+        "terminal": {"anyOf":[{"$ref":"#/$defs/Terminal"},{"type":"null"}]}
+      },
+      "required": [
+        "id",
+        "provider",
+        "projectRoot",
+        "nativeConversationId",
+        "createdAt",
+        "observedAt",
+        "workspace",
+        "launchState",
+        "activity",
+        "message",
+        "requestedSettings",
+        "remoteControl",
+        "terminal"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {"properties":{"launchState":{"const":"started"}},"type":"object"},
+          "then": {
+            "properties": {
+              "nativeConversationId": {"$ref":"#/$defs/Name"},
+              "workspace": {"$ref":"#/$defs/Workspace"},
+              "observedAt": {"$ref":"#/$defs/Timestamp"}
+            },
+            "type": "object"
+          }
+        },
+        {
+          "if": {"properties":{"activity":{"not":{"const":"unknown"}}},"type":"object"},
+          "then": {
+            "properties": {"workspace":{"$ref":"#/$defs/Workspace"},"observedAt":{"$ref":"#/$defs/Timestamp"}},
+            "type": "object"
+          }
+        },
+        {
+          "if": {
+            "properties": {"remoteControl":{"type":"object","properties":{"state":{"const":"ready"}}}},
+            "type": "object"
+          },
+          "then": {"properties":{"nativeConversationId":{"$ref":"#/$defs/Name"}},"type":"object"}
+        }
+      ]
+    },
+    "SessionList": {
+      "type": "object",
+      "properties": {"sessions":{"type":"array","items":{"$ref":"#/$defs/Session"}}},
+      "required": ["sessions"],
+      "additionalProperties": false
+    },
+    "CreateParams": {
+      "type": "object",
+      "properties": {
+        "id": {"$ref":"#/$defs/Id"},
+        "provider": {"$ref":"#/$defs/ProviderId"},
+        "projectRoot": {"$ref":"#/$defs/Path"},
+        "workspace": {"type":"string","enum":["worktree","existing"]},
+        "prompt": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 32000,
+          "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f\\u007f]+$(?![\\s\\S])",
+          "allOf": [{"pattern":"\\S"}]
+        },
+        "settings": {"$ref":"#/$defs/Settings"},
+        "remoteControl": {
+          "type": "boolean",
+          "default": true,
+          "description": "Normalize omission to true before fingerprinting and dispatch; false explicitly requests local-only."
+        }
+      },
+      "required": ["id","provider","projectRoot","workspace","prompt"],
+      "additionalProperties": false
+    },
+    "Request": {
+      "type": "object",
+      "properties": {
+        "version": {"const":1},
+        "method": {"type":"string","enum":["providers.list","sessions.create","sessions.get","sessions.list"]},
+        "params": {"type":"object"}
+      },
+      "required": ["version","method","params"],
+      "additionalProperties": false,
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "method": {"const":"providers.list"},
+            "params": {"type":"object","properties":{},"required":[],"additionalProperties":false}
+          }
+        },
+        {
+          "type": "object",
+          "properties": {"method":{"const":"sessions.create"},"params":{"$ref":"#/$defs/CreateParams"}}
+        },
+        {
+          "type": "object",
+          "properties": {
+            "method": {"const":"sessions.get"},
+            "params": {
+              "type": "object",
+              "properties": {"projectRoot":{"$ref":"#/$defs/Path"},"id":{"$ref":"#/$defs/Id"}},
+              "required": ["projectRoot","id"],
+              "additionalProperties": false
+            }
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "method": {"const":"sessions.list"},
+            "params": {
+              "type": "object",
+              "properties": {"projectRoot":{"$ref":"#/$defs/Path"}},
+              "required": ["projectRoot"],
+              "additionalProperties": false
+            }
+          }
+        }
+      ]
+    },
+    "SuccessResponse": {
+      "type": "object",
+      "properties": {
+        "version": {"const":1},
+        "method": {"type":"string","enum":["providers.list","sessions.create","sessions.get","sessions.list"]},
+        "ok": {"const":true},
+        "result": {"type":"object"}
+      },
+      "required": ["version","method","ok","result"],
+      "additionalProperties": false,
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {"method":{"const":"providers.list"},"result":{"$ref":"#/$defs/Providers"}}
+        },
+        {
+          "type": "object",
+          "properties": {"method":{"const":"sessions.create"},"result":{"$ref":"#/$defs/Session"}}
+        },
+        {"type":"object","properties":{"method":{"const":"sessions.get"},"result":{"$ref":"#/$defs/Session"}}},
+        {
+          "type": "object",
+          "properties": {"method":{"const":"sessions.list"},"result":{"$ref":"#/$defs/SessionList"}}
+        }
+      ]
+    },
+    "ErrorResponse": {
+      "type": "object",
+      "properties": {
+        "version": {"const":1},
+        "ok": {"const":false},
+        "error": {
+          "type": "object",
+          "properties": {
+            "code": {
+              "type": "string",
+              "enum": [
+                "invalid_request",
+                "unsupported_version",
+                "not_found",
+                "request_conflict",
+                "unsupported",
+                "requires_setup",
+                "state_incompatible",
+                "output_limit",
+                "internal_error"
+              ]
+            },
+            "message": {"$ref":"#/$defs/Text"}
+          },
+          "required": ["code","message"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["version","ok","error"],
+      "additionalProperties": false
+    }
+  }
+}
