@@ -65,3 +65,37 @@ jobs:
           -collect-test-diagnostics never
           CODE_SIGN_IDENTITY=-
           test
+
+  ios-siri-routing:
+    # Keep recognized-text routing separate from direct App Intents tests so a
+    # Siri indexing failure cannot be mistaken for a passing shortcut action.
+    runs-on: xcode-27
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - run: brew install xcodegen
+      - run: xcodegen generate
+        working-directory: ios
+      - name: Select an available iOS 27 iPhone
+        run: |
+          device_id="$(xcrun simctl list devices available --json | python3 -c 'import json,sys; devices=json.load(sys.stdin)["devices"]; print(next(d["udid"] for runtime, entries in devices.items() if ".iOS-27-" in runtime for d in entries if d["name"].startswith("iPhone") and d["isAvailable"]))')"
+          echo "IOS_TEST_DEVICE=$device_id" >> "$GITHUB_ENV"
+      - name: Route recognized status phrases through Siri
+        run: >-
+          xcodebuild -project ios/RuntimeBrief.xcodeproj
+          -scheme RuntimeBriefSiri
+          -sdk iphonesimulator
+          -destination "platform=iOS Simulator,id=${IOS_TEST_DEVICE}"
+          -only-testing:RuntimeBriefSiriTests/SiriVoiceRoutingUITests
+          -resultBundlePath "$RUNNER_TEMP/siri-routing.xcresult"
+          -collect-test-diagnostics never
+          RUNTIMEBRIEF_E2E_SIRI_ROUTING=1
+          CODE_SIGN_IDENTITY=-
+          test
+      - name: Save Siri response screenshots and test diagnostics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: siri-routing-xcresult
+          path: ${{ runner.temp }}/siri-routing.xcresult
+          if-no-files-found: ignore
