@@ -41,7 +41,7 @@ struct SessionModelOptions: DynamicOptionsProvider {
 struct StartSessionIntent: AppIntent {
     static let title: LocalizedStringResource = "Start Coding Session"
     static let description = IntentDescription(
-        "Creates a Claude Code, Codex, or Cursor session on your Mac using its native launcher. Confirms the task before sending it.",
+        "Starts a coding agent session for a project, after confirming the task and session options.",
         categoryName: "Coding Agents"
     )
     static let openAppWhenRun = false
