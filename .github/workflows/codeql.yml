@@ -42,6 +42,15 @@ jobs:
           brew install xcodegen
           xcodegen generate
 
+      - name: Resolve Swift packages before compiler tracing
+        if: matrix.language == 'swift'
+        run: >-
+          xcodebuild -resolvePackageDependencies
+          -project ios/RuntimeBrief.xcodeproj
+          -scheme RuntimeBrief
+          -sdk iphonesimulator
+          -destination 'generic/platform=iOS Simulator'
+
       - name: Initialize CodeQL
         uses: github/codeql-action/init@db488ddef3bf6cb639b32c2e9a7c0a7ea8271d28 # v4.37.8
         with:
