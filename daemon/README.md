@@ -54,9 +54,11 @@ ChatGPT workspace selected during sign-in.
 ## Native Claude tasks
 
 Claude tasks use a separate execution path from the isolated analyst. Install
-Claude Code and Claude Desktop on the Mac, sign in to both, and complete any
-workspace-trust setup there. Native background sessions are required; the
-integration was verified with Claude Code 2.1.263.
+Claude Code and tmux on the Mac, sign in to Claude, and complete its native
+workspace-trust setup. `install-service` installs RuntimeBrief's private,
+checksum-verified copy of current `t`; `runtimebriefd install-t` can install it
+separately. Neither command changes your dotfiles or installed `t`. Projects
+need `origin/main`; each task starts in a separate worktree from that ref.
 
 Registered projects, including new repositories discovered under trusted
 roots, allow launches by default. Every authenticated client paired with the
@@ -78,14 +80,19 @@ Claude sessions remain available. The decision inbox's `allowed_actions`
 setting does not control Claude launches.
 
 The authenticated launch API accepts a task, stable request UUID, optional
-model alias, and optional permission mode. Defaults are the Mac's configured
-Claude model and Manual permissions. The iOS composer offers Fable, Opus,
+model alias, permission mode, and `remoteControl` boolean. Defaults are the
+Mac's configured Claude model, Manual permissions, and **Remote Control on**.
+Omitting `remoteControl` requests a connection; only `false` disables it.
+The iOS composer offers Fable, Opus,
 Sonnet, Haiku, Auto, Bypass, and the other supported choices. Claude controls
 model availability, tools, account policy, and workspace trust.
 
-Delivery receipts record launch settings and native identity without storing
-the prompt. Desktop takeover transfers the saved conversation; Desktop can
-apply its own permission mode afterward. See the
+Delivery receipts record launch settings, backend identity, terminal target,
+and independently observed Remote Control state without storing the prompt.
+A link appears only after Claude reports a native connection. Existing native
+background receipts retain Desktop takeover; the explicit
+`claude_session_backend: native` setting retains that older launcher, which
+cannot accept requests requiring Remote Control. See the
 [request contract and handoff limits](../docs/session-control.md#claude-launch-api).
 
 ## Brief freshness

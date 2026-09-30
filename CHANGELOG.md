@@ -1,5 +1,16 @@
 # Release notes
 
+## 1.0.2 (18) — 2026-09-29
+
+- Start Claude Code, Codex, and Cursor tasks from the same project screen,
+  using the unchanged pinned `t` and existing dotfiles.
+- Request Remote Control by default. Continue Codex and Cursor in their live
+  native terminal from the phone, including follow-ups and permission controls.
+- Keep input retries from repeating keys after lost acknowledgments or daemon
+  restarts. Stop remote writes when the native owner changes or exits.
+- Group linked worktrees under their repository in RuntimeBrief. Assign Codex
+  conversations to the original native project when its metadata API supports it.
+
 ## 1.0.1 (17) — 2026-09-08
 
 - Bring the Claude task launch and connection improvements from TestFlight

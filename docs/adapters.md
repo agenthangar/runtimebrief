@@ -132,10 +132,13 @@ Application Support and SQLite catalogs contain metadata/cache rows, not a
 second transcript source, so the adapter reads and deduplicates one store.
 
 - **Partitioned by date, not project.** The first line of every rollout is a
-  `session_meta` record whose payload carries the session `cwd` — that is the
-  only project linkage. The adapter reads just the first line of each file
-  (newest mtime first, capped at 1000 files) and matches a project when the
-  cwd equals the project path or lies inside it. `~/.codex/session_index.jsonl`
+  `session_meta` record whose payload carries the session `cwd`. The adapter
+  indexes those records (newest mtime first, capped at 1000 files) and matches
+  sessions within a project or in an external linked worktree sharing that
+  project's Git metadata. Both folders must be Git roots for the latter match,
+  so separately registered monorepo folders are not combined. Parent workspace
+  attribution requires concrete activity paths as described below.
+  `~/.codex/session_index.jsonl`
   exists but has no cwd, so it can't be used for discovery.
 - **Record shape:** one JSON object per line, `{timestamp, type, payload}`
   with an ISO 8601 top-level timestamp. Observed `type` values:
@@ -147,8 +150,12 @@ second transcript source, so the adapter reads and deduplicates one store.
   `final_answer` for the closing report), `task_started`, `task_complete`,
   `token_count`, `patch_apply_end` (its `changes` keys are the absolute paths
   of files the agent wrote), `turn_aborted`, ….
-- `response_item` payload types: `message` (developer/system context — not
-  prompts), `reasoning` (encrypted — never surfaced), `function_call`,
+- **Codex CLI 0.159.0, verified 2026-09-29:** shared app-server rollouts use
+  `event_msg.item_completed` with `UserMessage` / `AgentMessage` items. Their
+  `text` / `Text` content and native message phase provide prompts, replies,
+  and progress/completion state. Other items, including reasoning, are skipped.
+- `response_item` payload types: `message` (context and copies of the native
+  message events; not counted again), `reasoning` (encrypted — never surfaced), `function_call`,
   `custom_tool_call`, `web_search_call`, `tool_search_call` and their
   `*_output` counterparts.
 
@@ -195,7 +202,12 @@ agent threads plus older CLI chats appear together:
 - **Project JSONL:** records are `{role, message}` user/assistant turns with
   text and `tool_use` blocks, followed by an optional `turn_ended` result.
   User prompts may be plain text or wrapped in `<user_query>` tags. Cursor
-  encodes the workspace path in the directory name.
+  encodes the workspace path in the directory name. CLI 2026.09.28-64d2043,
+  verified 2026-09-29, normalizes punctuation and separators to hyphens and
+  collapses repeated hyphens. Older separator-only keys remain supported.
+  Existing folder candidates resolve the key; when multiple folders collide,
+  concrete absolute activity paths must identify one, or the session stays
+  unassigned.
 - **Desktop SQLite:** `composerHeaders` carries thread timestamps, state,
   title, and workspace URI. `cursorDiskKV` stores `composerData:<id>` plus
   ordered `bubbleId:<composerId>:<bubbleId>` records. RuntimeBrief opens the
@@ -217,6 +229,8 @@ agent threads plus older CLI chats appear together:
   thread opened at a parent workspace is assigned to a child project only
   when a concrete tool/file record references a path inside that project;
   this prevents the same parent thread from leaking into sibling projects.
+  External linked worktrees also match their owning Git root, with the same
+  repository/subproject isolation as the Claude and Codex readers.
   Duplicate IDs present in more than one Cursor store collapse to one thread.
 
 ### What the adapter extracts

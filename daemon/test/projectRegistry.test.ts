@@ -26,6 +26,23 @@ function makeRepo(root: string, name: string): string {
 }
 
 describe("trusted project roots", () => {
+  it("groups numbered linked worktrees under their real repository for every provider", () => {
+    const root = makeRoot();
+    const repo = makeRepo(root, "real-project");
+    fs.writeFileSync(path.join(repo, "README.md"), "Fictional repository\n");
+    git(repo, "add", "."); git(repo, "commit", "-m", "Fixture");
+    const worktrees = path.join(root, "workspaces"); fs.mkdirSync(worktrees);
+    git(repo, "worktree", "add", "-b", "fixture-one", path.join(worktrees, "1"));
+    git(repo, "worktree", "add", "-b", "fixture-two", path.join(worktrees, "2"));
+    const explicit = { id: "real", name: "Real Project", path: repo };
+    const registered = projectsForConfig(testConfig({ projects: [explicit], project_roots: [worktrees, root] }));
+    expect(registered.map(p => p.id)).toEqual(["real"]);
+    expect(registered[0]?.name).toBe("Real Project");
+    const discovered = projectsForConfig(testConfig({ project_roots: [worktrees, root] }));
+    expect(discovered.map(p => p.name)).toEqual(["real-project"]);
+    expect(fs.realpathSync(discovered[0]!.path)).toBe(fs.realpathSync(repo));
+  });
+
   it("discovers direct child Git repositories, including repos without commits", () => {
     const root = makeRoot();
     const sampleRepo = makeRepo(root, "sample-repo");

@@ -17,6 +17,10 @@ export class LaunchStore {
       id TEXT PRIMARY KEY, request_id TEXT UNIQUE NOT NULL,
       fingerprint TEXT NOT NULL, project_id TEXT NOT NULL, receipt TEXT NOT NULL
     )`);
+    this.db.exec(`CREATE TABLE IF NOT EXISTS terminal_inputs (
+      session_id TEXT NOT NULL, request_id TEXT NOT NULL, fingerprint TEXT NOT NULL,
+      state TEXT NOT NULL, PRIMARY KEY (session_id, request_id)
+    )`);
     hardenPrivateDatabase(file);
   }
 
@@ -30,9 +34,10 @@ export class LaunchStore {
     return JSON.parse(row.receipt) as ClaudeLaunch;
   }
 
-  insert(requestId: string, fingerprint: string, receipt: ClaudeLaunch): void {
-    this.db.prepare("INSERT INTO launches VALUES (?, ?, ?, ?, ?)")
+  insert(requestId: string, fingerprint: string, receipt: ClaudeLaunch): ClaudeLaunch {
+    const result = this.db.prepare("INSERT INTO launches VALUES (?, ?, ?, ?, ?) ON CONFLICT(request_id) DO NOTHING")
       .run(receipt.id, requestId, fingerprint, receipt.projectId, JSON.stringify(receipt));
+    return result.changes ? receipt : this.byRequest(requestId, fingerprint)!;
   }
 
   get(id: string, projectId: string): ClaudeLaunch | null {
@@ -50,6 +55,22 @@ export class LaunchStore {
   save(receipt: ClaudeLaunch): void {
     this.db.prepare("UPDATE launches SET receipt = ? WHERE id = ?")
       .run(JSON.stringify(receipt), receipt.id);
+  }
+
+  inputStatus(id: string, requestId: string, fingerprint: string): string | null {
+    const row = this.db.prepare("SELECT fingerprint, state FROM terminal_inputs WHERE session_id = ? AND request_id = ?")
+      .get(id, requestId) as { fingerprint: string; state: string } | undefined;
+    if (!row) return null;
+    if (row.fingerprint !== fingerprint) throw new LaunchError(409, "request_conflict", "This input request ID was used for different keys.");
+    return row.state;
+  }
+
+  reserveInput(id: string, requestId: string, fingerprint: string): void {
+    this.db.prepare("INSERT INTO terminal_inputs VALUES (?, ?, ?, 'unknown')").run(id, requestId, fingerprint);
+  }
+
+  finishInput(id: string, requestId: string): void {
+    this.db.prepare("UPDATE terminal_inputs SET state = 'sent' WHERE session_id = ? AND request_id = ?").run(id, requestId);
   }
 
   close(): void { this.db.close(); }

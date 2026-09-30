@@ -32,11 +32,12 @@ struct ClaudeLaunchTests {
         #expect(request.httpMethod == "POST")
         #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer test-token")
         let data = try #require(request.httpBody)
-        let body = try #require(JSONSerialization.jsonObject(with: data) as? [String: String])
-        #expect(body["requestId"] == requestID)
-        #expect(body["prompt"] == "Investigate export validation")
-        #expect(body["model"] == "fable")
-        #expect(body["permissionMode"] == "auto")
+        let body = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        #expect(body["requestId"] as? String == requestID)
+        #expect(body["prompt"] as? String == "Investigate export validation")
+        #expect(body["model"] as? String == "fable")
+        #expect(body["permissionMode"] as? String == "auto")
+        #expect(body["remoteControl"] as? Bool == true)
     }
 
     @Test func showsActionablePermissionFailure() async throws {
@@ -61,4 +62,20 @@ struct ClaudeLaunchTests {
     }
 
     private static let receipt = #"{"id":"receipt-id","projectId":"fixture","name":"Fixture task","createdAt":"2026-09-01T00:00:00Z","state":"running","message":"Claude is working.","nativeId":"1234abcd","sessionId":null,"cwd":"/tmp/fixture","openedAt":null}"#
+
+    @Test func localOnlyChoiceHasItsOwnStableRetryIdentity() {
+        let defaults = UserDefaults(suiteName: "claude-local-\(UUID())")!
+        let remote = ClaudeLaunchDraft.request(projectID: "fixture", scope: "fixture", prompt: "Inspect the export", defaults: defaults)
+        let local = ClaudeLaunchDraft.request(projectID: "fixture", scope: "fixture", prompt: "Inspect the export", remoteControl: false, defaults: defaults)
+        #expect(remote.requestId != local.requestId)
+        #expect(!local.remoteControl)
+        #expect(ClaudeLaunchDraft.request(projectID: "fixture", scope: "fixture", prompt: "Inspect the export", remoteControl: false, defaults: defaults).requestId == local.requestId)
+    }
+
+    @Test func remoteLinksStayOnTheNativeSessionSurface() {
+        #expect(ClaudeRemoteControl(state: "ready", url: "https://claude.ai/code/session_fixture").nativeURL != nil)
+        for url in ["http://claude.ai/code/session_fixture", "https://claude.ai.evil.invalid/code/session_fixture", "https://claude.ai/code/session_fixture?token=fixture", "javascript:alert(1)"] {
+            #expect(ClaudeRemoteControl(state: "ready", url: url).nativeURL == nil)
+        }
+    }
 }

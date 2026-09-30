@@ -3,6 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import readline from "node:readline";
 import { isSensitivePath } from "../secretFilter.js";
+import { sharesGitRepository } from "./gitWorkspace.js";
 import type { ParsedSession } from "./claudeCodeSessions.js";
 import type {
   ActivityEvent,
@@ -182,6 +183,7 @@ export async function sessionMatchesProject(
   projectPath: string,
 ): Promise<boolean> {
   if (cwdMatchesProject(sessionCwd, projectPath)) return true;
+  if (sharesGitRepository(sessionCwd, projectPath)) return true;
   if (!sessionCwd || !cwdMatchesProject(projectPath, sessionCwd)) return false;
   const resolvedProject = path.resolve(projectPath);
   return (await referencedPaths(filePath, sessionCwd)).some((candidate) =>
@@ -809,20 +811,29 @@ export async function parseCodexSessionFile(filePath: string): Promise<ParsedSes
       } else if (record.type === "turn_context") {
         if (!session.model) session.model = stringOrNull(payload.model);
       } else if (record.type === "event_msg") {
-        const kind = stringOrNull(payload.type);
+        let kind = stringOrNull(payload.type);
+        // Shared app-server releases emit completed message items instead of
+        // the older user_message / agent_message events. Read their native
+        // content, leaving response_item context and reasoning private.
+        const item = kind === "item_completed" && payload.item && typeof payload.item === "object"
+          ? payload.item as Record<string, unknown>
+          : null;
+        if (item?.type === "UserMessage") kind = "user_message";
+        else if (item?.type === "AgentMessage") kind = "agent_message";
+        const message = item ? completedMessageText(item) : stringOrNull(payload.message);
         if (kind === "user_message") {
-          const text = normalizeUserText(stringOrNull(payload.message));
+          const text = normalizeUserText(message);
           if (text) {
             session.userPrompts.push(text);
             session.state = "active";
             session.stateReason = "The latest observed lifecycle event is a user request.";
           }
         } else if (kind === "agent_message") {
-          const text = stringOrNull(payload.message)?.trim();
+          const text = message?.trim();
           if (text) {
             lastAgentMessage = text;
           }
-          const phase = stringOrNull(payload.phase);
+          const phase = stringOrNull(item?.phase ?? payload.phase);
           if (phase === "final_answer") {
             session.state = "completed";
             session.stateReason = "Codex recorded a final answer.";
@@ -882,8 +893,8 @@ export async function parseCodexSessionFile(filePath: string): Promise<ParsedSes
             }
           }
         }
-        // "message" items are developer/system context; "reasoning" is
-        // encrypted internal reasoning — neither is surfaced.
+        // Messages also duplicate the native events above. Context and
+        // encrypted reasoning are never surfaced as user activity.
       }
       // world_state, compacted, … are metadata — skipped.
     }
@@ -900,6 +911,18 @@ export async function parseCodexSessionFile(filePath: string): Promise<ParsedSes
   session.finalAssistantText = lastAgentMessage;
   session.filesTouched = [...filesTouched];
   return session;
+}
+
+function completedMessageText(item: Record<string, unknown>): string | null {
+  if (!Array.isArray(item.content)) return null;
+  const text = item.content.flatMap((block: unknown) => {
+    if (!block || typeof block !== "object") return [];
+    const content = block as Record<string, unknown>;
+    return (content.type === "text" || content.type === "Text") && typeof content.text === "string"
+      ? [content.text]
+      : [];
+  }).join("\n");
+  return text || null;
 }
 
 /** Strip Codex UI context wrappers while retaining the user's actual request. */

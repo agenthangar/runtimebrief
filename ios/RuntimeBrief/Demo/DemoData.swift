@@ -284,7 +284,21 @@ struct DemoRuntimeBriefDataSource: RuntimeBriefDataSource {
 
     func startClaude(projectID: String, request: ClaudeLaunchRequest) async throws -> ClaudeLaunch {
         _ = try DemoData.card(id: projectID)
-        return await DemoClaudeTasks.shared.start(projectID: projectID, requestID: request.requestId, model: request.model, permissionMode: request.permissionMode)
+        return await DemoClaudeTasks.shared.start(projectID: projectID, requestID: request.requestId, model: request.model, permissionMode: request.permissionMode, remoteControl: request.remoteControl)
+    }
+
+    func sessions(projectID: String) async throws -> ClaudeLaunchList { try await claudeLaunches(projectID: projectID) }
+    func startSession(projectID: String, request: SessionLaunchRequest) async throws -> ClaudeLaunch {
+        _ = try DemoData.card(id: projectID)
+        return await DemoClaudeTasks.shared.start(projectID: projectID, request: request)
+    }
+    func terminal(projectID: String, launchID: String) async throws -> TerminalSnapshot {
+        _ = try DemoData.card(id: projectID)
+        return try await DemoClaudeTasks.shared.terminal(projectID: projectID, launchID: launchID)
+    }
+    func sendInput(projectID: String, launchID: String, input: TerminalInput) async throws -> TerminalInputResult {
+        _ = try DemoData.card(id: projectID)
+        return try await DemoClaudeTasks.shared.input(projectID: projectID, launchID: launchID, input: input)
     }
 
     func openClaude(projectID: String, launchID: String) async throws -> ClaudeLaunch {
