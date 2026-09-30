@@ -38,6 +38,9 @@ struct RuntimeBriefShortcuts: AppShortcutsProvider {
                 // Keep at least one phrase without \(\.$project): shortcuts whose
                 // every phrase embeds a parameter stay hidden until parameter
                 // values have been donated via updateAppShortcutParameters().
+                "Get me status from \(.applicationName)",
+                "Get my project status from \(.applicationName)",
+                "Get status from \(.applicationName)",
                 "Get a project status in \(.applicationName)",
                 "Show project status in \(.applicationName)",
                 "Run \(.applicationName) project status",

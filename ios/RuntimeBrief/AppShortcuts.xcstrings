@@ -61,6 +61,36 @@
         }
       }
     },
+    "Get me status from ${applicationName}": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Get me status from ${applicationName}"
+          }
+        }
+      }
+    },
+    "Get my project status from ${applicationName}": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Get my project status from ${applicationName}"
+          }
+        }
+      }
+    },
+    "Get status from ${applicationName}": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Get status from ${applicationName}"
+          }
+        }
+      }
+    },
     "Get the status of ${project} using ${applicationName}": {
       "localizations": {
         "en": {

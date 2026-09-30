@@ -114,9 +114,10 @@ provide entity context for requests about visible content.
 
 Shortcut vocabulary refreshes at launch and after a successful project refresh.
 The English `AppShortcuts.xcstrings` catalog contains the spoken phrases.
-The visible name remains RuntimeBrief while `CFBundleSpokenName` supplies
-"Runtime Brief" for Siri's speech recognition. The short, parameter-free
-"Show Runtime Brief status" phrase avoids needing Siri to choose an entity.
+The visible and spoken name are both RuntimeBrief to match Siri's observed
+one-word transcription. "Runtime Brief" remains an alternative app name.
+The short, parameter-free "Get me status from RuntimeBrief" and
+"Show Runtime Brief status" phrases avoid needing Siri to choose an entity.
 Status also supports "Can you tell me the status of the Sample Tracker app
 from RuntimeBrief." Background entity
 suggestions return no names on connection/setup errors so a vocabulary failure

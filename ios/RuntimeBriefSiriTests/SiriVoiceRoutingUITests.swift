@@ -44,6 +44,7 @@ final class SiriVoiceRoutingUITests: XCTestCase {
         try await Task.sleep(for: .seconds(10))
 
         for request in [
+            "Get me status from RuntimeBrief",
             "Get a project status in RuntimeBrief",
             "Show Runtime Brief status",
             "What's the status of Sample Tracker in RuntimeBrief",
