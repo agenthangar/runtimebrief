@@ -22,7 +22,9 @@ targets:
     type: application
     platform: iOS
     sources:
-      - RuntimeBrief
+      - path: RuntimeBrief
+      - path: SWIFTTERM-LICENSE.txt
+        buildPhase: resources
     dependencies:
       - package: SwiftTerm
     settings:
