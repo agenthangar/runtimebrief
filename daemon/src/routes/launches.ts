@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { FastifyInstance } from "fastify";
 import type { ServerDeps } from "../server.js";
 import { CLAUDE_MODELS, CLAUDE_PERMISSION_MODES, SESSION_PROVIDERS, LaunchError } from "../launches/types.js";
+import { parseTerminalInput } from "../launches/terminalInput.js";
 
 const startSchema = z.object({
   requestId: z.uuid().transform(value => value.toLowerCase()),
@@ -22,7 +23,7 @@ const sessionSchema = startSchema.extend({
   if (!modes.includes(body.permissionMode)) context.addIssue({ code: "custom", message: "Unsupported permission mode" });
   if (body.provider === "claude" && !CLAUDE_MODELS.includes(body.model as never)) context.addIssue({ code: "custom", message: "Unsupported model" });
 });
-const inputSchema = z.object({ requestId: z.uuid().transform(value => value.toLowerCase()), data: z.string().min(1).max(8000).refine(value => Buffer.byteLength(value) <= 16384) }).strict();
+const inputSchema = z.object({ requestId: z.uuid().transform(value => value.toLowerCase()), data: z.string().refine(value => parseTerminalInput(value) !== null) }).strict();
 
 export function registerLaunchRoutes(app: FastifyInstance, deps: ServerDeps): void {
   app.register(async routes => {

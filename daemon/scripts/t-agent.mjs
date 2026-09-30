@@ -4,6 +4,7 @@ import path from "node:path";
 import net from "node:net";
 import { execFileSync } from "node:child_process";
 import pty from "node-pty";
+import { parseTerminalInput } from "../dist/launches/terminalInput.js";
 
 process.umask(0o077);
 const file = process.env.RB_T_CONFIG;
@@ -30,14 +31,18 @@ const server = net.createServer({ allowHalfOpen: true }, connection => {
       if (request.data !== undefined) {
         if (writing) return connection.end('{"live":true,"accepted":false}\n');
         writing = ownsWrite = true;
-        if (typeof request.data !== "string" || Buffer.byteLength(request.data) > 16_384) return connection.destroy();
-        if (request.data.length > 1 && request.data.endsWith("\r")) {
+        const input = parseTerminalInput(request.data);
+        if (!input) return connection.destroy();
+        if ("text" in input) {
           // TUIs treat text plus Enter in one write as a paste, not submission.
-          child.write("\u001b[200~" + request.data.slice(0, -1) + "\u001b[201~");
-          await new Promise(resolve => setTimeout(resolve, 150));
-          if (!active) return connection.end('{"live":false}\n');
-          child.write("\r");
-        } else child.write(request.data);
+          // This intentional input goes only to the owned native CLI, never a shell.
+          child.write("\u001b[200~" + input.text + "\u001b[201~");
+          if (input.submit) {
+            await new Promise(resolve => setTimeout(resolve, 150));
+            if (!active) return connection.end('{"live":false}\n');
+            child.write("\r");
+          }
+        } else child.write(input.key);
       }
       connection.end(JSON.stringify({ live: true, accepted: request.data !== undefined, pid: child.pid }) + "\n");
     } catch { connection.destroy(); } finally { if (ownsWrite) writing = false; }
