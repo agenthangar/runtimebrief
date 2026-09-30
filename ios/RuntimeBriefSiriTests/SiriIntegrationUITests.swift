@@ -48,7 +48,7 @@ final class SiriIntegrationUITests: XCTestCase {
 
         let overviewResult = try await definitions.intents["GetProjectStatusIntent"].makeIntent().run()
         let overview: String = try overviewResult.value
-        XCTAssertTrue(overview.contains("Status for 3 projects"))
+        XCTAssertTrue(overview.contains("You have 3 projects"))
 
         let attentionResult = try await definitions.intents["GetAttentionIntent"].makeIntent().run()
         let attention: [AnyAppEntity] = try attentionResult.value
