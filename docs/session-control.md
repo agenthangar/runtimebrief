@@ -98,10 +98,24 @@ visibility in ChatGPT's or Cursor's mobile interfaces.
 
 The native CLIs own models, execution, history, and approvals. Codex Manual uses
 its workspace-write sandbox with on-request approval; Plan uses its read-only
-sandbox. Cursor offers its native Agent, Plan, and Ask modes. Model defaults
-come from the Mac; an explicit native model identifier can be supplied. Bypass
-permissions is not offered for these two providers. Unsupported settings fail
-before a launch is reserved.
+sandbox. Model menus load each native account's catalog from the Mac (Codex
+`model/list`, Cursor `--list-models`). Default inherits the Mac configuration
+without overriding it. Catalogs refresh every five minutes; discovery failures
+retain Default and explain how to recover.
+
+| Permission | Codex | Cursor |
+|---|---|---|
+| Manual (default) | `--sandbox workspace-write --ask-for-approval on-request` | Native approval prompts |
+| Auto | `--approve-for-me` | `--auto-review` |
+| Plan | `--sandbox read-only --ask-for-approval on-request` | `--mode plan` |
+| Ask | Unavailable | `--mode ask` |
+| Bypass (explicit selection) | `--dangerously-bypass-approvals-and-sandbox` | `--force --sandbox disabled`; explicit denials still apply |
+| Pre-approved Only | `--sandbox workspace-write --ask-for-approval never` | Unavailable |
+
+RuntimeBrief never adds workspace trust or MCP approval flags. Unsupported
+settings fail before a launch is reserved. Older daemons still show their
+supported permissions and Default; update the Mac daemon for the model catalog
+and additional permission choices.
 
 A private PTY runner keeps the native CLI alive after daemon or phone disconnects.
 Remote keys enter that PTY directly and can never reach t's launcher shell.

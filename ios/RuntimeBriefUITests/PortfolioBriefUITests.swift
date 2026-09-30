@@ -52,6 +52,8 @@ final class PortfolioBriefUITests: XCTestCase {
             briefToggle.waitForExistence(timeout: 10),
             "The Codex project detail should render its deterministic brief."
         )
+        XCTAssertEqual(briefToggle.value as? String, "Collapsed")
+        briefToggle.tap()
         XCTAssertEqual(briefToggle.value as? String, "Expanded")
         XCTAssertTrue(
             app.descendants(matching: .any)
@@ -60,6 +62,7 @@ final class PortfolioBriefUITests: XCTestCase {
                 .waitForExistence(timeout: 5),
             "The Codex project brief should cite at least one evidence source."
         )
+        app.buttons["analyst-section-toggle"].tap()
         XCTAssertTrue(
             app.buttons["generate-analyst-update"].exists,
             "The Codex CLI analyst should remain an explicit opt-in action."
@@ -77,6 +80,7 @@ final class PortfolioBriefUITests: XCTestCase {
             sessionsToggle.waitForExistence(timeout: 10),
             "The Codex project detail should show recent agent sessions."
         )
+        sessionsToggle.tap()
         XCTAssertTrue(
             app.staticTexts["session-source-codex"].waitForExistence(timeout: 10),
             "The live project evidence should include a Codex session."
@@ -133,6 +137,8 @@ final class PortfolioBriefUITests: XCTestCase {
             "Project detail should show the deterministic brief and its evidence."
         )
         XCTAssertTrue(briefToggle.label.contains(expectedHeadline))
+        XCTAssertEqual(briefToggle.value as? String, "Collapsed")
+        briefToggle.tap()
         XCTAssertEqual(briefToggle.value as? String, "Expanded")
         XCTAssertTrue(
             app.descendants(matching: .any)
@@ -141,6 +147,7 @@ final class PortfolioBriefUITests: XCTestCase {
                 .waitForExistence(timeout: 5),
             "At least one source record should be visible for the brief claims."
         )
+        app.buttons["analyst-section-toggle"].tap()
         XCTAssertTrue(
             app.buttons["generate-analyst-update"].exists,
             "The analyst must remain an explicit opt-in action."
@@ -176,6 +183,8 @@ final class PortfolioBriefUITests: XCTestCase {
             releaseToggle.waitForExistence(timeout: 15),
             "An iOS project should show its Xcode, TestFlight, and App Store release summary."
         )
+        XCTAssertEqual(releaseToggle.value as? String, "Collapsed")
+        releaseToggle.tap()
         XCTAssertTrue(app.staticTexts["Xcode"].exists)
         let testFlightLabel = app.staticTexts["TestFlight"]
         let appStoreLabel = app.staticTexts["App Store"]
@@ -213,6 +222,7 @@ final class PortfolioBriefUITests: XCTestCase {
             sessionsToggle.waitForExistence(timeout: 15),
             "Project detail should show recent agent sessions."
         )
+        sessionsToggle.tap()
         for source in ["claude-code", "codex", "cursor"] {
             XCTAssertTrue(
                 app.staticTexts["session-source-\(source)"].waitForExistence(timeout: 10),

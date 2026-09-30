@@ -4,6 +4,14 @@ export const CLAUDE_MODELS = ["default", "fable", "opus", "sonnet", "haiku"] as 
 export const CLAUDE_PERMISSION_MODES = ["manual", "auto", "acceptEdits", "plan", "bypassPermissions", "dontAsk"] as const;
 export const SESSION_PROVIDERS = ["claude", "codex", "cursor"] as const;
 export type SessionProvider = typeof SESSION_PROVIDERS[number];
+export const NATIVE_PERMISSION_MODES = {
+  codex: ["manual", "auto", "plan", "bypassPermissions", "dontAsk"],
+  cursor: ["manual", "auto", "plan", "ask", "bypassPermissions"],
+} as const;
+export function permissionModes(provider: SessionProvider): readonly string[] {
+  return provider === "claude" ? CLAUDE_PERMISSION_MODES : NATIVE_PERMISSION_MODES[provider];
+}
+export interface AgentModel { id: string; label: string }
 export interface ClaudeLaunchOptions {
   provider?: SessionProvider;
   model: string;
@@ -66,6 +74,9 @@ export interface TerminalSnapshot {
 export interface LaunchCapability {
   available: boolean;
   message: string;
+  models?: AgentModel[];
+  modelsMessage?: string;
+  permissionModes?: readonly string[];
 }
 
 export interface NativeClaudeSession {

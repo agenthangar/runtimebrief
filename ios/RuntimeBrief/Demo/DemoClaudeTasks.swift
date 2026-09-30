@@ -11,7 +11,7 @@ actor DemoClaudeTasks {
         ClaudeLaunchList(
             capability: ClaudeLaunchCapability(available: true, message: "Try a fictional Claude task. Demo mode never sends work to a Mac."),
             launches: tasks.filter { $0.projectId == projectID },
-            providers: AgentProvider.allCases.map { AgentCapability(id: $0, available: true, message: "Try a fictional \($0.label) task. Demo mode never sends work to a Mac.") }
+            providers: AgentProvider.allCases.map { AgentCapability(id: $0, available: true, message: "Try a fictional \($0.label) task. Demo mode never sends work to a Mac.", models: [AgentModel(id: "demo-model", label: "Demo model")], permissionModes: $0 == .claude ? $0.modes : $0 == .codex ? ["manual", "auto", "plan", "bypassPermissions", "dontAsk"] : ["manual", "auto", "plan", "ask", "bypassPermissions"]) }
         )
     }
 

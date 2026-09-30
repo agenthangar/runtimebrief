@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { FastifyInstance } from "fastify";
 import type { ServerDeps } from "../server.js";
-import { CLAUDE_MODELS, CLAUDE_PERMISSION_MODES, SESSION_PROVIDERS, LaunchError } from "../launches/types.js";
+import { CLAUDE_MODELS, CLAUDE_PERMISSION_MODES, permissionModes, SESSION_PROVIDERS, LaunchError } from "../launches/types.js";
 import { parseTerminalInput } from "../launches/terminalInput.js";
 
 const startSchema = z.object({
@@ -19,7 +19,7 @@ const sessionSchema = startSchema.extend({
   model: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/).default("default"),
   permissionMode: z.string().default("manual"),
 }).superRefine((body, context) => {
-  const modes: readonly string[] = body.provider === "claude" ? CLAUDE_PERMISSION_MODES : body.provider === "cursor" ? ["manual", "plan", "ask"] : ["manual", "plan"];
+  const modes: readonly string[] = permissionModes(body.provider);
   if (!modes.includes(body.permissionMode)) context.addIssue({ code: "custom", message: "Unsupported permission mode" });
   if (body.provider === "claude" && !CLAUDE_MODELS.includes(body.model as never)) context.addIssue({ code: "custom", message: "Unsupported model" });
 });

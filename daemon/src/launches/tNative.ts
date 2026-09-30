@@ -6,11 +6,12 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import Database from "better-sqlite3";
 import { bindCodexProject } from "./codexProject.js";
+import { discoverNativeModels, NativeModelCatalog } from "./nativeModels.js";
 import { TLegacyBackend, promptHash, tSlot, tTarget, type TLegacyOptions } from "./tLegacy.js";
 import { hasPinnedT } from "./tDependency.js";
 import { parseCodexSessionFile } from "../adapters/codexSessions.js";
 import { parseCursorProjectTranscript } from "../adapters/cursorSessions.js";
-import { LaunchError, type ClaudeLaunch, type LaunchCapability, type TerminalSnapshot } from "./types.js";
+import { LaunchError, NATIVE_PERMISSION_MODES, type ClaudeLaunch, type LaunchCapability, type TerminalSnapshot } from "./types.js";
 
 const exec = promisify(execFile);
 const uuid = /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/;
@@ -31,10 +32,12 @@ export class TNativeBackend extends TLegacyBackend {
   private readonly historyRoot: string;
   private readonly projectBinder: (launch: ClaudeLaunch) => Promise<string>;
   private readonly bindingAttempts = new Map<string, number>();
+  private readonly models: NativeModelCatalog;
 
   constructor(provider: "codex" | "cursor", options: TLegacyOptions & { historyRoot?: string; projectBinder?: (launch: ClaudeLaunch) => Promise<string> } = {}) {
     super({ ...options, binary: options.binary ?? resolveAgentBinary(provider) });
     this.provider = provider;
+    this.models = new NativeModelCatalog(() => discoverNativeModels(provider, this.binary));
     this.id = `t-${provider}`;
     this.projectBinder = options.projectBinder ?? (launch => bindCodexProject(this.binary, launch));
     this.historyRoot = options.historyRoot ?? (provider === "codex" && process.env.CODEX_HOME ? process.env.CODEX_HOME : path.join(os.homedir(), provider === "codex" ? ".codex" : ".cursor"));
@@ -47,7 +50,7 @@ export class TNativeBackend extends TLegacyBackend {
       await exec(this.binary, ["--version"], { timeout: 10000 });
       if (cwd) await exec("/usr/bin/git", ["-C", cwd, "rev-parse", "--verify", "refs/remotes/origin/main"], { timeout: 3000 });
     } catch { return { available: false, message: `Install ${this.provider} and tmux on your Mac, and use a Git project with origin/main.` }; }
-    return { available: true, message: `Starts ${this.provider} in a t worktree. Remote terminal control is on by default; the native agent handles sign-in and permissions.` };
+    return { available: true, message: `Starts ${this.provider} in a t worktree. Remote terminal control is on by default; the native agent handles sign-in and permissions.`, permissionModes: NATIVE_PERMISSION_MODES[this.provider], ...await this.models.get() };
   }
 
   private runner(launch: ClaudeLaunch): Runner {

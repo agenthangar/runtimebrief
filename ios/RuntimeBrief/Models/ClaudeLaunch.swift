@@ -95,6 +95,36 @@ struct AgentCapability: Decodable, Equatable, Sendable, Identifiable {
     let id: AgentProvider
     let available: Bool
     let message: String
+    let models: [AgentModel]?
+    let modelsMessage: String?
+    let permissionModes: [String]?
+
+    init(id: AgentProvider, available: Bool, message: String, models: [AgentModel]? = nil, modelsMessage: String? = nil, permissionModes: [String]? = nil) {
+        self.id = id; self.available = available; self.message = message
+        self.models = models; self.modelsMessage = modelsMessage; self.permissionModes = permissionModes
+    }
+}
+
+struct AgentModel: Decodable, Equatable, Identifiable, Sendable {
+    let id: String
+    let label: String
+}
+
+extension AgentProvider {
+    func permissionLabel(_ mode: String) -> String {
+        mode == "ask" ? "Ask" : (ClaudePermissionMode(rawValue: mode)?.label ?? mode.capitalized)
+    }
+    func permissionExplanation(_ mode: String) -> String {
+        if self == .claude { return ClaudePermissionMode(rawValue: mode)?.explanation ?? "" }
+        switch mode {
+        case "auto": return self == .codex ? "Codex reviews approval requests automatically in its workspace sandbox." : "Cursor reviews safe actions automatically and asks before other actions."
+        case "plan": return self == .codex ? "Codex explores in its read-only sandbox." : "Cursor explores and plans before making changes."
+        case "ask": return "Cursor answers questions without making changes."
+        case "bypassPermissions": return self == .codex ? "Runs Codex without approval prompts or its sandbox." : "Runs Cursor without approval prompts or its sandbox. Explicitly denied commands remain denied."
+        case "dontAsk": return "Codex uses its workspace sandbox and denies actions that would need approval."
+        default: return self == .codex ? "Codex uses its workspace sandbox and asks before actions that need approval." : "Cursor asks before actions that need permission."
+        }
+    }
 }
 
 struct SessionLaunchRequest: Encodable, Sendable {

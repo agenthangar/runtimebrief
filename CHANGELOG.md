@@ -1,5 +1,12 @@
 # Release notes
 
+## 1.0.2 (19) — 2026-09-30
+
+- Select Codex and Cursor models from the native account catalog in a menu.
+- Add explicit Auto and Bypass permission choices, with native policy mappings.
+  Keep Manual permissions and Remote Control on as the defaults.
+- Open project summary sections collapsed, with a tap to expand their details.
+
 ## 1.0.2 (18) — 2026-09-29
 
 - Start Claude Code, Codex, and Cursor tasks from the same project screen,

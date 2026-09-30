@@ -3,7 +3,7 @@ import fs from "node:fs";
 import type { RuntimeBriefConfig } from "../config.js";
 import { projectsForConfig } from "../projectRegistry.js";
 import { LaunchStore } from "./store.js";
-import { DEFAULT_LAUNCH_OPTIONS, CLAUDE_MODELS, CLAUDE_PERMISSION_MODES, LaunchError, type ClaudeLaunchOptions, type ClaudeLaunch, type ClaudeProvider, type NativeClaudeSession, type ClaudeSessionBackend, type SessionProvider } from "./types.js";
+import { DEFAULT_LAUNCH_OPTIONS, CLAUDE_MODELS, permissionModes, LaunchError, type ClaudeLaunchOptions, type ClaudeLaunch, type ClaudeProvider, type NativeClaudeSession, type ClaudeSessionBackend, type SessionProvider } from "./types.js";
 import { promptHash } from "./tLegacy.js";
 
 export const CLAUDE_LAUNCH_ACTION = "launch-claude";
@@ -68,7 +68,7 @@ export class LaunchService {
   async start(projectId: string, requestId: string, prompt: string, options: ClaudeLaunchOptions = DEFAULT_LAUNCH_OPTIONS): Promise<ClaudeLaunch> {
     const project = this.project(projectId, true);
     const provider: SessionProvider = options.provider ?? "claude";
-    const modes: readonly string[] = provider === "claude" ? CLAUDE_PERMISSION_MODES : provider === "cursor" ? ["manual", "plan", "ask"] : ["manual", "plan"];
+    const modes: readonly string[] = permissionModes(provider);
     if (!modes.includes(options.permissionMode) || !/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/.test(options.model)
       || (provider === "claude" && !CLAUDE_MODELS.includes(options.model as never))) {
       throw new LaunchError(400, "unsupported_settings", "This agent does not support those launch settings.");

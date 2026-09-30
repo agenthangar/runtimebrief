@@ -3,6 +3,30 @@ import Testing
 @testable import RuntimeBrief
 
 struct AgentSessionTests {
+    @Test func nativeChoicesDecodeWithLegacyCompatibility() throws {
+        let old = try JSONDecoder().decode(AgentCapability.self, from: Data(#"{"id":"codex","available":true,"message":"Ready"}"#.utf8))
+        #expect(old.models == nil && old.permissionModes == nil)
+        let current = try JSONDecoder().decode(AgentCapability.self, from: Data(#"{"id":"cursor","available":true,"message":"Ready","models":[{"id":"example-model","label":"Example model"}],"permissionModes":["manual","bypassPermissions"]}"#.utf8))
+        #expect(current.models?.first?.id == "example-model")
+        #expect(current.permissionModes?.contains("bypassPermissions") == true)
+        #expect(AgentProvider.cursor.permissionLabel("bypassPermissions") == "Bypass")
+    }
+
+    @Test func selectedNativeOptionsAreSentAndChangeRetryIdentity() async throws {
+        let defaults = UserDefaults(suiteName: "options-\(UUID())")!
+        for provider in [AgentProvider.codex, .cursor] {
+            let selected = SessionLaunchDraft.request(projectID: "fixture", scope: "fixture", prompt: "Inspect the fictional options", provider: provider, model: "demo-model", permissionMode: "bypassPermissions", defaults: defaults)
+            let standard = SessionLaunchDraft.request(projectID: "fixture", scope: "fixture", prompt: "Inspect the fictional options", provider: provider, defaults: defaults)
+            #expect(selected.requestId != standard.requestId)
+            let json = try JSONSerialization.jsonObject(with: JSONEncoder().encode(selected)) as! [String: Any]
+            #expect(json["model"] as? String == "demo-model")
+            #expect(json["permissionMode"] as? String == "bypassPermissions")
+            #expect(json["remoteControl"] as? Bool == true)
+            let launch = await DemoClaudeTasks.shared.start(projectID: "fixture", request: selected)
+            #expect(launch.model == "demo-model" && launch.permissionMode == "bypassPermissions")
+        }
+    }
+
     @Test func providersHaveSeparateDurableRetryIdentities() {
         let defaults = UserDefaults(suiteName: "sessions-\(UUID())")!
         let prompt = "Inspect the fictional export"

@@ -11,12 +11,12 @@ struct ProjectDetailView: View {
     @State private var question = ""
     @State private var asking = false
     @State private var errorMessage: String?
-    @State private var briefExpanded = true
-    @State private var releaseExpanded = true
-    @State private var analystExpanded = true
-    @State private var askExpanded = true
-    @State private var sessionsExpanded = true
-    @State private var commitsExpanded = true
+    @State private var briefExpanded = false
+    @State private var releaseExpanded = false
+    @State private var analystExpanded = false
+    @State private var askExpanded = false
+    @State private var sessionsExpanded = false
+    @State private var commitsExpanded = false
     @FocusState private var questionFocused: Bool
 
     struct QAEntry: Identifiable {

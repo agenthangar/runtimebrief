@@ -66,6 +66,14 @@ final class AgentSessionUITests: XCTestCase {
             app.buttons["session-provider-picker"].tap()
             app.buttons[provider].tap()
             XCTAssertEqual(app.switches["claude-remote-control-toggle"].value as? String, "1")
+            let modelPicker = app.buttons["session-model-picker"]
+            modelPicker.tap(); app.buttons["Demo model"].tap()
+            XCTAssertTrue(modelPicker.label.contains("Demo model"))
+            let permissions = app.buttons["session-permissions-picker"]
+            permissions.tap(); app.buttons["Bypass"].tap()
+            XCTAssertTrue(permissions.label.contains("Bypass"))
+            let options = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+            options.name = "\(provider) selected model and Bypass"; options.lifetime = .keepAlways; add(options)
             let prompt = app.textFields["claude-task-prompt"]
             prompt.tap(); prompt.typeText("Inspect the fictional native terminal")
             app.buttons["start-claude-task"].tap()

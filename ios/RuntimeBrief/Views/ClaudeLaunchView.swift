@@ -133,7 +133,7 @@ private struct ClaudeTaskComposer: View {
     let providers: [AgentCapability]
     @Environment(\.dismiss) private var dismiss
     @State private var provider: AgentProvider = .claude
-    @State private var nativeModel = ""
+    @State private var nativeModel = "default"
     @State private var nativeMode = "manual"
     @State private var prompt = ""
     @State private var sending = false
@@ -149,7 +149,7 @@ private struct ClaudeTaskComposer: View {
     }
 
     private var capability: AgentCapability? { providers.first { $0.id == provider } }
-    private var selectedModel: String { provider == .claude ? model.rawValue : (nativeModel.isEmpty ? "default" : nativeModel) }
+    private var selectedModel: String { provider == .claude ? model.rawValue : nativeModel }
     private var selectedMode: String { provider == .claude ? permissionMode.rawValue : nativeMode }
 
     var body: some View {
@@ -176,7 +176,7 @@ private struct ClaudeTaskComposer: View {
                         ForEach(AgentProvider.allCases) { Text($0.label).tag($0) }
                     }
                     .accessibilityIdentifier("session-provider-picker")
-                    .onChange(of: provider) { nativeMode = "manual"; nativeModel = "" }
+                    .onChange(of: provider) { nativeMode = "manual"; nativeModel = "default" }
                     if let capability { Text(capability.message).font(.caption).foregroundStyle(capability.available ? Color.secondary : Color.orange) }
                     if provider == .claude {
                     Picker("Model", selection: $model) {
@@ -193,14 +193,24 @@ private struct ClaudeTaskComposer: View {
                         .font(.caption)
                         .foregroundStyle(permissionMode == .bypassPermissions ? .orange : .secondary)
                     } else {
-                        TextField("Model (blank uses Mac default)", text: $nativeModel)
-                            .textInputAutocapitalization(.never).autocorrectionDisabled()
-                            .accessibilityIdentifier("session-model-field")
+                        Picker("Model", selection: $nativeModel) {
+                            Text("\(provider.label) default").tag("default")
+                            ForEach(capability?.models ?? []) { Text($0.label).tag($0.id) }
+                        }
+                        .pickerStyle(.menu)
+                        .accessibilityIdentifier("session-model-picker")
+                        if let message = capability?.modelsMessage {
+                            Text(message).font(.caption).foregroundStyle(.secondary)
+                        } else if capability?.models == nil {
+                            Text("Update RuntimeBrief on your Mac to load available models.").font(.caption).foregroundStyle(.secondary)
+                        }
                         Picker("Permissions", selection: $nativeMode) {
-                            ForEach(provider.modes, id: \.self) { Text($0.capitalized).tag($0) }
-                        }.accessibilityIdentifier("session-permissions-picker")
-                        Text(provider == .codex ? "Manual uses Codex's workspace sandbox and native approval prompts. Plan uses its read-only sandbox." : "Cursor handles permission prompts. Plan and Ask use Cursor's native modes.")
-                            .font(.caption).foregroundStyle(.secondary)
+                            ForEach(capability?.permissionModes ?? provider.modes, id: \.self) { Text(provider.permissionLabel($0)).tag($0) }
+                        }
+                        .pickerStyle(.menu)
+                        .accessibilityIdentifier("session-permissions-picker")
+                        Text(provider.permissionExplanation(nativeMode))
+                            .font(.caption).foregroundStyle(nativeMode == "bypassPermissions" ? .orange : .secondary)
                     }
                     Toggle("Remote Control", isOn: $remoteControl)
                         .accessibilityIdentifier("claude-remote-control-toggle")
