@@ -474,6 +474,32 @@ describe("CodexSessionsAdapter", () => {
   });
   afterAll(() => fs.rmSync(root, { recursive: true, force: true }));
 
+  it("updates a cached rollout after the file grows", async () => {
+    const isolated = tmpdir("codex-cache");
+    try {
+      const dir = path.join(isolated, "sessions", "2026", "07", "09");
+      fs.mkdirSync(dir, { recursive: true });
+      const file = path.join(dir, `rollout-2026-07-09T10-00-00-${SID}.jsonl`);
+      fs.writeFileSync(file, [
+        sessionMeta("2026-07-09T10:00:00Z", CWD),
+        line("event_msg", { type: "user_message", message: "Check the app" }, "2026-07-09T10:01:00Z"),
+      ].join("\n") + "\n");
+      const cachedAdapter = new CodexSessionsAdapter(isolated);
+      const [first, concurrent] = await Promise.all([
+        cachedAdapter.transcriptPaths(project, 1),
+        cachedAdapter.transcriptPaths(project, 1),
+      ]);
+      expect(first[0]?.state).toBe("active");
+      expect(concurrent[0]?.state).toBe("active");
+      expect((await cachedAdapter.transcriptPaths(project, 1))[0]?.state).toBe("active");
+      fs.appendFileSync(file,
+        line("event_msg", { type: "task_complete" }, "2026-07-09T10:02:00Z") + "\n");
+      expect((await cachedAdapter.transcriptPaths(project, 1))[0]?.state).toBe("completed");
+    } finally {
+      fs.rmSync(isolated, { recursive: true, force: true });
+    }
+  });
+
   it("discovers projects with matching rollouts by session cwd", async () => {
     expect(await adapter.discover(project)).toBe(true);
     expect(

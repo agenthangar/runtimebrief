@@ -36,6 +36,14 @@ export class CodexSessionsAdapter implements RuntimeAdapter {
     string,
     Promise<IndexedRolloutFile[]>
   >();
+  private readonly parsedSessions = new Map<string, {
+    size: number;
+    mtimeMs: number;
+    dev: number;
+    ino: number;
+    session: ParsedSession;
+  }>();
+  private readonly parsedSessionsInFlight = new Map<string, Promise<ParsedSession>>();
 
   constructor(private readonly defaultRoot: string = path.join(os.homedir(), ".codex")) {}
 
@@ -67,6 +75,51 @@ export class CodexSessionsAdapter implements RuntimeAdapter {
     return shared;
   }
 
+  /** Completed rollouts can be hundreds of megabytes. Parse each unchanged
+   * file once per daemon lifetime, while still re-reading live/appended files. */
+  private parsedSession(filePath: string): Promise<ParsedSession> {
+    let stat: fs.Stats;
+    try {
+      stat = fs.statSync(filePath);
+    } catch {
+      return parseCodexSessionFile(filePath);
+    }
+    const cached = this.parsedSessions.get(filePath);
+    if (cached && cached.size === stat.size && cached.mtimeMs === stat.mtimeMs &&
+        cached.dev === stat.dev && cached.ino === stat.ino) {
+      // Refresh insertion order for bounded least-recently-used eviction.
+      this.parsedSessions.delete(filePath);
+      this.parsedSessions.set(filePath, cached);
+      return Promise.resolve(cached.session);
+    }
+    const existing = this.parsedSessionsInFlight.get(filePath);
+    if (existing) return existing;
+    const scan = parseCodexSessionFile(filePath).then((session) => {
+      try {
+        const after = fs.statSync(filePath);
+        if (after.size === stat.size && after.mtimeMs === stat.mtimeMs &&
+            after.dev === stat.dev && after.ino === stat.ino) {
+          this.parsedSessions.delete(filePath);
+          this.parsedSessions.set(filePath, { size: stat.size, mtimeMs: stat.mtimeMs,
+            dev: stat.dev, ino: stat.ino, session });
+          if (this.parsedSessions.size > 256) {
+            this.parsedSessions.delete(this.parsedSessions.keys().next().value!);
+          }
+        }
+      } catch {
+        this.parsedSessions.delete(filePath);
+      }
+      return session;
+    });
+    const shared = scan.finally(() => {
+      if (this.parsedSessionsInFlight.get(filePath) === shared) {
+        this.parsedSessionsInFlight.delete(filePath);
+      }
+    });
+    this.parsedSessionsInFlight.set(filePath, shared);
+    return shared;
+  }
+
   async discover(project: ProjectConfig): Promise<boolean> {
     // If the project explicitly lists transcript sources, honor that list.
     const sources = project.transcript_sources;
@@ -86,7 +139,7 @@ export class CodexSessionsAdapter implements RuntimeAdapter {
       if (refs.length >= limit) break;
       const meta = file.meta;
       if (!meta || !(await sessionMatchesProject(file.path, meta.cwd, project.path))) continue;
-      const session = await parseCodexSessionFile(file.path);
+      const session = await this.parsedSession(file.path);
       const ref: TranscriptRef = {
         source: this.id,
         id: session.sessionId ?? path.basename(file.path, ".jsonl"),
