@@ -56,6 +56,7 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
     registerHealthRoutes(app, VERSION);
     registerProjectRoutes(app, deps);
     registerAnalystRoutes(app, deps);
+    app.addHook("onClose", async () => { deps.analyst.close?.(); });
     registerDecisionRoutes(app, deps);
     registerLaunchRoutes(app, deps);
     if (deps.launches) app.addHook("onClose", async () => { deps.launches?.close(); });

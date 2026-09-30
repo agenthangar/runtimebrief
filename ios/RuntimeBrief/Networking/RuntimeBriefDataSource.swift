@@ -6,6 +6,7 @@ protocol RuntimeBriefDataSource: Sendable {
     func projects() async throws -> [ProjectSummary]
     func project(id: String) async throws -> ProjectCard
     func status(projectID: String) async throws -> AnalystAnswer
+    func voiceStatus(projectID: String) async throws -> VoiceStatus
     func ask(projectID: String, question: String) async throws -> AnalystAnswer
     func claudeLaunches(projectID: String) async throws -> ClaudeLaunchList
     func startClaude(projectID: String, request: ClaudeLaunchRequest) async throws -> ClaudeLaunch
@@ -59,6 +60,10 @@ struct LiveRuntimeBriefDataSource: RuntimeBriefDataSource {
 
     func status(projectID: String) async throws -> AnalystAnswer {
         try await client.status(projectID: projectID)
+    }
+
+    func voiceStatus(projectID: String) async throws -> VoiceStatus {
+        try await client.voiceStatus(projectID: projectID)
     }
 
     func ask(projectID: String, question: String) async throws -> AnalystAnswer {

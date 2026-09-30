@@ -312,6 +312,36 @@ describe("analyst service (mocked Codex CLI backend)", () => {
     });
   }
 
+  it("serves a completed analysis immediately while a missing one refreshes in the background", async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    let runs = 0;
+    const runner: AnalystBackendRunner = async function* ({ model }) {
+      expect(model).toBe("gpt-6-luna");
+      runs++;
+      await gate;
+      yield { type: "result", costUsd: 0,
+        finalText: "Done: Export checks passed. [git-working-tree]\nNow: Ready for review. [git-working-tree]\nNext: Review the export. [git-working-tree]",
+        isError: false };
+    };
+    const analyst = service(runner);
+    const first = analyst.voiceStatus("demo");
+    expect(first.status).toBeNull();
+    expect(first.refreshing).toBe(true);
+    expect(analyst.voiceStatus("demo").refreshing).toBe(true);
+    release();
+    for (let i = 0; i < 100 && !analyst.voiceStatus("demo").status; i++) {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    const final = analyst.voiceStatus("demo");
+    expect(final.status?.answer).toContain("Export checks passed");
+    expect(final.status?.evidence.some((item) => item.id === "git-working-tree")).toBe(true);
+    expect(final.status?.model).toBe("gpt-6-luna");
+    expect(final.refreshing).toBe(false);
+    expect(runs).toBe(1);
+    analyst.close();
+  });
+
   async function collect(gen: AsyncGenerator<AnalystChunk>) {
     const chunks: AnalystChunk[] = [];
     for await (const c of gen) chunks.push(c);

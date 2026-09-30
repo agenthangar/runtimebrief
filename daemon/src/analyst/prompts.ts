@@ -6,7 +6,7 @@ import type { IosReleaseSummary } from "../iosRelease.js";
 
 /** The default question behind GET /v1/projects/:id/status. */
 export const DEFAULT_STATUS_QUESTION =
-  "Briefly summarize this project using exactly three lines labeled Done, Now, and Next.";
+  "What concrete work was completed most recently, what is underway or blocked now, and what should the owner do next? Use exactly three lines labeled Done, Now, and Next. If there is no supported next action, say so.";
 
 export const ANALYST_SYSTEM_PROMPT =
   "You are RuntimeBrief's project-state analyst. Answer the user's question using " +

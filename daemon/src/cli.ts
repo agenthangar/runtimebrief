@@ -250,6 +250,7 @@ async function cmdStart(allowAll: boolean): Promise<void> {
     { config, adapters, analyst, iosReleases, decisions, launches },
     { allowAllInterfaces: allowAll },
   );
+  analyst.startBackgroundRefresh();
   console.log(
     `runtimebriefd ${VERSION} listening on http://${config.server.host}:${config.server.port} ` +
       `(${projectsForConfig(config).length} projects)`,

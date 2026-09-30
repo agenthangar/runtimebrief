@@ -26,7 +26,7 @@ const DEFAULT_ANALYST_PERMISSION_PROFILE = "runtimebrief-analyst-fixture";
 const OPENAI_MODEL_PROVIDER = "openai";
 const CHATGPT_CODEX_BASE_URL = "https://chatgpt.com/backend-api/codex";
 const CHATGPT_BASE_URL = "https://chatgpt.com/backend-api/";
-export const SUPPORTED_CODEX_CLI_VERSION = "0.144.1";
+export const SUPPORTED_CODEX_CLI_VERSION = "0.156.1";
 
 export interface AnalystRunParams {
   evidencePacket: string;
@@ -67,10 +67,12 @@ const analystOutputSchema = z
   });
 
 const ALLOWED_ENABLED_FEATURES = new Set([
+  "item_ids",
   "resize_all_images",
   "terminal_resize_reflow",
   "tool_search_always_defer_mcp_tools",
   "tui_app_server",
+  "unified_exec_zsh_fork",
 ]);
 
 export const EXPECTED_CODEX_FEATURES = [
@@ -166,6 +168,63 @@ export const EXPECTED_CODEX_FEATURES = [
   "web_search_request",
   "workspace_dependencies",
   "workspace_owner_usage_nudge",
+  "agent_message_board",
+  "analytics_plan_history",
+  "api_key_model_discovery",
+  "apply_patch_preserve_line_endings",
+  "background_paginated_rollout_migration",
+  "bedrock_setup_wizard",
+  "code_mode_buffered_exec",
+  "code_mode_interrupt",
+  "code_mode_prewarm",
+  "codex_apps_mcp_2026_07_28",
+  "compaction_image_budget",
+  "content_item_kinds",
+  "context_management",
+  "cwd_relative_turn_diffs",
+  "daemon_auto_start",
+  "deferred_tool_world_state",
+  "executed_tool_call_metadata",
+  "executor_capability_discovery",
+  "external_agent_memory_import",
+  "guardian_enhanced_node_repl_transcripts",
+  "guardian_ext",
+  "guardian_node_repl_transcript_images",
+  "guardian_reuse_parent_compaction",
+  "guardianv2",
+  "guardianv2.thread_context",
+  "image_resize_notice",
+  "in_app_chat",
+  "in_app_dictation",
+  "in_app_local_automation",
+  "in_app_updates",
+  "local_thread_store_shared_compression",
+  "mcp_2026_07_28",
+  "mcp_oauth_refresh_coordination",
+  "nonfatal_clock_read_errors",
+  "omit_app_server_notification_media",
+  "powershell_shell_version",
+  "psp",
+  "reasoning_effort_override",
+  "recommended_plugins",
+  "retain_client_developer_messages",
+  "send_async_message",
+  "send_message_to_user_async",
+  "shell_snapshot_v2",
+  "skill_search",
+  "skip_host_skill_discovery",
+  "sleep_tool",
+  "step_model_switching",
+  "system_proxy_fallback",
+  "transcript_v2",
+  "unbounded_connection_retries",
+  "unified_exec_tty",
+  "unified_image_budget",
+  "use_xaa",
+  "view_image",
+  "windows_sandbox_service",
+  "worktrees",
+  "write_stdin_approval",
 ] as const;
 
 const FEATURE_FALSE_OVERRIDES = [
@@ -177,6 +236,8 @@ const FEATURE_FALSE_OVERRIDES = [
   "browser_use_full_cdp_access",
   "code_mode",
   "code_mode_host",
+  "compaction_image_budget",
+  "content_item_kinds",
   "collaboration_modes",
   "computer_use",
   "deferred_executor",
@@ -185,9 +246,14 @@ const FEATURE_FALSE_OVERRIDES = [
   "fast_mode",
   "goals",
   "guardian_approval",
+  "guardian_reuse_parent_compaction",
   "hooks",
   "image_generation",
   "in_app_browser",
+  "in_app_chat",
+  "in_app_dictation",
+  "in_app_local_automation",
+  "in_app_updates",
   "memories",
   "mentions_v2",
   "multi_agent",
@@ -195,6 +261,7 @@ const FEATURE_FALSE_OVERRIDES = [
   "personality",
   "plugin_sharing",
   "plugins",
+  "realtime_conversation",
   "remote_compaction_v2",
   "remote_control",
   "remote_plugin",
@@ -202,15 +269,22 @@ const FEATURE_FALSE_OVERRIDES = [
   "respect_system_proxy",
   "shell_snapshot",
   "shell_tool",
+  "skill_search",
+  "sleep_tool",
   "skill_mcp_dependency_install",
   "sqlite",
   "steer",
+  "system_proxy_fallback",
   "terminal_resize_reflow",
   "tool_call_mcp_elicitation",
   "tool_search_always_defer_mcp_tools",
   "tool_suggest",
   "tui_app_server",
   "unified_exec",
+  "unbounded_connection_retries",
+  "unified_exec_tty",
+  "view_image",
+  "worktrees",
   "workspace_dependencies",
 ] as const;
 
@@ -220,23 +294,34 @@ const CRITICAL_CONFIG_FALSE_FEATURES = [
   "browser_use",
   "browser_use_external",
   "code_mode_host",
+  "content_item_kinds",
   "computer_use",
   "goals",
   "hooks",
   "image_generation",
   "in_app_browser",
+  "in_app_chat",
+  "in_app_dictation",
+  "in_app_local_automation",
+  "in_app_updates",
   "memories",
   "multi_agent",
   "network_proxy",
   "plugins",
+  "realtime_conversation",
   "remote_control",
   "remote_plugin",
   "respect_system_proxy",
   "shell_tool",
+  "skill_search",
+  "sleep_tool",
   "skill_mcp_dependency_install",
   "tool_call_mcp_elicitation",
   "tool_suggest",
   "unified_exec",
+  "unified_exec_tty",
+  "view_image",
+  "worktrees",
   "workspace_dependencies",
 ] as const;
 
@@ -1112,9 +1197,9 @@ function assertSafeConfigRead(
     recordValue(config, "notify") !== null ||
     recordValue(config, "hooks") !== null ||
     recordValue(config, "model_catalog_json") !== null ||
-    recordValue(config, "experimental_thread_config_endpoint") !== null ||
+    recordValue(config, "experimental_thread_config_endpoint") != null ||
     recordValue(config, "oss_provider") !== null ||
-    recordValue(config, "debug") !== null ||
+    recordValue(config, "debug") != null ||
     recordValue(shellEnvironment, "inherit") !== "none" ||
     recordValue(skills, "include_instructions") !== false ||
     recordValue(analytics, "enabled") !== false ||
@@ -1200,7 +1285,8 @@ function assertSafeConfigRead(
     `permissions.${permissionProfile}.filesystem.:workspace_roots.codex-home`,
     `permissions.${permissionProfile}.filesystem.:workspace_roots.user-home`,
     `permissions.${permissionProfile}.network.enabled`,
-    ...CRITICAL_CONFIG_FALSE_FEATURES.map((feature) => `features.${feature}`),
+    ...CRITICAL_CONFIG_FALSE_FEATURES.map((feature) =>
+      feature === "sleep_tool" ? "features.sleep_tool.enabled" : `features.${feature}`),
   ];
   for (const key of criticalOrigins) assertSessionFlagOrigin(origins, key);
 
@@ -1241,7 +1327,29 @@ function assertNoManagedRequirements(value: unknown): void {
   } catch {
     throw new Error("Codex CLI managed requirements could not be verified.");
   }
-  if (parsed.requirements !== null) {
+  if (parsed.requirements === null) return;
+  const requirements = requireRecord(parsed.requirements);
+  // Codex 0.156.1 returns its full requirements shape even when there is no
+  // managed policy. The login method restriction comes from our own forced
+  // ChatGPT session setting; every other managed constraint must be absent.
+  const expectedKeys = [
+    "modelProvider", "modelProviders", "allowedLoginMethods",
+    "cliAuthCredentialsStore", "chatgptBaseUrl",
+    "additionalDeveloperInstructions", "allowedApprovalPolicies",
+    "allowedApprovalsReviewers", "allowedSandboxModes",
+    "allowedWindowsSandboxImplementations", "allowedPermissionProfiles",
+    "defaultPermissions", "allowedWebSearchModes", "allowManagedHooksOnly",
+    "allowBrowserAndComputerUse", "allowAppshots", "allowRemoteControl",
+    "computerUse", "browserUse", "inAppBrowser", "featureRequirements",
+    "hooks", "enforceResidency", "network", "application", "autoReview",
+    "models", "sqliteHome", "logDir", "modelCatalogJson",
+    "checkForUpdateOnStartup", "allowLoginShell", "feedback",
+  ];
+  assertExactKeys(requirements, expectedKeys);
+  if (
+    JSON.stringify(requirements.allowedLoginMethods) !== '["chatgpt"]' ||
+    expectedKeys.some((key) => key !== "allowedLoginMethods" && requirements[key] !== null)
+  ) {
     throw new Error("Codex CLI managed requirements are not supported.");
   }
 }
@@ -1262,14 +1370,16 @@ function assertSafeFeatureInventory(value: unknown): void {
     throw new Error("Codex CLI feature inventory was unsafe.");
   }
   for (const [name, feature] of byName) {
-    const shouldBeEnabled = ALLOWED_ENABLED_FEATURES.has(name);
+    // In 0.156.1 the feature inventory reports the stable unified_exec
+    // capability as enabled even when the effective session config explicitly
+    // disables it. assertSafeConfigRead verifies that value and its origin.
+    const shouldBeEnabled = ALLOWED_ENABLED_FEATURES.has(name) || name === "unified_exec";
     if (feature.enabled !== shouldBeEnabled) {
       throw new Error("Codex CLI feature inventory was unsafe.");
     }
-    if (
-      shouldBeEnabled &&
-      (feature.stage !== "removed" || feature.defaultEnabled !== true)
-    ) {
+    if (shouldBeEnabled &&
+        (feature.defaultEnabled !== true ||
+          (name === "unified_exec" ? feature.stage !== "stable" : feature.stage !== "removed"))) {
       throw new Error("Codex CLI feature inventory was unsafe.");
     }
   }
@@ -1322,8 +1432,9 @@ function assertThreadBoundary(
     parsed.cwd !== isolatedWorkspace ||
     parsed.thread.cwd !== isolatedWorkspace ||
     parsed.thread.sessionId !== parsed.thread.id ||
-    parsed.runtimeWorkspaceRoots.length !== 1 ||
-    parsed.runtimeWorkspaceRoots[0] !== isolatedWorkspace ||
+    (parsed.runtimeWorkspaceRoots.length !== 0 &&
+      (parsed.runtimeWorkspaceRoots.length !== 1 ||
+       parsed.runtimeWorkspaceRoots[0] !== isolatedWorkspace)) ||
     parsed.activePermissionProfile.id !== permissionProfile
   ) {
     throw new Error("Codex CLI analyst isolation could not be verified.");
@@ -1611,6 +1722,21 @@ function runCodexAppServer(
     };
 
     const handleNotification = (method: string, params: unknown) => {
+      if (method === "warning") {
+        const warning = z.object({
+          threadId: z.string(),
+          message: z.literal("Code Mode is unavailable because code-mode host is disabled. Code mode will fail closed; enable `features.code_mode_host` and install `codex-code-mode-host`."),
+        }).strict().parse(params);
+        if (threadId === null || warning.threadId !== threadId) throw new Error("mismatched warning");
+        return;
+      }
+      if (method === "account/updated") {
+        // Newer Codex emits this after loading the linked OAuth credential.
+        // Discard it without inspecting or retaining account metadata; the
+        // separate account/read and getAuthStatus responses remain mandatory.
+        void params;
+        return;
+      }
       if (method === "remoteControl/status/changed") {
         const status = z.object({ status: z.literal("disabled") }).parse(params);
         void status;

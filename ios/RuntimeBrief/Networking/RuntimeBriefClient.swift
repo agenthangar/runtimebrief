@@ -158,6 +158,10 @@ struct RuntimeBriefClient: Sendable {
         try await getJSON("/v1/projects/\(escape(projectID))/status")
     }
 
+    func voiceStatus(projectID: String) async throws -> VoiceStatus {
+        try await getJSON("/v1/projects/\(escape(projectID))/voice-status")
+    }
+
     func ask(projectID: String, question: String) async throws -> AnalystAnswer {
         var request = try makeRequest(path: "/v1/projects/\(escape(projectID))/ask")
         request.httpMethod = "POST"

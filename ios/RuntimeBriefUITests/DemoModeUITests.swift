@@ -35,8 +35,11 @@ final class DemoModeUITests: XCTestCase {
         }
         app.swipeDown(); app.swipeDown()
         let brief = app.buttons["brief-section-toggle"]
-        brief.tap(); XCTAssertEqual(brief.value as? String, "Expanded")
-        brief.tap(); XCTAssertEqual(brief.value as? String, "Collapsed")
+        // Tap the header, not the center of the expanded card; its center
+        // moves into the evidence content after expansion.
+        let briefHeader = brief.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.1))
+        briefHeader.tap(); XCTAssertEqual(brief.value as? String, "Expanded")
+        briefHeader.tap(); XCTAssertEqual(brief.value as? String, "Collapsed")
         keepScreenshot(named: "02-project-brief")
         app.buttons["analyst-section-toggle"].tap()
 

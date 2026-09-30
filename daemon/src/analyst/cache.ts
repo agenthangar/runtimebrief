@@ -14,6 +14,10 @@ export interface CachedAnswer {
   evidence: EvidenceRef[];
 }
 
+export interface LatestStatus extends CachedAnswer {
+  model: string;
+}
+
 export interface AnswerCacheIdentity {
   backend: string;
   model: string;
@@ -43,6 +47,16 @@ export class AnswerCache {
         evidence_json TEXT NOT NULL DEFAULT '[]',
         created_at INTEGER NOT NULL,
         PRIMARY KEY (project_id, question_hash)
+      )
+    `);
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS latest_status (
+        project_id TEXT PRIMARY KEY,
+        model TEXT NOT NULL,
+        prompt_version TEXT NOT NULL,
+        answer TEXT NOT NULL,
+        evidence_json TEXT NOT NULL,
+        created_at INTEGER NOT NULL
       )
     `);
     let columns = this.db.pragma("table_info(answers)") as { name: string }[];
@@ -131,6 +145,7 @@ export class AnswerCache {
     identity: AnswerCacheIdentity,
     answer: string,
     evidence: EvidenceRef[] = [],
+    createdAt: number = Date.now(),
   ): void {
     this.db
       .prepare(
@@ -145,8 +160,39 @@ export class AnswerCache {
         AnswerCache.questionHash(question, identity),
         answer,
         JSON.stringify(evidence),
-        Date.now(),
+        createdAt,
       );
+  }
+
+  getLatestStatus(projectId: string, model: string, promptVersion: string): LatestStatus | null {
+    const row = this.db.prepare(
+      `SELECT answer, evidence_json AS evidenceJson, created_at AS createdAt, model
+       FROM latest_status WHERE project_id = ? AND model = ? AND prompt_version = ?`,
+    ).get(projectId, model, promptVersion) as
+      | { answer: string; evidenceJson: string; createdAt: number; model: string }
+      | undefined;
+    if (!row) return null;
+    try {
+      const evidence = JSON.parse(row.evidenceJson) as unknown;
+      if (!Array.isArray(evidence)) return null;
+      return { answer: row.answer, evidence: evidence as EvidenceRef[], createdAt: row.createdAt, model: row.model };
+    } catch {
+      return null;
+    }
+  }
+
+  setLatestStatus(
+    projectId: string, model: string, promptVersion: string,
+    answer: string, evidence: EvidenceRef[], createdAt: number = Date.now(),
+  ): void {
+    this.db.prepare(
+      `INSERT INTO latest_status (project_id, model, prompt_version, answer, evidence_json, created_at)
+       VALUES (?, ?, ?, ?, ?, ?)
+       ON CONFLICT (project_id) DO UPDATE SET model = excluded.model,
+         prompt_version = excluded.prompt_version, answer = excluded.answer,
+         evidence_json = excluded.evidence_json, created_at = excluded.created_at
+       WHERE excluded.created_at >= latest_status.created_at`,
+    ).run(projectId, model, promptVersion, answer, JSON.stringify(evidence), createdAt);
   }
 
   close(): void {

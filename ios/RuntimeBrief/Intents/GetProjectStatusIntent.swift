@@ -5,7 +5,7 @@ import SwiftUI
 struct GetProjectStatusIntent: AppIntent {
     static let title: LocalizedStringResource = "Get Project Status"
     static let description = IntentDescription(
-        "Reads a project's evidence-backed brief without starting an analyst run.",
+        "Reads a recent evidence-backed analysis of a project without waiting for a model run.",
         categoryName: "Status"
     )
     // Runs headlessly from Siri/Shortcuts — the app never opens.
@@ -20,12 +20,23 @@ struct GetProjectStatusIntent: AppIntent {
 
     func perform() async throws -> some IntentResult & ProvidesDialog & ReturnsValue<String> & ShowsSnippetView {
         do {
-            let snapshot = try await ProjectsStore.shared.briefSnapshot()
+            let dataSource = RuntimeBriefDataSourceFactory.current(timeout: 4)
+            let snapshot = try await ProjectsStore.shared.briefSnapshot(dataSource: dataSource)
             if let project {
                 guard let current = snapshot.projects.first(where: { $0.id == project.id }) else {
                     throw RuntimeBriefError.notFound
                 }
-                let text = SiriBrief.project(current, snapshot: snapshot)
+                let text: String
+                if snapshot.isSaved {
+                    text = SiriBrief.project(current, snapshot: snapshot)
+                } else {
+                    do {
+                        let status = try await dataSource.voiceStatus(projectID: current.id)
+                        text = SiriBrief.prefix(snapshot) + SiriBrief.analyzedProject(current, status: status)
+                    } catch {
+                        text = "The analysis is unavailable right now. " + SiriBrief.project(current, snapshot: snapshot)
+                    }
+                }
                 return .result(value: text, dialog: IntentDialog(stringLiteral: text),
                                view: StatusSnippetView(projectName: current.name, branch: current.branch, answer: text))
             }

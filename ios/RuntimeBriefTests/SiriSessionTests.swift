@@ -64,7 +64,7 @@ struct SiriSessionTests {
                 source: source(transport), scope: "fixture", isDemo: false, defaults: storage) { _, _ in }
         }
         let first = try await launch()
-        #expect(first.text.contains("uncertain"))
+        #expect(first.text.contains("can't confirm"))
         let id = try transport.lastRequestID()
         transport.failPost = true
         await #expect(throws: SiriIntentFailure.self) { try await launch() }
@@ -75,6 +75,18 @@ struct SiriSessionTests {
         #expect(try transport.lastRequestID() == id)
         _ = try await launch()
         #expect(try transport.lastRequestID() != id)
+    }
+
+    @Test func spokenStatusQuestionCannotStartACodingSession() async throws {
+        let transport = SessionTransport(provider: .codex)
+        await #expect(throws: SiriIntentFailure.self) {
+            try await SiriSessionLauncher.run(project: project, provider: .codex,
+                task: "What is the latest status of the app?", source: source(transport),
+                scope: "fixture", isDemo: false, defaults: defaults()) { _, _ in
+                Issue.record("Status question reached write confirmation")
+            }
+        }
+        #expect(transport.recorder.requests.isEmpty)
     }
 
     @Test func unavailableAuthRemovedProjectAndInvalidSettingsNeverConfirmOrWrite() async throws {

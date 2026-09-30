@@ -320,6 +320,12 @@ struct DemoRuntimeBriefDataSource: RuntimeBriefDataSource {
         try DemoData.analystAnswer(projectID: projectID)
     }
 
+    func voiceStatus(projectID: String) async throws -> VoiceStatus {
+        let answer = try DemoData.analystAnswer(projectID: projectID)
+        return VoiceStatus(answer: answer.answer, analyzedAt: Date(), model: "fictional demo",
+                           evidence: answer.evidence ?? [], refreshing: false, unavailable: false)
+    }
+
     func ask(projectID: String, question: String) async throws -> AnalystAnswer {
         try DemoData.analystAnswer(projectID: projectID, question: question)
     }

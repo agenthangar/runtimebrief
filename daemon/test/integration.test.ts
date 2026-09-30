@@ -86,6 +86,7 @@ describe("daemon integration", () => {
       ["GET", "/v1/projects"],
       ["GET", "/v1/projects/fixture"],
       ["GET", "/v1/projects/fixture/status"],
+      ["GET", "/v1/projects/fixture/voice-status"],
       ["POST", "/v1/projects/fixture/ask"],
       ["GET", "/v1/actions"],
       ["POST", "/v1/projects/fixture/actions"],
@@ -141,6 +142,19 @@ describe("daemon integration", () => {
     const res = await fetch(`${base}/v1/projects/fixture/status`, { headers: authHeaders() });
     const body = await res.json();
     expect(body.cached).toBe(true);
+    expect(backendCalls.length).toBe(before);
+  });
+
+  it("returns the latest completed voice analysis without another model run", async () => {
+    const before = backendCalls.length;
+    const res = await fetch(`${base}/v1/projects/fixture/voice-status`, { headers: authHeaders() });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.answer).toBe("Feature branch in progress, tests green. [git-working-tree]");
+    expect(body.model).toBe("gpt-6-luna");
+    expect(body.analyzedAt).toEqual(expect.any(String));
+    expect(body.evidence.some((item: { id: string }) => item.id === "git-working-tree")).toBe(true);
+    expect(body.refreshing).toBe(false);
     expect(backendCalls.length).toBe(before);
   });
 
@@ -249,6 +263,8 @@ describe("daemon integration", () => {
   it("analyst routes 404 on unknown projects", async () => {
     const res = await fetch(`${base}/v1/projects/ghost/status`, { headers: authHeaders() });
     expect(res.status).toBe(404);
+    const voice = await fetch(`${base}/v1/projects/ghost/voice-status`, { headers: authHeaders() });
+    expect(voice.status).toBe(404);
   });
 
   it("records an allowlisted decision without executing it", async () => {
