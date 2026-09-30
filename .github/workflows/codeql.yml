@@ -35,6 +35,14 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
+      - name: Ensure Rosetta is available for CodeQL compiler tracing
+        if: matrix.language == 'swift'
+        run: |
+          if ! /usr/bin/arch -x86_64 /usr/bin/true; then
+            /usr/sbin/softwareupdate --install-rosetta --agree-to-license
+          fi
+          /usr/bin/arch -x86_64 /usr/bin/true
+
       - name: Generate the Xcode project
         if: matrix.language == 'swift'
         working-directory: ios
