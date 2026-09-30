@@ -45,11 +45,14 @@ jobs:
           device_id="$(xcrun simctl list devices available --json | python3 -c 'import json,sys; devices=json.load(sys.stdin)["devices"]; print(next(d["udid"] for runtime, entries in devices.items() if ".iOS-27-" in runtime for d in entries if d["name"].startswith("iPhone") and d["isAvailable"]))')"
           echo "IOS_TEST_DEVICE=$device_id" >> "$GITHUB_ENV"
       - name: Build and test on simulator
+        # Xcode 27 can wait ten minutes collecting simulator sysdiagnoses even
+        # after all tests pass. Keep test results and attached screenshots.
         run: >-
           xcodebuild -project ios/RuntimeBrief.xcodeproj
           -scheme RuntimeBrief
           -sdk iphonesimulator
           -destination "platform=iOS Simulator,id=${IOS_TEST_DEVICE}"
+          -collect-test-diagnostics never
           CODE_SIGN_IDENTITY=-
           test
       - name: Test Siri through system App Intents
@@ -59,5 +62,6 @@ jobs:
           -sdk iphonesimulator
           -destination "platform=iOS Simulator,id=${IOS_TEST_DEVICE}"
           -skip-testing:RuntimeBriefSiriTests/SiriIntegrationUITests/testLiveSiriCreatesNativeSessions
+          -collect-test-diagnostics never
           CODE_SIGN_IDENTITY=-
           test
