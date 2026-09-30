@@ -33,11 +33,16 @@ final class AgentSessionUITests: XCTestCase {
             XCTAssertTrue(terminal.waitForExistence(timeout: 10)); terminal.tap()
             let input = app.textFields["session-terminal-input"]
             XCTAssertTrue(input.waitForExistence(timeout: 10))
-            let marker = "IOS-\(provider.uppercased())-CONTINUED"
+            let marker = "IOS-\(provider.uppercased())-\(UUID().uuidString.prefix(8))"
             input.tap(); input.typeText("Reply exactly \(marker). Then recall the text you put in native-proof.txt earlier.")
             app.buttons["session-terminal-send"].tap()
             let screen = app.descendants(matching: .any)["session-terminal-screen"]
-            let observed = expectation(for: NSPredicate(format: "label CONTAINS %@", marker), evaluatedWith: screen)
+            // Wait for the native reply as well as the single submitted prompt echo.
+            let replied = NSPredicate { value, _ in
+                guard let element = value as? XCUIElement else { return false }
+                return element.label.components(separatedBy: marker).count >= 3
+            }
+            let observed = expectation(for: replied, evaluatedWith: screen)
             await fulfillment(of: [observed], timeout: 45)
             let screenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
             screenshot.name = "\(provider) live native terminal"; screenshot.lifetime = .keepAlways; add(screenshot)
