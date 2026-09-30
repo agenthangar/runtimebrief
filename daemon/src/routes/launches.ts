@@ -7,6 +7,7 @@ const startSchema = z.object({
   requestId: z.uuid().transform(value => value.toLowerCase()),
   model: z.enum(CLAUDE_MODELS).default("default"),
   permissionMode: z.enum(CLAUDE_PERMISSION_MODES).default("manual"),
+  remoteControl: z.boolean().optional(),
   prompt: z.string().trim().min(10).max(8_000)
     .refine(value => !value.startsWith("/"), "Describe a task instead of a slash command.")
     .refine(value => !/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(value), "The prompt contains unsupported control characters."),
@@ -32,6 +33,7 @@ export function registerLaunchRoutes(app: FastifyInstance, deps: ServerDeps): vo
       if (!body.success) return reply.code(400).send({ error: "invalid_request", message: "Use a task description between 10 and 8,000 characters and a unique request ID." });
       const receipt = await deps.launches.start(req.params.id, body.data.requestId, body.data.prompt, {
         model: body.data.model, permissionMode: body.data.permissionMode,
+        ...(body.data.remoteControl === undefined ? {} : { remoteControl: body.data.remoteControl }),
       });
       return reply.code(202).send(receipt);
     });

@@ -73,6 +73,7 @@ final class ClaudeLaunchUITests: XCTestCase {
         let start = app.buttons["start-claude-task"]
         XCTAssertTrue(start.waitForExistence(timeout: 5))
         XCTAssertFalse(start.isEnabled)
+        XCTAssertEqual(app.switches["claude-remote-control-toggle"].value as? String, "1")
         app.buttons["claude-model-picker"].tap()
         app.buttons["Sonnet"].tap()
         app.buttons["claude-permissions-picker"].tap()
@@ -88,6 +89,11 @@ final class ClaudeLaunchUITests: XCTestCase {
         XCTAssertTrue(newTask.waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["Demo task ready to review. No work was sent to a Mac."].waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["Started with Sonnet · Bypass"].exists)
+        XCTAssertTrue(app.staticTexts["Remote Control connected"].exists)
+        let remote = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "remote-control-")).firstMatch
+        XCTAssertTrue(remote.exists)
+        remote.tap()
+        XCTAssertTrue(app.staticTexts["Demo only. No session was opened."].waitForExistence(timeout: 5))
         let screenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
         screenshot.name = "Claude task receipt"
         screenshot.lifetime = .keepAlways

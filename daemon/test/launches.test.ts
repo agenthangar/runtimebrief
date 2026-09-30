@@ -8,7 +8,7 @@ import { LaunchStore } from "../src/launches/store.js";
 import { LaunchService } from "../src/launches/service.js";
 import { NativeClaudeProvider } from "../src/launches/claude.js";
 import { desktopHasSession } from "../src/launches/desktop.js";
-import type { ClaudeProvider, NativeClaudeSession } from "../src/launches/types.js";
+import type { ClaudeProvider, NativeClaudeSession, ClaudeSessionBackend } from "../src/launches/types.js";
 import { authHeaders, testConfig, tmpdir } from "./helpers.js";
 
 const cleanups: (() => void | Promise<void>)[] = [];
@@ -150,13 +150,127 @@ describe("Claude launch API", () => {
     for (const prompt of ["", "/desktop", "x".repeat(8_001), "bad\u001bcontrol characters"]) {
       expect((await app.inject({ method: "POST", url, headers: authHeaders(), payload: { requestId: randomUUID(), prompt } })).statusCode).toBe(400);
     }
-    for (const options of [{ model: "--unsafe" }, { permissionMode: "auto; echo bad" }, { model: "unknown-model" }]) {
+    for (const options of [{ model: "--unsafe" }, { permissionMode: "auto; echo bad" }, { model: "unknown-model" }, { remoteControl: "true" }]) {
       expect((await app.inject({ method: "POST", url, headers: authHeaders(), payload: { requestId: randomUUID(), prompt: "Inspect this project", ...options } })).statusCode).toBe(400);
     }
     expect(provider.start).not.toHaveBeenCalled();
     const accepted = await app.inject({ method: "POST", url, headers: authHeaders(), payload: { requestId: randomUUID(), prompt: "Inspect the fictional export" } });
     expect(accepted.statusCode).toBe(202);
     expect(accepted.json().nativeId).toBe("1234abcd");
+  });
+});
+
+describe("replaceable session backend", () => {
+  function backend(): ClaudeSessionBackend {
+    return {
+      id: "t-legacy",
+      capability: vi.fn(async () => ({ available: true, message: "Ready" })),
+      create: vi.fn(async () => {}),
+      get: vi.fn(async receipt => ({ ...receipt, state: "starting", tmuxTarget: "fixture-terminal" })),
+      open: vi.fn(async () => { throw new Error("Use Remote Control"); }),
+    };
+  }
+
+  it("requests Remote Control by default through the API and treats explicit true as the same request", async () => {
+    const f = setup(); const t = backend();
+    const service = new LaunchService(f.config, f.provider, f.store, t);
+    const app = buildServer({ config: f.config, adapters: [], analyst: {} as never, launches: service });
+    service.close = () => {};
+    cleanups.push(() => app.close());
+    const url = "/v1/projects/fixture/claude-launches";
+    const body = { requestId: randomUUID(), prompt: "Inspect the fictional workflow" };
+    const first = await app.inject({ method: "POST", url, headers: authHeaders(), payload: body });
+    expect(first.statusCode).toBe(202);
+    expect(first.json().requestedRemoteControl).toBe(true);
+    const explicit = await app.inject({ method: "POST", url, headers: authHeaders(), payload: { ...body, remoteControl: true } });
+    expect(explicit.statusCode).toBe(202);
+    expect(explicit.json().id).toBe(first.json().id);
+    expect(t.create).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ requestedRemoteControl: true }), body.prompt);
+  });
+
+  it("rejects required Remote Control when the legacy native launcher is selected", async () => {
+    const f = setup();
+    await expect(f.service.start("fixture", randomUUID(), "Inspect the fictional workflow", { model: "default", permissionMode: "manual", remoteControl: true })).rejects.toMatchObject({ statusCode: 409, code: "unsupported" });
+    expect(f.provider.start).not.toHaveBeenCalled();
+  });
+
+  it("reserves once despite concurrent asynchronous capability checks", async () => {
+    const f = setup(); const t = backend();
+    const service = new LaunchService(f.config, f.provider, f.store, t);
+    const request = randomUUID();
+    const receipts = await Promise.all(Array.from({ length: 8 }, () => service.start("fixture", request, "Inspect the fictional workflow")));
+    expect(new Set(receipts.map(r => r.id)).size).toBe(1);
+    expect(t.create).toHaveBeenCalledTimes(1);
+    expect(f.provider.start).not.toHaveBeenCalled();
+    expect(receipts[0]).toMatchObject({ backend: "t-legacy", requestedRemoteControl: true, projectRoot: fs.realpathSync(f.dir) });
+  });
+
+  it("does not reserve setup failures or execute again after losing the launch response", async () => {
+    const f = setup(); const t = backend();
+    const service = new LaunchService(f.config, f.provider, f.store, t);
+    vi.mocked(t.capability).mockResolvedValueOnce({ available: false, message: "Install t" });
+    const request = randomUUID(); const prompt = "Inspect the fictional workflow";
+    await expect(service.start("fixture", request, prompt)).rejects.toMatchObject({ code: "requires_setup" });
+    expect(f.store.list("fixture")).toEqual([]);
+    vi.mocked(t.create).mockRejectedValueOnce(new Error("Lost response"));
+    const first = await service.start("fixture", request, prompt);
+    expect(first.state).toBe("unknown");
+    const restarted = new LaunchService(f.config, f.provider, f.store, t);
+    expect((await restarted.start("fixture", request, prompt)).id).toBe(first.id);
+    await restarted.list("fixture");
+    expect(t.create).toHaveBeenCalledTimes(1);
+    expect(t.get).toHaveBeenCalled();
+  });
+
+  it("keeps old background receipts on their original native provider", async () => {
+    const f = setup(); const old = await f.service.start("fixture", randomUUID(), "Inspect the fictional workflow");
+    const t = backend(); const upgraded = new LaunchService(f.config, f.provider, f.store, t);
+    expect((await upgraded.list("fixture")).launches[0]?.nativeId).toBe(old.nativeId);
+    await upgraded.open("fixture", old.id);
+    expect(f.provider.open).toHaveBeenCalledTimes(1);
+    expect(t.open).not.toHaveBeenCalled();
+    expect(t.get).not.toHaveBeenCalled();
+  });
+
+  it("preserves backend identity when a replacement is installed", async () => {
+    const f = setup(); const current = backend();
+    const service = new LaunchService(f.config, f.provider, f.store, current);
+    const request = randomUUID(); const prompt = "Inspect the fictional workflow";
+    const first = await service.start("fixture", request, prompt);
+    const replacement = backend(); Object.assign(replacement, { id: "t-api" });
+    const upgraded = new LaunchService(f.config, f.provider, f.store, replacement);
+    const old = (await upgraded.list("fixture")).launches[0]!;
+    expect(old).toMatchObject({ backend: "t-legacy", state: "unknown" });
+    expect((await upgraded.start("fixture", request, prompt)).id).toBe(first.id);
+    expect(replacement.create).not.toHaveBeenCalled();
+    expect(replacement.get).not.toHaveBeenCalled();
+    const withLegacy = new LaunchService(f.config, f.provider, f.store, replacement, [current]);
+    expect((await withLegacy.list("fixture")).launches[0]?.backend).toBe("t-legacy");
+    expect(current.get).toHaveBeenCalled();
+    expect(replacement.get).not.toHaveBeenCalled();
+  });
+
+  it("reserves atomically across independent store connections", () => {
+    const f = setup();
+    const other = new LaunchStore(path.join(f.dir, "launches.db")); cleanups.push(() => other.close());
+    const request = randomUUID();
+    const receipt = { id: randomUUID(), projectId: "fixture", name: "Fixture", createdAt: new Date().toISOString(), state: "starting" as const, message: "Starting", nativeId: null, sessionId: null, openedAt: null, cwd: f.dir };
+    expect(f.store.insert(request, "fixture-fingerprint", receipt).id).toBe(receipt.id);
+    expect(other.insert(request, "fixture-fingerprint", { ...receipt, id: randomUUID() }).id).toBe(receipt.id);
+    expect(f.store.list("fixture")).toHaveLength(1);
+    expect(() => other.insert(request, "different-fingerprint", { ...receipt, id: randomUUID() })).toThrow("different task");
+  });
+
+  it("allows explicit local-only launch and detects changed connection preferences", async () => {
+    const f = setup(); const t = backend();
+    const service = new LaunchService(f.config, f.provider, f.store, t);
+    const request = randomUUID(); const prompt = "Inspect the fictional workflow";
+    const local = await service.start("fixture", request, prompt, { model: "default", permissionMode: "manual", remoteControl: false });
+    expect(local.requestedRemoteControl).toBe(false);
+    expect(local.remoteControl).toBeUndefined();
+    await expect(service.start("fixture", request, prompt)).rejects.toMatchObject({ code: "request_conflict" });
+    const next = await service.start("fixture", randomUUID(), prompt);
+    expect(next.requestedRemoteControl).toBe(true);
   });
 });
 

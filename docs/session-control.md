@@ -1,10 +1,77 @@
 # Native session launch and takeover
 
-Status: Claude Code launch and native Desktop takeover implemented. Build 16
-adds default project access and model/permission selectors (2026-09-07).
+Status: current-t compatibility backend and Remote Control UI implemented.
+Older background launches retain their verified native Desktop handoff.
 Codex, Cursor, and control of pre-existing Desktop sessions remain research.
 
-## Implemented Claude flow
+## Default Claude flow through current t
+
+All integration changes live in RuntimeBrief. `runtimebriefd install-t` downloads
+the unchanged `agenthangar/t` commit `1643729085f647edc715353919e6b05baa61fce5`
+into RuntimeBrief's private tools directory and verifies its archive checksum.
+`install-service` installs that dependency automatically. Existing dotfiles and
+the user's `t` executable are unchanged. The default config is
+`claude_session_backend: t`; `native` retains the legacy background launcher.
+
+On the phone, select **New Claude task**, choose a model and permission mode,
+and start the task. **Remote Control** is on by default, with a local-only toggle.
+The daemon reserves a private SQLite receipt before bounded dispatch through
+the pinned public `t open` command. `t` creates its worktree and tmux session.
+A small RuntimeBrief bridge substitutes a clean shell and supplies the initial
+task as one native Claude argv argument. It suppresses terminal attachment;
+it never pastes a task into a terminal or answers trust/permission dialogs.
+No personal `.zshrc` is sourced.
+
+The current `t` requires a Git repository with `origin/main` and starts its new
+worktree there, fetching origin as part of its existing behavior. Shared-checkout
+launches are not offered by this adapter. A unique numeric slot derived from the
+receipt UUID avoids branch/session collisions. Worktrees live under
+RuntimeBrief's private directory, outside the human worktree sweep. The actual
+workspace is recorded; local uncommitted edits are not copied into it.
+The evidence adapter associates external worktree transcripts with their
+owning Git repository, so these sessions appear in the project's brief too.
+
+The receipt independently records `backend`, `launchState`, `activity`, and
+`remoteControl`. A tmux identity is not task acknowledgment: Claude's exact
+native transcript must contain the submitted task. A Remote Control link is
+shown only when that conversation reports an active native connection and its
+terminal still has the same native identity. Disconnections and missing owners
+remove the link. The preference is echoed as `requestedRemoteControl`.
+The native URL is never constructed from a guessed session identifier.
+
+Use **Open Remote Control** to continue in Claude's web/mobile surface, or copy
+the exact `tmux attach -t ...` command to a terminal on your Mac. Your installed
+`t ls -a` can also list these sessions; older `t` versions may not attach by a
+conversation UUID or resolve their title. Claude sign-in, workspace trust,
+Remote Control eligibility, and trusted-device verification remain native setup
+steps. Remote Control failure does not send the task again.
+
+Requests that fail read-only setup checks are not reserved. Once reserved, lost
+responses, duplicate submissions, and daemon restarts never dispatch again.
+The private temporary task file is removed when the native runner consumes it;
+receipts retain a hash for acknowledgment, not task text. Native Claude history
+and t's private terminal log remain their normal local records.
+
+`ClaudeSessionBackend` is the replacement seam. A future implementation of
+[the t API proposal](session-manager/README.md) can replace the new-session
+backend while retaining the legacy backend for its existing receipts. Upgrades
+never adopt, migrate, or relaunch a conversation implicitly. This compatibility
+backend does not implement or claim conformance to the proposed `t api` wire
+schema; RuntimeBrief owns the durable receipts during this interim phase.
+
+Implementation verification used a fictional Git fixture, the pinned unchanged
+`t`, and real Claude Code on a Mac. Concurrent authenticated API requests created
+one receipt; the task wrote the exact expected file, acknowledged the initial
+prompt, and reported a native Remote Control connection. Reopening the receipt
+store returned the same task without dispatching again. A separate explicit
+local-only task completed without registering a remote bridge. Automated tests
+cover hostile prompt argv, changed owners, exit/disconnection, backend upgrades,
+and retries. Simulator tests and a fresh Revyl cloud build verify the demo
+composer, default-on toggle, receipt, and demo continuation button. Browser
+continuation requires Claude's trusted-device verification; a physical-phone
+launch and browser follow-up were not established by these checks.
+
+## Legacy background flow
 
 Registered projects, including automatic discoveries, allow Claude launches by
 default. `claude_launch_enabled: false` is an explicit per-project opt-out. The
@@ -88,7 +155,8 @@ Send `POST /v1/projects/:id/claude-launches` with JSON such as:
   "requestId": "11111111-1111-4111-8111-111111111111",
   "prompt": "Review the fictional export workflow and describe the next step.",
   "model": "fable",
-  "permissionMode": "auto"
+  "permissionMode": "auto",
+  "remoteControl": true
 }
 ```
 
@@ -96,6 +164,10 @@ Generate a fresh UUID for each new task; the UUID above is only an example.
 Prompts are trimmed and must contain 10–8,000 characters. Slash commands,
 unsupported control characters, unknown fields, and unsupported option values
 are rejected with HTTP 400.
+Omitted `remoteControl` means true for the t backend; false explicitly disables
+the connection for that launch without changing provider-global settings.
+The explicit legacy `native` backend rejects a new request for Remote Control;
+old requests without that field and existing receipts remain compatible.
 
 | iOS model label | `model` value | Behavior |
 | --- | --- | --- |
@@ -120,18 +192,28 @@ The receipt includes `id`, `projectId`, `name`, `createdAt`, `state`, `message`,
 `permissionMode` choices. Native IDs can be null until acknowledged. States
 include `starting`, `running`, `needs_input`, `completed`, `stopped`, `failed`,
 `unknown`, and `in_desktop`.
+New t receipts additionally include `backend: "t-legacy"`, `projectRoot`,
+`tmuxTarget`, `launchState`, `activity`, `requestedRemoteControl`, and
+`remoteControl: { state, url, observedAt }`. A ready connection is independent
+of task acknowledgment or turn completion. The list remains the existing
+latest-20 product API; it is not the proposed exhaustive `t api` list.
 
 Retry the same task/settings with the same `requestId`. Reusing an ID with a
 different prompt, project, model, or permission mode returns HTTP 409
 `request_conflict`. A disabled project returns HTTP 403 `launch_disabled`;
 an unregistered project returns HTTP 404. Refresh uncertain receipts before
 deciding to create a new request.
+Changing the Remote Control preference also conflicts. Setup failures from the
+t backend return HTTP 409 `requires_setup` before reservation.
 
 `POST /v1/projects/:id/claude-launches/:launchId/open` transfers a confirmed
 conversation to Desktop and returns the updated receipt. It does not accept a
 new prompt or new launch choices. `model` and `permissionMode` always describe
 the launch, not Desktop's current settings. Once handed off, later requests
 only open Desktop and never resume or replay the old CLI conversation.
+This endpoint applies to legacy background receipts. A t receipt returns
+`use_native_session`; its native Remote Control link and terminal are the
+continuation surfaces.
 
 ## First milestone
 

@@ -45,7 +45,21 @@ struct ClaudeLaunchView: View {
                     }
                     Text(launch.message).font(.caption).foregroundStyle(.secondary)
                     Text("Started with \(launch.settingsLabel)").font(.caption.weight(.medium))
-                    if let nativeID = launch.nativeId {
+                    if let remote = launch.remoteControl {
+                        Text(remote.label).font(.caption).foregroundStyle(.secondary)
+                        if remote.state == "ready", RuntimeBriefModeStore.isDemoEnabled {
+                            Button("Open Remote Control") { openMessage = "Demo only. No session was opened." }
+                                .accessibilityIdentifier("remote-control-\(launch.id)")
+                        } else if remote.state == "ready", let url = remote.nativeURL {
+                            Link("Open Remote Control", destination: url)
+                                .accessibilityIdentifier("remote-control-\(launch.id)")
+                        }
+                    }
+                    if let target = launch.tmuxTarget {
+                        Text("On your Mac: tmux attach -t \(target)")
+                            .font(.caption.monospaced()).textSelection(.enabled)
+                    }
+                    if let nativeID = launch.nativeId, launch.backend == nil {
                         Text("Session \(nativeID)").font(.caption.monospaced()).foregroundStyle(.secondary)
                         Button {
                             Task { await open(launch) }
@@ -55,7 +69,7 @@ struct ClaudeLaunchView: View {
                         .disabled(openingID != nil)
                         .accessibilityIdentifier("take-over-claude-\(launch.id)")
                     }
-                    if launch.openedAt == nil && launch.nativeId != nil {
+                    if launch.backend == nil && launch.openedAt == nil && launch.nativeId != nil {
                         Text("Moves the saved conversation to Desktop and stops any current response. Desktop may apply its own permission mode.")
                             .font(.caption2).foregroundStyle(.secondary)
                     }
@@ -116,6 +130,7 @@ private struct ClaudeTaskComposer: View {
     @State private var errorMessage: String?
     @State private var model: ClaudeModel = .default
     @State private var permissionMode: ClaudePermissionMode = .manual
+    @State private var remoteControl = true
     @FocusState private var focused: Bool
 
     private var taskPrompt: String { prompt.trimmingCharacters(in: .whitespacesAndNewlines) }
@@ -145,6 +160,10 @@ private struct ClaudeTaskComposer: View {
                     Text(permissionMode.explanation)
                         .font(.caption)
                         .foregroundStyle(permissionMode == .bypassPermissions ? .orange : .secondary)
+                    Toggle("Remote Control", isOn: $remoteControl)
+                        .accessibilityIdentifier("claude-remote-control-toggle")
+                    Text("Connect through your Claude account from another device. Availability depends on Claude setup on your Mac.")
+                        .font(.caption).foregroundStyle(.secondary)
                 } footer: {
                     Text(model == .default ? "Uses your Mac's configured model." : "Uses the latest \(model.label) available to your Claude account.")
                 }
@@ -199,16 +218,16 @@ private struct ClaudeTaskComposer: View {
         defer { sending = false }
         let prompt = taskPrompt
         let scope = RuntimeBriefModeStore.isDemoEnabled ? "demo" : (ServerSettings.load().baseURL?.absoluteString ?? "unconfigured")
-        let request = ClaudeLaunchDraft.request(projectID: project.id, scope: scope, prompt: prompt, model: model, permissionMode: permissionMode)
+        let request = ClaudeLaunchDraft.request(projectID: project.id, scope: scope, prompt: prompt, model: model, permissionMode: permissionMode, remoteControl: remoteControl)
         do {
             let receipt = try await source.startClaude(projectID: project.id, request: request)
             if receipt.state == "failed" {
-                ClaudeLaunchDraft.clear(projectID: project.id, scope: scope, prompt: prompt, model: model, permissionMode: permissionMode)
+                ClaudeLaunchDraft.clear(projectID: project.id, scope: scope, prompt: prompt, model: model, permissionMode: permissionMode, remoteControl: remoteControl)
                 errorMessage = receipt.message
             } else {
                 // Keep uncertain requests stable across reconnects and app restarts.
                 if receipt.state != "unknown" {
-                    ClaudeLaunchDraft.clear(projectID: project.id, scope: scope, prompt: prompt, model: model, permissionMode: permissionMode)
+                    ClaudeLaunchDraft.clear(projectID: project.id, scope: scope, prompt: prompt, model: model, permissionMode: permissionMode, remoteControl: remoteControl)
                 }
                 dismiss()
             }
@@ -219,23 +238,24 @@ private struct ClaudeTaskComposer: View {
 }
 
 enum ClaudeLaunchDraft {
-    private static func key(projectID: String, scope: String, prompt: String, model: ClaudeModel, permissionMode: ClaudePermissionMode) -> String {
+    private static func key(projectID: String, scope: String, prompt: String, model: ClaudeModel, permissionMode: ClaudePermissionMode, remoteControl: Bool) -> String {
         // Keep default-mode retry keys compatible with already-sent build-15 tasks.
         var identity = [scope, projectID, prompt]
         if model != .default || permissionMode != .manual { identity += [model.rawValue, permissionMode.rawValue] }
+        if !remoteControl { identity += ["remoteControl", "false"] }
         let input = try! JSONEncoder().encode(identity)
         let digest = SHA256.hash(data: input).map { String(format: "%02x", $0) }.joined()
         return "runtimebrief.claude.request.\(digest)"
     }
 
-    static func request(projectID: String, scope: String, prompt: String, model: ClaudeModel = .default, permissionMode: ClaudePermissionMode = .manual, defaults: UserDefaults = .standard) -> ClaudeLaunchRequest {
-        let key = key(projectID: projectID, scope: scope, prompt: prompt, model: model, permissionMode: permissionMode)
+    static func request(projectID: String, scope: String, prompt: String, model: ClaudeModel = .default, permissionMode: ClaudePermissionMode = .manual, remoteControl: Bool = true, defaults: UserDefaults = .standard) -> ClaudeLaunchRequest {
+        let key = key(projectID: projectID, scope: scope, prompt: prompt, model: model, permissionMode: permissionMode, remoteControl: remoteControl)
         let id = defaults.string(forKey: key) ?? UUID().uuidString.lowercased()
         defaults.set(id, forKey: key)
-        return ClaudeLaunchRequest(requestId: id, prompt: prompt, model: model, permissionMode: permissionMode)
+        return ClaudeLaunchRequest(requestId: id, prompt: prompt, model: model, permissionMode: permissionMode, remoteControl: remoteControl)
     }
 
-    static func clear(projectID: String, scope: String, prompt: String, model: ClaudeModel = .default, permissionMode: ClaudePermissionMode = .manual, defaults: UserDefaults = .standard) {
-        defaults.removeObject(forKey: key(projectID: projectID, scope: scope, prompt: prompt, model: model, permissionMode: permissionMode))
+    static func clear(projectID: String, scope: String, prompt: String, model: ClaudeModel = .default, permissionMode: ClaudePermissionMode = .manual, remoteControl: Bool = true, defaults: UserDefaults = .standard) {
+        defaults.removeObject(forKey: key(projectID: projectID, scope: scope, prompt: prompt, model: model, permissionMode: permissionMode, remoteControl: remoteControl))
     }
 }

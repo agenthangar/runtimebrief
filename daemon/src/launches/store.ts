@@ -30,9 +30,10 @@ export class LaunchStore {
     return JSON.parse(row.receipt) as ClaudeLaunch;
   }
 
-  insert(requestId: string, fingerprint: string, receipt: ClaudeLaunch): void {
-    this.db.prepare("INSERT INTO launches VALUES (?, ?, ?, ?, ?)")
+  insert(requestId: string, fingerprint: string, receipt: ClaudeLaunch): ClaudeLaunch {
+    const result = this.db.prepare("INSERT INTO launches VALUES (?, ?, ?, ?, ?) ON CONFLICT(request_id) DO NOTHING")
       .run(receipt.id, requestId, fingerprint, receipt.projectId, JSON.stringify(receipt));
+    return result.changes ? receipt : this.byRequest(requestId, fingerprint)!;
   }
 
   get(id: string, projectId: string): ClaudeLaunch | null {

@@ -13,6 +13,11 @@ struct ClaudeLaunch: Decodable, Identifiable, Sendable, Equatable {
     let openedAt: Date?
     var model: String? = nil
     var permissionMode: String? = nil
+    var backend: String? = nil
+    var tmuxTarget: String? = nil
+    var launchState: String? = nil
+    var requestedRemoteControl: Bool? = nil
+    var remoteControl: ClaudeRemoteControl? = nil
 
     var settingsLabel: String {
         let model = ClaudeModel(rawValue: model ?? "default")?.label ?? "Claude"
@@ -34,6 +39,28 @@ struct ClaudeLaunch: Decodable, Identifiable, Sendable, Equatable {
     }
 }
 
+struct ClaudeRemoteControl: Decodable, Sendable, Equatable {
+    let state: String
+    let url: String?
+
+    var nativeURL: URL? {
+        guard let url,
+              url.range(of: #"^https://claude\.ai/code/session_[A-Za-z0-9_-]+$"#, options: .regularExpression) != nil
+        else { return nil }
+        return URL(string: url)
+    }
+
+    var label: String {
+        switch state {
+        case "ready": "Remote Control connected"
+        case "disabled": "Remote Control off"
+        case "starting": "Remote Control starting"
+        case "unavailable": "Remote Control needs setup in Claude"
+        default: "Remote Control connection unconfirmed"
+        }
+    }
+}
+
 struct ClaudeLaunchCapability: Decodable, Sendable, Equatable {
     let available: Bool
     let message: String
@@ -49,6 +76,7 @@ struct ClaudeLaunchRequest: Encodable, Sendable {
     let prompt: String
     var model: ClaudeModel = .default
     var permissionMode: ClaudePermissionMode = .manual
+    var remoteControl: Bool = true
 }
 
 enum ClaudeModel: String, Codable, CaseIterable, Identifiable, Sendable {

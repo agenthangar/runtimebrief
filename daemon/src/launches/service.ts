@@ -3,19 +3,26 @@ import fs from "node:fs";
 import type { RuntimeBriefConfig } from "../config.js";
 import { projectsForConfig } from "../projectRegistry.js";
 import { LaunchStore } from "./store.js";
-import { DEFAULT_LAUNCH_OPTIONS, LaunchError, type ClaudeLaunchOptions, type ClaudeLaunch, type ClaudeProvider, type NativeClaudeSession } from "./types.js";
+import { DEFAULT_LAUNCH_OPTIONS, LaunchError, type ClaudeLaunchOptions, type ClaudeLaunch, type ClaudeProvider, type NativeClaudeSession, type ClaudeSessionBackend } from "./types.js";
+import { promptHash } from "./tLegacy.js";
 
 export const CLAUDE_LAUNCH_ACTION = "launch-claude";
 
 export class LaunchService {
   private readonly pending = new Map<string, Promise<ClaudeLaunch>>();
   private readonly opening = new Map<string, Promise<ClaudeLaunch>>();
+  private readonly backends: Map<string, ClaudeSessionBackend>;
 
   constructor(
     private readonly config: RuntimeBriefConfig,
     private readonly provider: ClaudeProvider,
     private readonly store: LaunchStore,
-  ) {}
+    private readonly backend?: ClaudeSessionBackend,
+    previousBackends: ClaudeSessionBackend[] = [],
+  ) {
+    this.backends = new Map(previousBackends.map(value => [value.id, value]));
+    if (backend) this.backends.set(backend.id, backend);
+  }
 
   private project(id: string, requireWrite: boolean) {
     const project = projectsForConfig(this.config).find(p => p.id === id);
@@ -31,14 +38,17 @@ export class LaunchService {
     let capability;
     try {
       this.project(projectId, true);
-      capability = await this.provider.capability();
+      capability = this.backend ? await this.backend.capability(this.project(projectId, true).path) : await this.provider.capability();
     } catch (error) {
       if (!(error instanceof LaunchError)) throw error;
       capability = { available: false, message: error.message };
     }
+    const receipts = this.store.list(projectId);
     let native: NativeClaudeSession[] | null = null;
-    try { native = await this.provider.sessions(); } catch { /* preserve receipts when Claude is unavailable */ }
-    const launches = this.store.list(projectId).map(receipt => this.reconcile(receipt, native));
+    if (receipts.some(receipt => !receipt.backend)) {
+      try { native = await this.provider.sessions(); } catch { /* preserve old receipts */ }
+    }
+    const launches = await Promise.all(receipts.map(receipt => receipt.backend ? this.observeBackend(receipt) : this.reconcile(receipt, native)));
     return { capability, launches };
   }
 
@@ -47,9 +57,13 @@ export class LaunchService {
     // Preserve request identity for retries from older clients using the defaults.
     const identity: unknown[] = [projectId, prompt];
     if (options.model !== "default" || options.permissionMode !== "manual") identity.push(options.model, options.permissionMode);
+    if (options.remoteControl === false) identity.push("remoteControl", false);
     const fingerprint = createHash("sha256").update(JSON.stringify(identity)).digest("hex");
     const previous = this.store.byRequest(requestId, fingerprint);
     if (previous) return this.pending.get(requestId) ?? previous;
+    if (!this.backend && options.remoteControl === true) {
+      throw new LaunchError(409, "unsupported", "The legacy background launcher does not support Remote Control. Select local-only or install the t launcher.");
+    }
     // The synchronous reservation prevents two in-flight requests from dispatching twice.
     let cwd: string;
     try {
@@ -58,20 +72,45 @@ export class LaunchService {
     } catch {
       throw new LaunchError(409, "project_unavailable", "The project folder is no longer available on your Mac.");
     }
+    if (this.backend) {
+      const capability = await this.backend.capability(cwd);
+      if (!capability.available) throw new LaunchError(409, "requires_setup", capability.message);
+      // Capability checks yield. Another request may have reserved while we checked.
+      const reserved = this.store.byRequest(requestId, fingerprint);
+      if (reserved) return this.pending.get(requestId) ?? reserved;
+    }
     const id = randomUUID();
     const receipt: ClaudeLaunch = {
       id, projectId, name: `RuntimeBrief ${project.name} ${id}`,
       createdAt: new Date().toISOString(), cwd, nativeId: null, sessionId: null, openedAt: null,
       state: "starting", message: "Checking Claude Code on your Mac…",
-      ...options,
+      model: options.model, permissionMode: options.permissionMode,
+      ...(this.backend ? {
+        backend: this.backend.id, projectRoot: cwd, promptHash: promptHash(prompt),
+        launchState: "starting" as const, activity: "unknown" as const,
+        requestedRemoteControl: options.remoteControl !== false,
+      } : {}),
     };
-    this.store.insert(requestId, fingerprint, receipt);
+    const reserved = this.store.insert(requestId, fingerprint, receipt);
+    if (reserved.id !== id) return this.pending.get(requestId) ?? reserved;
     const task = this.dispatch(receipt, prompt);
     this.pending.set(requestId, task);
     try { return await task; } finally { this.pending.delete(requestId); }
   }
 
   private async dispatch(receipt: ClaudeLaunch, prompt: string): Promise<ClaudeLaunch> {
+    if (receipt.backend) {
+      try {
+        await this.backend!.create(receipt, prompt);
+        return await this.observeBackend(receipt);
+      } catch {
+        receipt.state = "unknown";
+        receipt.launchState = "unknown";
+        receipt.message = "The t launch result is uncertain. Refresh this receipt before starting another task.";
+        this.store.save(receipt);
+        return receipt;
+      }
+    }
     const capability = await this.provider.capability().catch(() => ({ available: false, message: "Claude Code is unavailable on your Mac." }));
     if (!capability.available) {
       receipt.state = "failed";
@@ -93,6 +132,24 @@ export class LaunchService {
       this.store.save(receipt);
       return receipt;
     }
+  }
+
+  private async observeBackend(receipt: ClaudeLaunch): Promise<ClaudeLaunch> {
+    const backend = this.backends.get(receipt.backend!);
+    if (!backend) {
+      receipt.state = "unknown";
+      receipt.message = "This session belongs to a backend that is currently unavailable. Its task will not be replayed.";
+      if (receipt.remoteControl) receipt.remoteControl = { state: "unknown", url: null, observedAt: new Date().toISOString() };
+    } else {
+      try { receipt = await backend.get(receipt); }
+      catch {
+        receipt.state = "unknown";
+        receipt.message = "Current t status is unavailable. Check its native session on your Mac.";
+        if (receipt.remoteControl) receipt.remoteControl = { state: "unknown", url: null, observedAt: new Date().toISOString() };
+      }
+    }
+    this.store.save(receipt);
+    return receipt;
   }
 
   private reconcile(receipt: ClaudeLaunch, native: NativeClaudeSession[] | null): ClaudeLaunch {
@@ -140,6 +197,12 @@ export class LaunchService {
     this.project(projectId, true);
     const receipt = this.store.get(id, projectId);
     if (!receipt) throw new LaunchError(404, "not_found", "This launch could not be found.");
+    if (receipt.backend) {
+      const backend = this.backends.get(receipt.backend);
+      if (!backend) throw new LaunchError(409, "backend_unavailable", "The original session backend is unavailable. The task will not be replayed.");
+      await backend.open(receipt);
+      return receipt;
+    }
     if (!receipt.nativeId) throw new LaunchError(409, "not_ready", "Claude has not confirmed a session yet. Refresh before taking over.");
     if (this.opening.has(id)) return this.opening.get(id)!;
     const task = this.provider.open(receipt).then(() => {

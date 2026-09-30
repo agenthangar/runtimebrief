@@ -12,13 +12,15 @@ actor DemoClaudeTasks {
         )
     }
 
-    func start(projectID: String, requestID: String, model: ClaudeModel, permissionMode: ClaudePermissionMode) -> ClaudeLaunch {
+    func start(projectID: String, requestID: String, model: ClaudeModel, permissionMode: ClaudePermissionMode, remoteControl: Bool = true) -> ClaudeLaunch {
         if let existing = tasks.first(where: { $0.id == requestID && $0.projectId == projectID }) { return existing }
         let launch = ClaudeLaunch(
             id: requestID, projectId: projectID, name: "Demo Claude task", createdAt: Date(),
             state: "completed", message: "Demo task ready to review. No work was sent to a Mac.",
             nativeId: "demo-task", sessionId: nil, cwd: "/demo/sample-tracker", openedAt: nil,
-            model: model.rawValue, permissionMode: permissionMode.rawValue
+            model: model.rawValue, permissionMode: permissionMode.rawValue,
+            backend: "t-legacy", requestedRemoteControl: remoteControl,
+            remoteControl: ClaudeRemoteControl(state: remoteControl ? "ready" : "disabled", url: nil)
         )
         tasks.insert(launch, at: 0)
         return launch

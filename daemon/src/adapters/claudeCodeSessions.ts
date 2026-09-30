@@ -728,6 +728,20 @@ function pathIsWithin(candidate: string, parent: string): boolean {
   );
 }
 
+/** Linked worktrees share Git metadata even when they live outside the project. */
+function gitCommonDirectory(directory: string): string | null {
+  try {
+    let gitdir = path.join(directory, ".git");
+    if (!fs.statSync(gitdir).isDirectory()) {
+      const match = /^gitdir: (.+)$/.exec(fs.readFileSync(gitdir, "utf8").trim());
+      if (!match) return null;
+      gitdir = path.resolve(directory, match[1]!);
+    }
+    const common = path.join(gitdir, "commondir");
+    return fs.realpathSync(fs.existsSync(common) ? path.resolve(gitdir, fs.readFileSync(common, "utf8").trim()) : gitdir);
+  } catch { return null; }
+}
+
 function claudeSessionMatchesProject(
   session: ParsedSession,
   projectPath: string,
@@ -736,6 +750,10 @@ function claudeSessionMatchesProject(
     session.workspacePaths ?? (session.cwd ? [session.cwd] : []);
   if (workspaces.some((workspace) => pathIsWithin(workspace, projectPath)))
     return true;
+  // Require the registered folder itself to be a Git root. Sharing a monorepo
+  // parent alone must not mix sessions between separately registered subfolders.
+  const projectGit = gitCommonDirectory(projectPath);
+  if (projectGit && workspaces.some(workspace => gitCommonDirectory(workspace) === projectGit)) return true;
   for (const workspace of workspaces) {
     if (!pathIsWithin(projectPath, workspace)) continue;
     if (
@@ -827,10 +845,15 @@ export interface ParsedSession {
   workspacePaths?: string[];
   /** Claude Desktop's local title, used only as a summary fallback. */
   title?: string | null;
+  /** Latest native bridge report; observation only, never a synthesized connection. */
+  remoteControlStatus?: { content: string; url: unknown; timestamp: string | null };
 }
 
 interface TranscriptLine {
   type?: string;
+  subtype?: string;
+  content?: string;
+  url?: unknown;
   timestamp?: string;
   sessionId?: string;
   gitBranch?: string;
@@ -922,6 +945,13 @@ export async function parseClaudeSessionFile(
       // Sidechains are subagent threads; their prompts aren't the user's.
       // TODO: surface sidechain summaries separately if they prove useful.
       if (record.isSidechain === true) continue;
+
+      if (record.type === "system" && record.subtype === "bridge_status" && record.sessionId === session.sessionId) {
+        session.remoteControlStatus = {
+          content: typeof record.content === "string" ? record.content : "", url: record.url,
+          timestamp: record.timestamp && !Number.isNaN(Date.parse(record.timestamp)) ? record.timestamp : null,
+        };
+      }
 
       if (record.type === "user" && record.message?.role === "user") {
         const text =
