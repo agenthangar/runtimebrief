@@ -1,7 +1,7 @@
 import Foundation
 
 /// Server URL lives in UserDefaults; the token lives in the Keychain only.
-struct ServerSettings: Sendable {
+struct ServerSettings: Sendable, Equatable {
     var baseURL: URL?
     var token: String?
 

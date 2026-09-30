@@ -11,7 +11,7 @@ settings:
     SWIFT_VERSION: "6.0"
     SWIFT_STRICT_CONCURRENCY: complete
     CODE_SIGN_STYLE: Automatic
-    CURRENT_PROJECT_VERSION: 19
+    CURRENT_PROJECT_VERSION: 20
     MARKETING_VERSION: "1.0.2"
 packages:
   SwiftTerm:
@@ -90,7 +90,13 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.runtimebrief.app.siri-tests
-        GENERATE_INFOPLIST_FILE: true
+    info:
+      path: RuntimeBriefSiriTests/Info.plist
+      properties:
+        RUNTIMEBRIEF_E2E_SERVER_URL: $(RUNTIMEBRIEF_E2E_SERVER_URL)
+        RUNTIMEBRIEF_E2E_TOKEN: $(RUNTIMEBRIEF_E2E_TOKEN)
+        RUNTIMEBRIEF_E2E_PROJECT_ID: $(RUNTIMEBRIEF_E2E_PROJECT_ID)
+        RUNTIMEBRIEF_E2E_SIRI_LIVE: $(RUNTIMEBRIEF_E2E_SIRI_LIVE)
 schemes:
   RuntimeBrief:
     build:

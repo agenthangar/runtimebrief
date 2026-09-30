@@ -79,6 +79,22 @@ personal signing change local; do not commit it or change the production
 | List projects | List my RuntimeBrief projects | Project entities |
 | Open project | Open Sample Tracker in RuntimeBrief | Opens project detail |
 | Ask the analyst | Ask RuntimeBrief a question about Sample Tracker | Answer text |
+| Start coding session | Start a Codex session in RuntimeBrief | Session receipt ID |
+
+**Start Coding Session** supports Claude Code, Codex, and Cursor through the
+same `/sessions` API and `t` launchers as the app. Siri asks for the project,
+agent, and task, then confirms the destination and settings before writing.
+The device must be locally authenticated. Advanced Shortcuts parameters offer
+the Mac's current model choices, reasoning, permissions (Manual by default),
+and Remote Control (on by default). Unsupported or unavailable choices stop
+before a launch. The action validates the live project rather than trusting
+an offline snapshot. Changing the connection during confirmation stops it.
+
+The spoken result distinguishes starting, working, needs-input, ready-to-review,
+failed, and uncertain receipts from Remote Control readiness. A lost response
+or uncertain receipt retains the same durable request ID across retries,
+including retries from the app. After a confirmed receipt, repeating the task
+creates a new session. Demo launches remain fictional and never contact a Mac.
 
 Status, attention, and list actions read `/v1/projects` with a five-second
 network timeout. They never start an analyst. Status includes the evidence
@@ -121,34 +137,41 @@ If the runtime rejects this framework with security error 803, those tests
 explicitly skip; other errors fail. Existing live daemon and Claude tests need
 their separately documented E2E configuration.
 
+Session tests exercise the real client encoding and `/sessions` endpoint for
+all three providers, confirmation cancellation, invalid settings, removed
+projects, authorization/setup failures, uncertain retries, and demo isolation.
+Cloud Shortcuts checks cover the actual parameter chooser and confirmation UI.
+For opt-in native Siri coverage, set `RUNTIMEBRIEF_E2E_SIRI_LIVE=1` plus
+`RUNTIMEBRIEF_E2E_SERVER_URL`, `RUNTIMEBRIEF_E2E_TOKEN`, and
+`RUNTIMEBRIEF_E2E_PROJECT_ID` for an isolated daemon and disposable Git fixture.
+Run `SiriIntegrationUITests/testLiveSiriCreatesNativeSessions`. It checks real
+project-scoped `t` receipts for each provider; native workspace trust, sign-in,
+and final task completion need separate observation on the fixture.
+
 Before release, test spoken requests and the Siri card on a physical iOS 27
 device with Siri configured, including ambiguous names, an offline Mac, and
 discovery opt-out. A simulator test does not verify speech recognition or
 Apple Intelligence routing.
 
-## Start a Claude task
+## Start a coding task
 
-Use iOS build 16 or newer and an updated daemon for the model and permission
-selectors. Install and sign in to Claude Code and Claude Desktop on your Mac.
+Use an updated daemon with the `t` session launchers. Install and sign in to
+the coding agents you want to use on your Mac.
 All registered projects allow tasks by default, including projects discovered
 later under a trusted root.
 
-1. Open a project and tap **New task** in its **Claude Code** section.
-2. Choose **Claude default**, **Fable**, **Opus**, **Sonnet**, or **Haiku**.
-   Claude default uses the Mac's configured model; named choices use Claude's
-   model aliases. Availability depends on the installed Claude version and
-   account.
-3. Choose **Manual** (the default), **Auto**, **Accept Edits**, **Plan**,
-   **Bypass**, or **Pre-approved Only**. The explanation below the selector
-   describes the mode. Bypass runs tools without permission prompts; select
-   it only for trusted work. Auto also depends on the selected model/account.
-4. Enter a task of 10–8,000 characters and tap **Start in Claude Code**.
+1. Open a project and tap **New task** in its **Coding agents** section.
+2. Choose Claude Code, Codex, or Cursor, then a model offered by its native
+   harness. Native default uses the Mac's configured model and reasoning.
+3. Choose permissions and, where supported, reasoning. Manual is the default;
+   the explanation describes the selected mode. Remote Control starts on.
+4. Enter a task of 10–8,000 characters and tap **Start in** the selected agent.
    The button remains visible above the keyboard. The receipt shows status
    and the original model/permission choices under **Started with**.
-5. Tap **Open in Claude Desktop** to move the saved conversation to the Mac
-   app. This stops any current background response. Select the RuntimeBrief
-   task in Desktop, check its permission mode, and send a follow-up to continue.
-   Desktop may reset the permission mode during handoff.
+5. Continue Claude through its Remote Control link, or open the Codex/Cursor
+   terminal when its connection is ready. Legacy Claude receipts may offer
+   Desktop handoff; that stops a current response and Desktop can apply its
+   own permissions.
 
 Claude keeps working when the phone disconnects. If a request has an uncertain
 result, refresh its receipt before starting another task. Retrying the same

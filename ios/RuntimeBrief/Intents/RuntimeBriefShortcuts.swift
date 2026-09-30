@@ -3,6 +3,16 @@ import AppIntents
 struct RuntimeBriefShortcuts: AppShortcutsProvider {
     static var appShortcuts: [AppShortcut] {
         AppShortcut(
+            intent: StartSessionIntent(),
+            phrases: [
+                "Start a coding session in \(.applicationName)",
+                "Start a \(\.$provider) session in \(.applicationName)",
+                "Start a task for \(\.$project) in \(.applicationName)",
+            ],
+            shortTitle: "Start Coding Session",
+            systemImageName: "terminal"
+        )
+        AppShortcut(
             intent: GetAttentionIntent(),
             phrases: [
                 "What needs attention in \(.applicationName)",
