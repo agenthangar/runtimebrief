@@ -8,7 +8,7 @@ import {
   sessionMatchesProject,
 } from "../src/adapters/codexSessions.js";
 import type { ProjectConfig } from "../src/types.js";
-import { tmpdir } from "./helpers.js";
+import { git, makeFixtureRepo, tmpdir } from "./helpers.js";
 
 // Fixture records mirror the real Codex CLI 0.144.x rollout shape, verified
 // against live rollouts on this machine (see docs/adapters.md).
@@ -162,6 +162,26 @@ describe("sessionMatchesProject", () => {
   });
   afterAll(() => fs.rmSync(dir, { recursive: true, force: true }));
 
+  it("matches an external linked worktree only to its owning Git root", async () => {
+    const repo = makeFixtureRepo();
+    const other = makeFixtureRepo();
+    const worktree = path.join(dir, "linked-worktree");
+    try {
+      git(repo, "worktree", "add", "--detach", worktree);
+      const rollout = path.join(dir, "linked.jsonl");
+      fs.writeFileSync(rollout, sessionMeta("2026-07-11T20:00:00Z", worktree));
+      expect(await sessionMatchesProject(rollout, worktree, repo)).toBe(true);
+      expect(await sessionMatchesProject(rollout, worktree, fs.realpathSync(repo))).toBe(true);
+      expect(await sessionMatchesProject(rollout, worktree, other)).toBe(false);
+      fs.mkdirSync(path.join(repo, "subproject"));
+      expect(await sessionMatchesProject(rollout, worktree, path.join(repo, "subproject"))).toBe(false);
+      expect(await sessionMatchesProject(rollout, path.join(dir, "missing"), repo)).toBe(false);
+    } finally {
+      fs.rmSync(repo, { recursive: true, force: true });
+      fs.rmSync(other, { recursive: true, force: true });
+    }
+  });
+
   it("matches a parent-workspace session only when it references the project path", async () => {
     const sampleSite = path.join(dir, "sampleSite.jsonl");
     fs.writeFileSync(
@@ -205,6 +225,35 @@ describe("parseCodexSessionFile", () => {
     fs.writeFileSync(file, buildFixtureRollout());
   });
   afterAll(() => fs.rmSync(path.dirname(file), { recursive: true, force: true }));
+
+  it("reads shared app-server completed message items without duplicating response items or leaking context", async () => {
+    const current = path.join(path.dirname(file), "rollout-current.jsonl");
+    const records = [
+      sessionMeta("2026-07-09T12:00:00Z", CWD),
+      line("response_item", { type: "message", role: "developer", content: [{ type: "input_text", text: "Private harness context" }] }, "2026-07-09T12:00:01Z"),
+      line("response_item", { type: "message", role: "user", content: [{ type: "input_text", text: "Review the fictional project" }] }, "2026-07-09T12:00:02Z"),
+      line("event_msg", { type: "item_completed", item: { type: "UserMessage", content: [{ type: "text", text: "Review the fictional project" }, { type: "image", text: "Private image metadata" }] } }, "2026-07-09T12:00:02Z"),
+      line("event_msg", { type: "item_completed", item: { type: "UserMessage", content: [{ type: "text", text: "<environment_context>private context</environment_context>" }] } }, "2026-07-09T12:00:03Z"),
+      line("event_msg", { type: "item_completed", item: { type: "Reasoning", content: [{ type: "Text", text: "Private reasoning" }] } }, "2026-07-09T12:00:04Z"),
+      line("event_msg", { type: "item_completed", item: { type: "AgentMessage", phase: "final_answer", content: [{ type: "Text", text: "Review complete." }] } }, "2026-07-09T12:00:05Z"),
+      line("response_item", { type: "message", role: "assistant", content: [{ type: "output_text", text: "Review complete." }] }, "2026-07-09T12:00:05Z"),
+      line("event_msg", { type: "task_complete" }, "2026-07-09T12:00:06Z"),
+    ];
+    fs.writeFileSync(current, records.join("\n"));
+    const completed = await parseCodexSessionFile(current);
+    expect(completed.userPrompts).toEqual(["Review the fictional project"]);
+    expect(completed.finalAssistantText).toBe("Review complete.");
+    expect(completed.state).toBe("completed");
+    fs.appendFileSync(current, "\n" + [
+      line("event_msg", { type: "item_completed", item: { type: "UserMessage", content: [{ type: "text", text: "Now continue" }] } }, "2026-07-09T12:01:00Z"),
+      line("event_msg", { type: "item_completed", item: { type: "AgentMessage", phase: "commentary", content: [{ type: "Text", text: "Continuing the review." }] } }, "2026-07-09T12:01:01Z"),
+      line("event_msg", { type: "item_completed", item: { type: "AgentMessage", content: null } }, "2026-07-09T12:01:02Z"),
+    ].join("\n"));
+    const continued = await parseCodexSessionFile(current);
+    expect(continued.userPrompts).toEqual(["Review the fictional project", "Now continue"]);
+    expect(continued.finalAssistantText).toBe("Continuing the review.");
+    expect(continued.state).toBe("active");
+  });
 
   it("extracts session metadata, prompts, final text, files touched", async () => {
     const session = await parseCodexSessionFile(file);

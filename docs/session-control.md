@@ -2,7 +2,8 @@
 
 Status: current-t compatibility backend and Remote Control UI implemented.
 Older background launches retain their verified native Desktop handoff.
-Codex, Cursor, and control of pre-existing Desktop sessions remain research.
+Codex and Cursor CLI paths and evidence readers have additional native checks;
+their phone launch/control backends and pre-existing Desktop control remain research.
 
 ## Default Claude flow through current t
 
@@ -70,6 +71,58 @@ and retries. Simulator tests and a fresh Revyl cloud build verify the demo
 composer, default-on toggle, receipt, and demo continuation button. Browser
 continuation requires Claude's trusted-device verification; a physical-phone
 launch and browser follow-up were not established by these checks.
+
+## Current t support for Codex and Cursor
+
+The providers have different native workflows. Testing another provider does
+not enable it in the Claude-specific phone composer or launch API.
+
+| Provider | Current t entry point | RuntimeBrief in this PR |
+| --- | --- | --- |
+| Claude | `t open <repo> <slot> --claude` | Phone launch, durable receipt, project evidence, native Remote Control requested by default. |
+| Codex | `t open <repo> <slot> --codex`, then `t resume <repo> <slot>` | Reads native project/worktree evidence. Phone launch and Remote Control are not implemented. |
+| Cursor | `t cursor ls` and `t cursor resume <id>` operate on legacy saved chats. Fresh interactive chats in current Cursor's project store are not found. No `t open --cursor` dev slot. | Reads legacy and current native project/worktree evidence. Phone launch and Remote Control are not implemented. |
+
+Native Mac checks used the same pinned, unchanged `t` and a fictional Git
+repository. Codex completed its initial task and resumed the same native
+conversation through `t`, recalling the earlier reply. A `t app --dry-run`
+resolved that resumed conversation's exact Desktop link; actual Desktop
+handoff and phone continuation were not tested. Bundled Codex CLI 0.159.0
+passed; the separately installed 0.156.1 CLI rejected this Mac's configured
+model. A future launcher must check the selected native CLI and account/model
+compatibility rather than treating a successful process start as readiness.
+
+Cursor completed native tasks. A legacy chat appeared in `t cursor ls` and
+resumed the saved ID through `t cursor resume`; continuation retained a marker
+submitted in the interactive CLI. However, a fresh interactive task from CLI
+2026.09.28-64d2043 was saved only in the project JSONL store. RuntimeBrief read
+it, but the pinned `t` neither listed it nor found it for resume, because its
+Cursor bridge reads only the legacy chat directory. Current Cursor support
+through unchanged `t` therefore remains incomplete.
+
+Separate fresh-chat resume probes lost earlier context, including initial
+`--print` tasks and a fresh interactive transcript followed by native
+`--resume --print`. Echoing the same ID is insufficient evidence of history
+continuity. Cursor changed from 2026.08.11-e8db854 to
+2026.09.28-64d2043 during setup; both old chat stores and new project JSONL were
+observed. These results do not establish seamless history migration or a
+reliable headless Cursor launch backend. RuntimeBrief does not manufacture
+legacy metadata to bypass these native/t compatibility limitations.
+
+The native tests exposed and fixed evidence-reader gaps: Codex 0.159.0 completed
+message items now supply real prompts/replies; Cursor's current punctuation-
+normalized workspace keys resolve to existing folders, retaining ambiguity
+guards and older keys. All three readers associate external linked worktrees
+with their owning Git root, without assigning them to unrelated repositories
+or separately registered monorepo folders. RuntimeBrief follows the provider's
+saved history; it does not repair or reconstruct a missing native conversation.
+
+[Codex Remote](https://learn.chatgpt.com/docs/remote) has its own connected-
+computer and trusted-device setup. Native CLI creation/resume, a tmux slot,
+and a Desktop link do not prove that a session is reachable from a phone.
+Codex and Cursor phone visibility/continuation remain unverified here. Keep
+those capabilities unavailable until their native paths have passed an actual
+continuation test. Claude's default-on Remote Control behavior is unchanged.
 
 ## Legacy background flow
 

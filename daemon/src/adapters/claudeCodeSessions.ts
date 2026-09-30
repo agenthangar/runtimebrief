@@ -4,6 +4,7 @@ import path from "node:path";
 import readline from "node:readline";
 import { execFileSync } from "node:child_process";
 import { isSensitivePath } from "../secretFilter.js";
+import { gitCommonDirectory } from "./gitWorkspace.js";
 import type {
   ActivityEvent,
   ProjectConfig,
@@ -726,20 +727,6 @@ function pathIsWithin(candidate: string, parent: string): boolean {
     relative === "" ||
     (!relative.startsWith("..") && !path.isAbsolute(relative))
   );
-}
-
-/** Linked worktrees share Git metadata even when they live outside the project. */
-function gitCommonDirectory(directory: string): string | null {
-  try {
-    let gitdir = path.join(directory, ".git");
-    if (!fs.statSync(gitdir).isDirectory()) {
-      const match = /^gitdir: (.+)$/.exec(fs.readFileSync(gitdir, "utf8").trim());
-      if (!match) return null;
-      gitdir = path.resolve(directory, match[1]!);
-    }
-    const common = path.join(gitdir, "commondir");
-    return fs.realpathSync(fs.existsSync(common) ? path.resolve(gitdir, fs.readFileSync(common, "utf8").trim()) : gitdir);
-  } catch { return null; }
 }
 
 function claudeSessionMatchesProject(
