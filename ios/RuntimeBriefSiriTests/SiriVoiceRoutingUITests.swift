@@ -13,7 +13,6 @@ final class SiriVoiceRoutingUITests: XCTestCase {
         app.launch()
         XCTAssertTrue(app.staticTexts["demo-data-banner"].waitForExistence(timeout: 10))
         try await Task.sleep(for: .seconds(10))
-        try requireSiriUI(app: app)
 
         XCUIDevice.shared.siriService.activate(voiceRecognitionText: "What needs attention in RuntimeBrief")
         let screenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
@@ -43,7 +42,6 @@ final class SiriVoiceRoutingUITests: XCTestCase {
         // Siri receives the phrase vocabulary asynchronously after the first
         // successful entity fetch. Give the system time to index this install.
         try await Task.sleep(for: .seconds(10))
-        try requireSiriUI(app: app)
 
         for request in [
             "Get a project status in RuntimeBrief",
@@ -78,17 +76,5 @@ final class SiriVoiceRoutingUITests: XCTestCase {
         let enabled = ProcessInfo.processInfo.environment[key]
             ?? Bundle(for: Self.self).object(forInfoDictionaryKey: key) as? String
         guard enabled == "1" else { throw XCTSkip("Enable recognized-text Siri routing on a Siri-enabled device.") }
-    }
-
-    @MainActor
-    private func requireSiriUI(app: XCUIApplication) throws {
-        // Hosted CI simulators can accept XCTest's activation call while Siri
-        // is disabled. Verify the system UI with a neutral request first; a
-        // later missing answer is then a real routing failure, not a false one.
-        XCUIDevice.shared.siriService.activate(voiceRecognitionText: "What time is it?")
-        guard XCUIApplication(bundleIdentifier: "com.apple.siri").waitForExistence(timeout: 5) else {
-            throw XCTSkip("Siri UI is unavailable on this simulator; recognized speech routing needs a Siri-enabled device.")
-        }
-        app.activate()
     }
 }
