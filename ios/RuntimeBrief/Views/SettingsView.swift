@@ -6,6 +6,7 @@ struct SettingsView: View {
     @State private var token = ""
     @State private var testResult: TestResult?
     @State private var testing = false
+    @AppStorage(ProjectDiscoverySettings.key) private var discoveryEnabled = true
     @FocusState private var focusedField: Field?
 
     enum Field {
@@ -21,6 +22,17 @@ struct SettingsView: View {
     var body: some View {
         NavigationStack {
             Form {
+                Section {
+                    Toggle("Make Projects Discoverable", isOn: $discoveryEnabled)
+                        .accessibilityIdentifier("siri-discovery-toggle")
+                        .onChange(of: discoveryEnabled) { _, _ in
+                            Task { await ProjectDiscovery.updateFromSavedProjects() }
+                        }
+                } header: {
+                    Text("Siri & Search")
+                } footer: {
+                    Text("Allow project names, branches, and brief headlines in on-device search and Siri suggestions. Your configured shortcuts remain available.")
+                }
                 Section {
                     TextField("https://your-mac.tailnet.ts.net", text: $serverURL)
                         .keyboardType(.URL)
@@ -101,8 +113,16 @@ struct SettingsView: View {
 
     private func save() {
         do {
+            let previous = ServerSettings.load()
             try ServerSettings.save(urlString: serverURL, token: token)
-            dismiss()
+            let current = ServerSettings.load()
+            Task {
+                if previous.baseURL != current.baseURL || previous.token != current.token {
+                    await ProjectsStore.shared.clear()
+                    ProjectNavigation.shared.path = []
+                }
+                dismiss()
+            }
         } catch {
             testResult = .failure((error as? RuntimeBriefError)?.errorDescription ?? "Couldn't save.")
         }

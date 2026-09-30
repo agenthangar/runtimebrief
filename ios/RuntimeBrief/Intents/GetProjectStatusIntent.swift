@@ -1,10 +1,11 @@
 import AppIntents
 import Foundation
+import SwiftUI
 
 struct GetProjectStatusIntent: AppIntent {
     static let title: LocalizedStringResource = "Get Project Status"
     static let description = IntentDescription(
-        "Asks the RuntimeBrief analyst what a project's current state is.",
+        "Reads a project's evidence-backed brief without starting an analyst run.",
         categoryName: "Status"
     )
     // Runs headlessly from Siri/Shortcuts — the app never opens.
@@ -17,17 +18,17 @@ struct GetProjectStatusIntent: AppIntent {
         Summary("Get the status of \(\.$project)")
     }
 
-    func perform() async throws -> some IntentResult & ProvidesDialog {
-        // TODO(iOS 27 / App Intents 2.0): stream the answer into the dialog
-        // as it generates instead of waiting for the full response.
-        // if #available(iOS 27, *) { ... }
+    func perform() async throws -> some IntentResult & ProvidesDialog & ReturnsValue<String> & ShowsSnippetView {
         do {
-            let answer = try await RuntimeBriefDataSourceFactory.current(timeout: 20)
-                .status(projectID: project.id)
-            return .result(dialog: IntentDialog(stringLiteral: answer.spokenAnswer))
+            let snapshot = try await ProjectsStore.shared.briefSnapshot()
+            guard let current = snapshot.projects.first(where: { $0.id == project.id }) else {
+                throw RuntimeBriefError.notFound
+            }
+            let text = SiriBrief.project(current, snapshot: snapshot)
+            return .result(value: text, dialog: IntentDialog(stringLiteral: text),
+                           view: StatusSnippetView(projectName: current.name, branch: current.branch, answer: text))
         } catch {
-            let message = unreachableMessage(for: error)
-            return .result(dialog: IntentDialog(stringLiteral: message))
+            throw SiriIntentFailure(message: unreachableMessage(for: error))
         }
     }
 }

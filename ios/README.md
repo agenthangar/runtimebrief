@@ -17,8 +17,9 @@ open RuntimeBrief.xcodeproj
 
 Select the `RuntimeBrief` scheme, pick a simulator, build and run. A simulator
 needs no Apple team or bundle-identifier change.
-Requires Xcode 26+ (Swift 6, iOS 26 SDK). Run the unit tests with **⌘U**
-(they use Swift Testing and a mocked transport — no daemon needed).
+Requires Xcode 27+ (Swift 6, iOS 27 SDK); the app still runs on iOS 26.
+Run the unit and UI tests with **⌘U**. Unit tests use Swift Testing and a
+mocked transport; bundled demo and settings UI tests need no daemon.
 
 On an unconfigured install, **Explore Demo** opens a bundled, fully offline
 portfolio made only from hand-authored fictional data. Demo mode never reads
@@ -65,8 +66,65 @@ personal signing change local; do not commit it or change the production
    Tap an iOS project to also see its local Xcode version/build, latest
    TestFlight build, and newest App Store version/state. The analyst runs only
    after you tap **Generate analyst update** or ask a question.
-5. Say: *"Hey Siri, what's the state of \<project\> in RuntimeBrief"*. Siri
-   shortcut phrases register after the first app launch.
+5. Say: *"Hey Siri, what's the state of \<project\> in RuntimeBrief"*. App
+   Shortcuts register after the first launch; a successful refresh supplies
+   project names for personalized phrases.
+
+## Siri and Search
+
+| Action | Example phrase | Shortcuts output |
+| --- | --- | --- |
+| Project status | What's the status of Sample Tracker in RuntimeBrief? | Brief text |
+| Needs attention | What needs attention in RuntimeBrief? | Project entities |
+| List projects | List my RuntimeBrief projects | Project entities |
+| Open project | Open Sample Tracker in RuntimeBrief | Opens project detail |
+| Ask the analyst | Ask RuntimeBrief a question about Sample Tracker | Answer text |
+
+Status, attention, and list actions read `/v1/projects` with a five-second
+network timeout. They never start an analyst. Status includes the evidence
+timestamp; attention distinguishes missing briefs from available briefs with
+no attention items. A connection failure can use the saved portfolio with an
+explicit saved-data warning and timestamp. Authentication and configuration
+failures stop the action instead of returning cached data.
+
+Answers include a Siri card and reusable Shortcuts values. Asking a question
+remains an explicit analyst action. Existing custom actions work on iOS 26;
+iOS 27 also exposes the system opening schema. Project rows and detail views
+provide entity context for requests about visible content.
+
+**Settings → Siri & Search → Make Projects Discoverable** controls Spotlight
+indexing, on-screen entity annotations, and opening
+donations. This setting applies immediately, independently of saving a Mac
+connection. The index includes names, branches, brief headlines, states, and
+evidence times. Turning discovery off, entering demo mode, changing the Mac
+connection, or removing projects reconciles the index. Demo data is never
+indexed or donated. Explicit shortcuts and their project choosers remain
+available when discovery is disabled, including in the fictional demo.
+
+Generate the project before testing:
+
+```sh
+xcodegen generate --spec ios/project.yml
+xcodebuild test -project ios/RuntimeBrief.xcodeproj -scheme RuntimeBrief \
+  -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=27.0'
+xcodebuild test -project ios/RuntimeBrief.xcodeproj -scheme RuntimeBriefSiri \
+  -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=27.0'
+```
+
+The regular scheme covers offline fallback, authentication failures, stale
+refresh rejection, actual intent results, real Spotlight indexing/removal,
+discovery write ordering, and UI preference persistence. The iOS 27-only Siri
+scheme uses `AppIntentsTesting` across processes to query entities, run actions,
+inspect returned values, open a project, and inspect on-screen annotations,
+including opting out while keeping explicit project selection usable.
+If the runtime rejects this framework with security error 803, those tests
+explicitly skip; other errors fail. Existing live daemon and Claude tests need
+their separately documented E2E configuration.
+
+Before release, test spoken requests and the Siri card on a physical iOS 27
+device with Siri configured, including ambiguous names, an offline Mac, and
+discovery opt-out. A simulator test does not verify speech recognition or
+Apple Intelligence routing.
 
 ## Start a Claude task
 
@@ -130,9 +188,11 @@ RuntimeBrief/
 ├── Networking/               RuntimeBriefClient (async/await + SSE), Keychain,
 │                             ServerSettings, SSEParser
 ├── Views/                    Projects list, project detail, settings
-└── Intents/                  ProjectEntity + fuzzy query, GetProjectStatus,
-                              AskProject, ListProjects, AppShortcuts, snippets
+└── Intents/                  ProjectEntity + search discovery, navigation,
+                              brief actions, AppShortcuts, snippets
 RuntimeBriefTests/            Swift Testing suites with a mocked transport
+RuntimeBriefUITests/          Demo and settings UI tests; optional live tests
+RuntimeBriefSiriTests/        iOS 27 system App Intents integration tests
 ```
 
 ## Asset provenance

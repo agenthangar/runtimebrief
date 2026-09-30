@@ -1,13 +1,26 @@
 import AppIntents
 import Foundation
+import CoreSpotlight
 
-struct ProjectEntity: AppEntity {
+struct ProjectEntity: AppEntity, IndexedEntity {
     static let typeDisplayRepresentation: TypeDisplayRepresentation = "Project"
     static let defaultQuery = ProjectQuery()
 
     var id: String
-    var name: String
-    var branch: String?
+    @Property(title: "Name") var name: String
+    @Property(title: "Branch") var branch: String?
+    @Property(title: "Brief") var headline: String
+    @Property(title: "State") var state: String
+    @Property(title: "Evidence Updated") var updatedAt: Date?
+
+    var attributeSet: CSSearchableItemAttributeSet {
+        let attributes = defaultAttributeSet
+        attributes.title = name
+        attributes.contentDescription = headline
+        attributes.keywords = [name, state, "project", "RuntimeBrief"] + [branch].compactMap { $0 }
+        attributes.contentModificationDate = updatedAt
+        return attributes
+    }
 
     var displayRepresentation: DisplayRepresentation {
         if let branch {
@@ -21,18 +34,41 @@ struct ProjectEntity: AppEntity {
         self.id = summary.id
         self.name = summary.name
         self.branch = summary.branch
+        self.headline = summary.brief?.headline ?? "No project brief available."
+        self.state = summary.brief?.state.rawValue ?? "unavailable"
+        self.updatedAt = summary.brief?.updatedAt ?? summary.lastActivityAt
     }
 
     init(id: String, name: String, branch: String? = nil) {
         self.id = id
         self.name = name
         self.branch = branch
+        self.headline = "No project brief available."
+        self.state = "unavailable"
+        self.updatedAt = nil
+    }
+}
+
+@available(iOS 27.0, *)
+extension ProjectQuery: IndexedEntityQuery {
+    func reindexEntities(for identifiers: [String], indexDescription: CSSearchableIndexDescription) async throws {
+        // A full reconciliation also removes projects that no longer exist.
+        try await reindexAllEntities(indexDescription: indexDescription)
+    }
+
+    func reindexAllEntities(indexDescription: CSSearchableIndexDescription) async throws {
+        guard ProjectDiscovery.isLiveDiscoveryEnabled else {
+            await ProjectDiscovery.shared.synchronize(projects: [])
+            return
+        }
+        let projects = try await ProjectsStore.shared.projects()
+        await ProjectDiscovery.shared.synchronize(projects: projects)
     }
 }
 
 /// Resolves projects by name with fuzzy matching, backed by a short-lived
 /// cache of /v1/projects so repeated Siri resolutions don't hammer the Mac.
-struct ProjectQuery: EntityQuery, EntityStringQuery {
+struct ProjectQuery: EntityStringQuery, EnumerableEntityQuery {
     func entities(for identifiers: [String]) async throws -> [ProjectEntity] {
         let projects = try await ProjectsStore.shared.projects()
         return projects
@@ -50,6 +86,12 @@ struct ProjectQuery: EntityQuery, EntityStringQuery {
     }
 
     func suggestedEntities() async throws -> [ProjectEntity] {
+        // Shortcuts also uses this query for its explicit project chooser.
+        // Discovery opt-out controls indexing and donations, not that chooser.
+        return try await allEntities()
+    }
+
+    func allEntities() async throws -> [ProjectEntity] {
         let projects = try await ProjectsStore.shared.projects()
         return projects.map(ProjectEntity.init(summary:))
     }
@@ -69,6 +111,37 @@ actor ProjectsStore {
     private var cached: [ProjectSummary]
     private var fetchedAt: Date?
     private let ttl: TimeInterval = 60
+    private let defaults: UserDefaults
+    private let discovery: ProjectDiscovery?
+    private var revision = 0
+
+    struct BriefSnapshot: Sendable {
+        let projects: [ProjectSummary]
+        let fetchedAt: Date?
+        let isSaved: Bool
+        let isDemo: Bool
+    }
+
+    /// Quick Siri reads use deterministic briefs and never start an analyst.
+    /// A failed connection may use the saved brief, explicitly labelled as such.
+    func briefSnapshot(dataSource: (any RuntimeBriefDataSource)? = nil) async throws -> BriefSnapshot {
+        if RuntimeBriefModeStore.isDemoEnabled {
+            return BriefSnapshot(projects: try await (dataSource ?? DemoRuntimeBriefDataSource()).projects(),
+                                 fetchedAt: nil, isSaved: false, isDemo: true)
+        }
+        do {
+            let projects = try await refresh(dataSource: dataSource ?? RuntimeBriefDataSourceFactory.current(timeout: 5))
+            return BriefSnapshot(projects: projects, fetchedAt: fetchedAt, isSaved: false, isDemo: false)
+        } catch {
+            // Configuration/auth failures must not reveal a previous connection's data.
+            switch error {
+            case RuntimeBriefError.network, RuntimeBriefError.timeout: break
+            default: throw error
+            }
+            guard !cached.isEmpty else { throw error }
+            return BriefSnapshot(projects: cached, fetchedAt: fetchedAt, isSaved: true, isDemo: false)
+        }
+    }
 
     #if DEBUG
     nonisolated static func resetPersistedSnapshotForUITesting() {
@@ -76,8 +149,9 @@ actor ProjectsStore {
     }
     #endif
 
-    init() {
-        let defaults = UserDefaults.standard
+    init(defaults: UserDefaults = .standard, discovery: ProjectDiscovery? = .shared) {
+        self.defaults = defaults
+        self.discovery = discovery
         if let data = defaults.data(forKey: Self.snapshotKey),
            let snapshot = try? JSONDecoder.runtimeBrief.decode(PersistedSnapshot.self, from: data) {
             cached = snapshot.projects
@@ -96,10 +170,14 @@ actor ProjectsStore {
             return cached
         }
         do {
-            return try await refresh(dataSource: dataSource)
+            return try await refresh(dataSource: dataSource ?? RuntimeBriefDataSourceFactory.current(timeout: 5))
         } catch {
             // Siri and Shortcuts should still resolve project names while the
             // Mac is temporarily offline.
+            switch error {
+            case RuntimeBriefError.network, RuntimeBriefError.timeout: break
+            default: throw error
+            }
             if !cached.isEmpty { return cached }
             throw error
         }
@@ -107,7 +185,11 @@ actor ProjectsStore {
 
     func refresh(dataSource: (any RuntimeBriefDataSource)? = nil) async throws -> [ProjectSummary] {
         let isDemo = RuntimeBriefModeStore.isDemoEnabled
+        let startingRevision = revision
         let fresh = try await (dataSource ?? RuntimeBriefDataSourceFactory.current()).projects()
+        guard startingRevision == revision, isDemo == RuntimeBriefModeStore.isDemoEnabled else {
+            throw CancellationError()
+        }
         if isDemo {
             return fresh
         }
@@ -118,6 +200,10 @@ actor ProjectsStore {
         // whose every phrase embeds \(\.$project) are never registered and the
         // spoken project name can't be resolved.
         RuntimeBriefShortcuts.updateAppShortcutParameters()
+        await discovery?.synchronize(projects: fresh)
+        guard startingRevision == revision, isDemo == RuntimeBriefModeStore.isDemoEnabled else {
+            throw CancellationError()
+        }
         return fresh
     }
 
@@ -129,7 +215,17 @@ actor ProjectsStore {
     }
 
     func invalidate() {
+        revision += 1
         fetchedAt = nil
+    }
+
+    func clear() async {
+        revision += 1
+        cached = []
+        fetchedAt = nil
+        defaults.removeObject(forKey: Self.snapshotKey)
+        await discovery?.synchronize(projects: [])
+        RuntimeBriefShortcuts.updateAppShortcutParameters()
     }
 
     private func persist() {
@@ -137,7 +233,7 @@ actor ProjectsStore {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
         if let data = try? encoder.encode(PersistedSnapshot(projects: cached, fetchedAt: fetchedAt)) {
-            UserDefaults.standard.set(data, forKey: Self.snapshotKey)
+            defaults.set(data, forKey: Self.snapshotKey)
         }
     }
 }

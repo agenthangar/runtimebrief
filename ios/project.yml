@@ -71,3 +71,31 @@ targets:
         RUNTIMEBRIEF_E2E_TOKEN: $(RUNTIMEBRIEF_E2E_TOKEN)
         RUNTIMEBRIEF_E2E_PROJECT_ID: $(RUNTIMEBRIEF_E2E_PROJECT_ID)
         RUNTIMEBRIEF_E2E_CLAUDE_LIVE: $(RUNTIMEBRIEF_E2E_CLAUDE_LIVE)
+  RuntimeBriefSiriTests:
+    type: bundle.ui-testing
+    platform: iOS
+    deploymentTarget: "27.0"
+    sources:
+      - RuntimeBriefSiriTests
+    dependencies:
+      - target: RuntimeBrief
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.runtimebrief.app.siri-tests
+        GENERATE_INFOPLIST_FILE: true
+schemes:
+  RuntimeBrief:
+    build:
+      targets:
+        RuntimeBrief: all
+    test:
+      targets:
+        - RuntimeBriefTests
+        - RuntimeBriefUITests
+  RuntimeBriefSiri:
+    build:
+      targets:
+        RuntimeBrief: all
+    test:
+      targets:
+        - RuntimeBriefSiriTests

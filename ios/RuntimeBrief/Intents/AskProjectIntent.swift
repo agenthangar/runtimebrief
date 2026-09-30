@@ -1,5 +1,6 @@
 import AppIntents
 import Foundation
+import SwiftUI
 
 struct AskProjectIntent: AppIntent {
     static let title: LocalizedStringResource = "Ask About a Project"
@@ -19,14 +20,14 @@ struct AskProjectIntent: AppIntent {
         Summary("Ask about \(\.$project): \(\.$question)")
     }
 
-    func perform() async throws -> some IntentResult & ProvidesDialog {
+    func perform() async throws -> some IntentResult & ProvidesDialog & ReturnsValue<String> & ShowsSnippetView {
         do {
             let answer = try await RuntimeBriefDataSourceFactory.current(timeout: 20)
                 .ask(projectID: project.id, question: question)
-            return .result(dialog: IntentDialog(stringLiteral: answer.spokenAnswer))
+            return .result(value: answer.spokenAnswer, dialog: IntentDialog(stringLiteral: answer.spokenAnswer),
+                           view: StatusSnippetView(projectName: project.name, branch: project.branch, answer: answer.spokenAnswer))
         } catch {
-            let message = unreachableMessage(for: error)
-            return .result(dialog: IntentDialog(stringLiteral: message))
+            throw SiriIntentFailure(message: unreachableMessage(for: error))
         }
     }
 }

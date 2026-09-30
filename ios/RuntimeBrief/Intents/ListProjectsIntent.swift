@@ -1,5 +1,6 @@
 import AppIntents
 import Foundation
+import SwiftUI
 
 struct ListProjectsIntent: AppIntent {
     static let title: LocalizedStringResource = "List Projects"
@@ -9,25 +10,23 @@ struct ListProjectsIntent: AppIntent {
     )
     static let openAppWhenRun = false
 
-    func perform() async throws -> some IntentResult & ProvidesDialog {
+    func perform() async throws -> some IntentResult & ProvidesDialog & ReturnsValue<[ProjectEntity]> & ShowsSnippetView {
         do {
-            let projects = try await RuntimeBriefDataSourceFactory.current(timeout: 20).projects()
-            guard !projects.isEmpty else {
-                let none = "No projects are registered yet. Run runtimebriefd add-project on your Mac."
-                return .result(dialog: IntentDialog(stringLiteral: none))
-            }
+            let snapshot = try await ProjectsStore.shared.briefSnapshot()
+            let projects = snapshot.projects
             let dayAgo = Date().addingTimeInterval(-24 * 60 * 60)
             let active = projects.filter { ($0.lastActivityAt ?? .distantPast) > dayAgo }
             let names = projects.map(\.name).formatted(.list(type: .and))
-            var dialog = "You have \(projects.count) project\(projects.count == 1 ? "" : "s"): \(names)."
+            var dialog = SiriBrief.prefix(snapshot) + (projects.isEmpty ? "No projects are registered yet. Add projects on your Mac." :
+                "You have \(projects.count) project\(projects.count == 1 ? "" : "s"): \(names).")
             if !active.isEmpty {
                 let activeNames = active.map(\.name).formatted(.list(type: .and))
                 dialog += " Active in the last day: \(activeNames)."
             }
-            return .result(dialog: IntentDialog(stringLiteral: dialog))
+            return .result(value: projects.map(ProjectEntity.init(summary:)), dialog: IntentDialog(stringLiteral: dialog),
+                           view: ProjectListSnippetView(lines: [SiriBrief.prefix(snapshot)] + projects.map { "\($0.name): \($0.brief?.headline ?? "No brief available")" }))
         } catch {
-            let message = unreachableMessage(for: error)
-            return .result(dialog: IntentDialog(stringLiteral: message))
+            throw SiriIntentFailure(message: unreachableMessage(for: error))
         }
     }
 }

@@ -5,6 +5,7 @@ final class DemoModeUITests: XCTestCase {
         continueAfterFailure = false
     }
 
+    @MainActor
     func testFirstLaunchExploresCompleteOfflineDemo() {
         let app = XCUIApplication()
         app.launchEnvironment["RUNTIMEBRIEF_E2E_CLEAR_STATE"] = "1"
@@ -40,7 +41,10 @@ final class DemoModeUITests: XCTestCase {
         XCTAssertTrue(question.waitForExistence(timeout: 5))
         question.tap()
         question.typeText("Did the fictional checks pass?")
-        app.buttons["submit-project-question"].tap()
+        if app.buttons["Done"].exists { app.buttons["Done"].tap() }
+        let submit = app.buttons["submit-project-question"]
+        for _ in 0..<4 where !submit.isHittable { app.swipeUp() }
+        submit.tap()
         XCTAssertTrue(app.staticTexts["project-answer"].waitForExistence(timeout: 5))
 
         app.navigationBars.buttons.firstMatch.tap()
@@ -50,6 +54,7 @@ final class DemoModeUITests: XCTestCase {
         XCTAssertTrue(app.buttons["explore-demo"].waitForExistence(timeout: 5))
     }
 
+    @MainActor
     private func keepScreenshot(named name: String) {
         let attachment = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
         attachment.name = name
