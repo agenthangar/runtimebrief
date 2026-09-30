@@ -109,6 +109,14 @@ remains an explicit analyst action. Existing custom actions work on iOS 26;
 iOS 27 also exposes the system opening schema. Project rows and detail views
 provide entity context for requests about visible content.
 
+Shortcut vocabulary refreshes at launch and after a successful project refresh.
+The English `AppShortcuts.xcstrings` catalog contains the spoken phrases, and
+"Runtime Brief" is an alternative app name. Status also supports "Can you tell
+me the status of the Sample Tracker app from RuntimeBrief." Background entity
+suggestions return no names on connection/setup errors so a vocabulary failure
+does not abort registration of every shortcut. Explicit reads still report
+connection errors and authenticate normally.
+
 **Settings → Siri & Search → Make Projects Discoverable** controls Spotlight
 indexing, on-screen entity annotations, and opening
 donations. This setting applies immediately, independently of saving a Mac
@@ -156,6 +164,22 @@ Before release, test spoken requests and the Siri card on a physical iOS 27
 device with Siri configured, including ambiguous names, an offline Mac, and
 discovery opt-out. A simulator test does not verify speech recognition or
 Apple Intelligence routing.
+
+To test Siri's matching of recognized text (rather than calling an intent by
+name), enable the separate opt-in test on a Siri-enabled device:
+
+```sh
+xcodebuild test -project ios/RuntimeBrief.xcodeproj -scheme RuntimeBriefSiri \
+  -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=27.0' \
+  -only-testing:RuntimeBriefSiriTests/SiriVoiceRoutingUITests \
+  RUNTIMEBRIEF_E2E_SIRI_ROUTING=1
+```
+
+This test checks the parameter-free chooser, a named project, and a conversational
+status request through `XCUISiriService`. A failed routing test must remain a
+failure even when direct App Intents or Shortcuts checks pass. App Shortcuts
+Preview can check the phrase template using the `Project` entity placeholder;
+it does not load the connected daemon's project names or verify speech.
 
 ## Start a coding task
 

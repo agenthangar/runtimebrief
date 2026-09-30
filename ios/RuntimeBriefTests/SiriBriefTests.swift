@@ -59,6 +59,23 @@ struct SiriBriefTests {
         #expect(SiriBrief.attentionProjects(snapshot.projects).isEmpty)
     }
 
+    @Test func coldOfflineLaunchCanResolveSavedProjectNames() async throws {
+        let suite = "siri-cold-launch-\(UUID().uuidString)"
+        let onlineStore = ProjectsStore(defaults: UserDefaults(suiteName: suite)!, discovery: nil)
+        let (live, _) = try source(projects: DemoData.projects)
+        _ = try await onlineStore.refresh(dataSource: live)
+
+        // A new process must resolve names from the persisted snapshot when
+        // launch-time shortcut registration cannot reach the daemon.
+        let relaunchedStore = ProjectsStore(defaults: UserDefaults(suiteName: suite)!, discovery: nil)
+        let offline = LiveRuntimeBriefDataSource(client: RuntimeBriefClient(settings: .mock, transport: MockTransport(stubs: [:])))
+        let projects = try await relaunchedStore.projects(dataSource: offline)
+        #expect(projects.map(\.id) == DemoData.projects.map(\.id))
+        let brief = try await relaunchedStore.briefSnapshot(dataSource: offline)
+        #expect(brief.isSaved)
+        #expect(SiriBrief.project(projects[0], snapshot: brief).contains("Using saved briefs from"))
+    }
+
     @Test func attentionReturnsOnlyAttentionProjectsAndLabelsDemo() {
         let snapshot = ProjectsStore.BriefSnapshot(projects: DemoData.projects, fetchedAt: nil, isSaved: false, isDemo: true)
         let projects = SiriBrief.attentionProjects(snapshot.projects)

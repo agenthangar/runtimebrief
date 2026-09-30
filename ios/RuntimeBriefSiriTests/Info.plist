@@ -24,6 +24,8 @@
 	<string>$(RUNTIMEBRIEF_E2E_SERVER_URL)</string>
 	<key>RUNTIMEBRIEF_E2E_SIRI_LIVE</key>
 	<string>$(RUNTIMEBRIEF_E2E_SIRI_LIVE)</string>
+	<key>RUNTIMEBRIEF_E2E_SIRI_ROUTING</key>
+	<string>$(RUNTIMEBRIEF_E2E_SIRI_ROUTING)</string>
 	<key>RUNTIMEBRIEF_E2E_TOKEN</key>
 	<string>$(RUNTIMEBRIEF_E2E_TOKEN)</string>
 </dict>

@@ -23,10 +23,13 @@ struct ProjectEntity: AppEntity, IndexedEntity {
     }
 
     var displayRepresentation: DisplayRepresentation {
+        // Siri's phrase expansion uses display names, rather than the string
+        // query's normalization. Register common spoken forms of the name.
+        let synonyms: [LocalizedStringResource] = ["\(name) app", "\(name) project"]
         if let branch {
-            DisplayRepresentation(title: "\(name)", subtitle: "\(branch)")
+            return DisplayRepresentation(title: "\(name)", subtitle: "\(branch)", synonyms: synonyms)
         } else {
-            DisplayRepresentation(title: "\(name)")
+            return DisplayRepresentation(title: "\(name)", synonyms: synonyms)
         }
     }
 
@@ -90,7 +93,15 @@ struct ProjectQuery: EntityStringQuery, EnumerableEntityQuery {
     func suggestedEntities() async throws -> [ProjectEntity] {
         // Shortcuts also uses this query for its explicit project chooser.
         // Discovery opt-out controls indexing and donations, not that chooser.
-        return try await allEntities()
+        do {
+            return try await allEntities()
+        } catch is RuntimeBriefError {
+            // A failed background vocabulary refresh otherwise aborts the
+            // registration of every shortcut, including parameter-free reads.
+            // Publish no names when setup/auth/network fails; explicit queries
+            // and intent execution still report the connection error.
+            return []
+        }
     }
 
     func allEntities() async throws -> [ProjectEntity] {
