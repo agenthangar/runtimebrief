@@ -6,6 +6,12 @@ export T_LOCAL_RC=/dev/null T_NO_AUTORELOAD=1
 export XDG_CONFIG_HOME="$RB_T_DIR/config" XDG_CACHE_HOME="$RB_T_DIR/cache" XDG_STATE_HOME="$RB_T_DIR/state"
 export PATH="$RB_T_DIR/bin:$RB_T_HOME/bin:${RB_T_PATH}"
 source "$RB_T_HOME/t.plugin.zsh" || exit 1
+# A process-local compatibility shim enables Cursor without patching upstream t.
+# It applies only to RuntimeBrief's isolated launcher shell.
+if [[ $RB_T_PROVIDER == cursor ]]; then
+  _dev_agent_valid() { case "$1" in claude|codex|cursor) return 0 ;; *) return 1 ;; esac }
+fi
+DEV_AGENT[$RB_T_REPO]="${RB_T_PROVIDER:-claude}"
 DEV_REPOS[$RB_T_REPO]="$RB_T_PROJECT"
 # A separate root and unique numeric slot prevent collisions and human sweeps.
 DEV_WORKTREE_ROOT="$RB_T_WORKTREES"
@@ -19,4 +25,4 @@ tmux() {
     *) command "$RB_T_TMUX" "$@" ;;
   esac
 }
-t open "$RB_T_REPO" "$RB_T_SLOT" --claude --local
+t open "$RB_T_REPO" "$RB_T_SLOT" --local

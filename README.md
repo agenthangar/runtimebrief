@@ -20,8 +20,8 @@ from source; maintainers distribute internal TestFlight builds. See the
   claim.
 - Optional on-demand analysis of a single project's locally collected evidence.
 - Read-only summaries of Git, Claude Code, Codex, and Cursor activity.
-- Native Claude Code tasks in every registered project, with model and
-  permission choices, isolated `t` worktrees, and Claude Remote Control.
+- Native Claude Code, Codex, and Cursor tasks, with model and permission
+  choices, isolated `t` worktrees, and phone continuation.
 - Local Xcode metadata plus optional read-only App Store Connect status.
 - Siri access through the iOS app and local MCP tools for ChatGPT and Codex.
 - No RuntimeBrief account, hosted relay, or analytics SDK.
@@ -65,9 +65,8 @@ Project observation is read-only. The optional decision inbox records an
 approve/reject choice in a private local database; RuntimeBrief does not execute
 the proposed action.
 
-Paired iOS clients can start native Claude Code tasks in registered projects
-by default. Claude owns the conversation, working environment, and tool
-permissions.
+Paired iOS clients can start native coding-agent tasks in registered projects
+by default. Each provider owns the conversation, execution, and tool permissions.
 
 ## Set it up
 
@@ -150,7 +149,7 @@ Then try:
 - *"Ask RuntimeBrief about **<project>."***
 - *"What are my projects up to in RuntimeBrief?"*
 
-### 3. Start Claude Code tasks (optional)
+### 3. Start coding-agent tasks (optional)
 
 Install Claude Code and tmux on your Mac, sign in to Claude, and complete its
 native workspace-trust setup. RuntimeBrief installs a pinned, unchanged copy
@@ -164,8 +163,9 @@ runtimebriefd install-service
 ```
 
 Clients paired with your daemon token can launch tasks in any registered
-project. In the iOS project screen, tap **New Claude task**, choose the model
-and permissions, describe the work, and start it. Models include your Claude
+project. In the iOS project screen, tap **New task**, choose Claude Code, Codex,
+or Cursor, select the model and permissions, describe the work, and start it.
+Install and sign in to each provider's CLI on your Mac. Models include your Claude
 default, Fable, Opus, Sonnet, and Haiku. Permissions include Manual (the default),
 Auto, Accept Edits, Plan, Bypass, and Pre-approved Only. Availability depends on
 your Claude version, account, and model. Bypass skips tool permission checks;
@@ -175,7 +175,9 @@ handles workspace trust and any tool requests on your Mac.
 
 **Remote Control is on by default**, including API requests that omit the
 option. Tap **Open Remote Control** once Claude confirms the connection, or
-attach to the terminal shown on the receipt. The Mac must stay awake. Claude
+use **Open Codex terminal** or **Open Cursor terminal** to continue those live
+CLIs through RuntimeBrief. You can also attach to the terminal shown on the
+receipt. The Mac must stay awake. Claude
 handles account eligibility and trusted-device verification. An explicit
 opt-out starts a local-only session. Existing background receipts keep their
 original Claude Desktop handoff; see [session control](docs/session-control.md).
@@ -183,8 +185,10 @@ original Claude Desktop handoff; see [session control](docs/session-control.md).
 To revoke launches and handoff requests, run `runtimebriefd disable-claude
 <project-id>` and reinstall the service. This sets `claude_launch_enabled:
 false` in the local project config. Use `enable-claude` to restore launches.
-Existing Claude tasks keep running.
-Launch prompts go directly to the local Claude process; RuntimeBrief stores
+This existing config flag applies to all three session providers. Existing
+tasks keep running. Linked worktrees belong to their original repository in
+RuntimeBrief; supported Codex versions also receive its native project identity.
+Launch prompts go directly to the local native process; RuntimeBrief stores
 delivery receipts and a request fingerprint, not another copy of the prompt.
 See [session control](docs/session-control.md) for recovery and takeover details.
 
@@ -242,6 +246,10 @@ All endpoints require `Authorization: Bearer <token>` and are rate-limited to
 | `GET /v1/projects/:id/claude-launches` | Claude capability and recent delivery receipts |
 | `POST /v1/projects/:id/claude-launches` | Start a native task with `{ requestId, prompt, model?, permissionMode?, remoteControl? }` (Remote Control defaults to `true`) |
 | `POST /v1/projects/:id/claude-launches/:launchId/open` | Claude Desktop handoff for legacy background receipts |
+| `GET /v1/projects/:id/sessions` | Provider capabilities and recent session receipts |
+| `POST /v1/projects/:id/sessions` | Start a task with `provider` (`claude`, `codex`, or `cursor`); Remote Control defaults to `true` |
+| `GET /v1/projects/:id/sessions/:launchId/terminal` | Verified live Codex/Cursor terminal snapshot |
+| `POST /v1/projects/:id/sessions/:launchId/input` | Idempotent native terminal input with `{ requestId, data }` |
 
 See the [Claude launch API](docs/session-control.md#claude-launch-api) for
 model and permission values, defaults, receipts, and retry behavior.

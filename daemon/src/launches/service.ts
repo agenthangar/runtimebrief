@@ -3,13 +3,14 @@ import fs from "node:fs";
 import type { RuntimeBriefConfig } from "../config.js";
 import { projectsForConfig } from "../projectRegistry.js";
 import { LaunchStore } from "./store.js";
-import { DEFAULT_LAUNCH_OPTIONS, LaunchError, type ClaudeLaunchOptions, type ClaudeLaunch, type ClaudeProvider, type NativeClaudeSession, type ClaudeSessionBackend } from "./types.js";
+import { DEFAULT_LAUNCH_OPTIONS, CLAUDE_MODELS, CLAUDE_PERMISSION_MODES, LaunchError, type ClaudeLaunchOptions, type ClaudeLaunch, type ClaudeProvider, type NativeClaudeSession, type ClaudeSessionBackend, type SessionProvider } from "./types.js";
 import { promptHash } from "./tLegacy.js";
 
 export const CLAUDE_LAUNCH_ACTION = "launch-claude";
 
 export class LaunchService {
   private readonly pending = new Map<string, Promise<ClaudeLaunch>>();
+  private readonly inputPending = new Set<string>();
   private readonly opening = new Map<string, Promise<ClaudeLaunch>>();
   private readonly backends: Map<string, ClaudeSessionBackend>;
 
@@ -28,7 +29,7 @@ export class LaunchService {
     const project = projectsForConfig(this.config).find(p => p.id === id);
     if (!project) throw new LaunchError(404, "not_found", "This project is no longer registered on your Mac.");
     if (requireWrite && project.claude_launch_enabled === false) {
-      throw new LaunchError(403, "launch_disabled", "Claude launches were disabled for this project on your Mac.");
+      throw new LaunchError(403, "launch_disabled", "Session launches were disabled for this project on your Mac.");
     }
     return project;
   }
@@ -49,19 +50,40 @@ export class LaunchService {
       try { native = await this.provider.sessions(); } catch { /* preserve old receipts */ }
     }
     const launches = await Promise.all(receipts.map(receipt => receipt.backend ? this.observeBackend(receipt) : this.reconcile(receipt, native)));
-    return { capability, launches };
+    const providers = await Promise.all((["claude", "codex", "cursor"] as const).map(async id => {
+      if (id === "claude") return { id, ...capability };
+      const backend = [...this.backends.values()].find(value => value.provider === id);
+      let available = { available: false, message: `Install the ${id} session launcher on your Mac.` };
+      try {
+        this.project(projectId, true);
+        if (backend) available = await backend.capability(this.project(projectId, true).path);
+      } catch (error) {
+        if (error instanceof LaunchError) available.message = error.message;
+      }
+      return { id, ...available };
+    }));
+    return { capability, providers, launches };
   }
 
   async start(projectId: string, requestId: string, prompt: string, options: ClaudeLaunchOptions = DEFAULT_LAUNCH_OPTIONS): Promise<ClaudeLaunch> {
     const project = this.project(projectId, true);
+    const provider: SessionProvider = options.provider ?? "claude";
+    const modes: readonly string[] = provider === "claude" ? CLAUDE_PERMISSION_MODES : provider === "cursor" ? ["manual", "plan", "ask"] : ["manual", "plan"];
+    if (!modes.includes(options.permissionMode) || !/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/.test(options.model)
+      || (provider === "claude" && !CLAUDE_MODELS.includes(options.model as never))) {
+      throw new LaunchError(400, "unsupported_settings", "This agent does not support those launch settings.");
+    }
+    const backend = provider === "claude" ? this.backend : [...this.backends.values()].find(value => value.provider === provider);
+    if (provider !== "claude" && !backend) throw new LaunchError(409, "unsupported", "Update the daemon on your Mac to enable this agent.");
     // Preserve request identity for retries from older clients using the defaults.
     const identity: unknown[] = [projectId, prompt];
+    if (provider !== "claude") identity.push("provider", provider);
     if (options.model !== "default" || options.permissionMode !== "manual") identity.push(options.model, options.permissionMode);
     if (options.remoteControl === false) identity.push("remoteControl", false);
     const fingerprint = createHash("sha256").update(JSON.stringify(identity)).digest("hex");
     const previous = this.store.byRequest(requestId, fingerprint);
     if (previous) return this.pending.get(requestId) ?? previous;
-    if (!this.backend && options.remoteControl === true) {
+    if (!backend && options.remoteControl === true) {
       throw new LaunchError(409, "unsupported", "The legacy background launcher does not support Remote Control. Select local-only or install the t launcher.");
     }
     // The synchronous reservation prevents two in-flight requests from dispatching twice.
@@ -72,8 +94,8 @@ export class LaunchService {
     } catch {
       throw new LaunchError(409, "project_unavailable", "The project folder is no longer available on your Mac.");
     }
-    if (this.backend) {
-      const capability = await this.backend.capability(cwd);
+    if (backend) {
+      const capability = await backend.capability(cwd);
       if (!capability.available) throw new LaunchError(409, "requires_setup", capability.message);
       // Capability checks yield. Another request may have reserved while we checked.
       const reserved = this.store.byRequest(requestId, fingerprint);
@@ -81,12 +103,12 @@ export class LaunchService {
     }
     const id = randomUUID();
     const receipt: ClaudeLaunch = {
-      id, projectId, name: `RuntimeBrief ${project.name} ${id}`,
+      provider, id, projectId, name: `RuntimeBrief ${project.name} ${id}`,
       createdAt: new Date().toISOString(), cwd, nativeId: null, sessionId: null, openedAt: null,
-      state: "starting", message: "Checking Claude Code on your Mac…",
+      state: "starting", message: `Checking ${provider} on your Mac…`,
       model: options.model, permissionMode: options.permissionMode,
-      ...(this.backend ? {
-        backend: this.backend.id, projectRoot: cwd, promptHash: promptHash(prompt),
+      ...(backend ? {
+        backend: backend.id, projectRoot: cwd, projectName: project.name, promptHash: promptHash(prompt),
         launchState: "starting" as const, activity: "unknown" as const,
         requestedRemoteControl: options.remoteControl !== false,
       } : {}),
@@ -101,7 +123,7 @@ export class LaunchService {
   private async dispatch(receipt: ClaudeLaunch, prompt: string): Promise<ClaudeLaunch> {
     if (receipt.backend) {
       try {
-        await this.backend!.create(receipt, prompt);
+        await this.backends.get(receipt.backend)!.create(receipt, prompt);
         return await this.observeBackend(receipt);
       } catch {
         receipt.state = "unknown";
@@ -216,6 +238,46 @@ export class LaunchService {
     });
     this.opening.set(id, task);
     try { return await task; } finally { this.opening.delete(id); }
+  }
+
+  private async controlled(projectId: string, id: string) {
+    this.project(projectId, true);
+    const stored = this.store.get(id, projectId);
+    if (!stored) throw new LaunchError(404, "not_found", "This session could not be found.");
+    const receipt = await this.observeBackend(stored);
+    const backend = this.backends.get(receipt.backend!);
+    if (receipt.requestedRemoteControl === false || !backend?.terminal || !backend.input) {
+      throw new LaunchError(409, "remote_disabled", "Remote terminal control is unavailable for this session.");
+    }
+    if (receipt.remoteControl?.state !== "ready") throw new LaunchError(409, "terminal_unavailable", receipt.message);
+    return { receipt, backend };
+  }
+
+  async terminal(projectId: string, id: string) {
+    const { receipt, backend } = await this.controlled(projectId, id);
+    return backend.terminal!(receipt);
+  }
+
+  async input(projectId: string, id: string, requestId: string, data: string) {
+    this.project(projectId, true);
+    if (!this.store.get(id, projectId)) throw new LaunchError(404, "not_found", "This session could not be found.");
+    const fingerprint = promptHash(data);
+    const previous = this.store.inputStatus(id, requestId, fingerprint);
+    if (previous) return { state: previous };
+    const { receipt, backend } = await this.controlled(projectId, id);
+    const raced = this.store.inputStatus(id, requestId, fingerprint);
+    if (raced) return { state: raced };
+    // Reserve before sending: a lost acknowledgment never repeats keys or an approval.
+    if (this.inputPending.has(id)) throw new LaunchError(409, "terminal_busy", "Another input is being sent. Wait for its acknowledgment before sending more keys.");
+    this.store.reserveInput(id, requestId, fingerprint);
+    this.inputPending.add(id);
+    try {
+      await backend.input!(receipt, data);
+      this.store.finishInput(id, requestId);
+      return { state: "sent" };
+    } catch {
+      return { state: "unknown" };
+    } finally { this.inputPending.delete(id); }
   }
 
   close(): void { this.store.close(); }

@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import fs from "node:fs";
@@ -40,13 +40,13 @@ export interface TLegacyOptions {
 
 /** Unchanged t creates the worktree and terminal; RuntimeBrief supplies missing machine guarantees. */
 export class TLegacyBackend implements ClaudeSessionBackend {
-  readonly id = "t-legacy";
-  private readonly root: string;
-  private readonly tHome: string;
+  readonly id: string = "t-legacy";
+  protected readonly root: string;
+  protected readonly tHome: string;
   private readonly claudeRoot: string;
-  private readonly tmux: string;
-  private readonly binary: string;
-  private readonly socket: string | undefined;
+  protected readonly tmux: string;
+  protected readonly binary: string;
+  protected readonly socket: string | undefined;
   private readonly native: NativeClaudeProvider;
 
   constructor(options: TLegacyOptions = {}) {
@@ -58,6 +58,8 @@ export class TLegacyBackend implements ClaudeSessionBackend {
     this.socket = options.socket;
     this.native = new NativeClaudeProvider(this.binary);
   }
+
+  readonly provider = "claude" as "claude" | "codex" | "cursor";
 
   async capability(cwd?: string): Promise<LaunchCapability> {
     if (!hasPinnedT(this.tHome)) return { available: false, message: "Run runtimebriefd install-t on your Mac, then refresh to enable t sessions." };
@@ -74,12 +76,12 @@ export class TLegacyBackend implements ClaudeSessionBackend {
     return auth.available ? { available: true, message: "Starts Claude in an isolated t worktree on your Mac. Remote Control is requested by default; Claude handles permissions and setup." } : auth;
   }
 
-  private directory(launch: ClaudeLaunch): string {
+  protected directory(launch: ClaudeLaunch): string {
     tSlot(launch.id);
     return path.join(this.root, "t-launches", launch.id);
   }
 
-  private async terminal(args: string[]): Promise<string> {
+  protected async tmuxCommand(args: string[]): Promise<string> {
     const { stdout } = await exec(this.tmux, [...(this.socket ? ["-L", this.socket] : []), ...args], { timeout: 3_000, maxBuffer: 256_000 });
     return stdout;
   }
@@ -90,11 +92,13 @@ export class TLegacyBackend implements ClaudeSessionBackend {
     // A second daemon/process cannot run t twice for the same durable receipt.
     fs.mkdirSync(directory, { mode: 0o700 });
     ensurePrivateDirectory(path.join(directory, "bin"));
-    const wrapper = path.join(directory, "bin", "claude");
+    const wrapper = path.join(directory, "bin", this.provider);
     // The runner is a script invoked with literal argv, including paths with spaces.
     const quote = (value: string) => `'${value.replaceAll("'", "'\\''")}'`;
-    fs.writeFileSync(wrapper, `#!/bin/sh\nexec ${quote(process.execPath)} ${quote(path.join(scripts, "t-claude.mjs"))} "$@"\n`, { mode: 0o700 });
+    fs.writeFileSync(wrapper, `#!/bin/sh\nexec ${quote(process.execPath)} ${quote(path.join(scripts, this.provider === "claude" ? "t-claude.mjs" : "t-agent.mjs"))} "$@"\n`, { mode: 0o700 });
     fs.writeFileSync(path.join(directory, "payload.json"), JSON.stringify({
+      provider: this.provider, token: randomUUID(),
+      nativeDirectories: Object.fromEntries(["XDG_CONFIG_HOME", "XDG_CACHE_HOME", "XDG_STATE_HOME", "CODEX_HOME"].map(key => [key, process.env[key] ?? null])),
       binary: this.binary, name: launch.name, prompt,
       model: launch.model ?? "default", permissionMode: launch.permissionMode ?? "manual",
       remoteControl: launch.requestedRemoteControl !== false,
@@ -110,7 +114,7 @@ export class TLegacyBackend implements ClaudeSessionBackend {
     await exec("/bin/zsh", ["-f", path.join(scripts, "t-launch.zsh")], {
       timeout: 20_000, maxBuffer: 128_000,
       env: { ...process.env,
-        RB_T_DIR: directory, RB_T_HOME: this.tHome, RB_T_TMUX: tmuxCommand,
+        RB_T_PROVIDER: this.provider, RB_T_DIR: directory, RB_T_HOME: this.tHome, RB_T_TMUX: tmuxCommand,
         RB_T_PATH: `${path.dirname(process.execPath)}:${path.dirname(this.binary)}:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin`,
         RB_T_PROJECT: launch.projectRoot ?? launch.cwd, RB_T_REPO: "runtimebrief", RB_T_SLOT: tSlot(launch.id),
         RB_T_WORKTREES: path.join(this.root, "t-worktrees"),
@@ -138,13 +142,13 @@ export class TLegacyBackend implements ClaudeSessionBackend {
       exited = typeof exit.code === "number" || exit.code === null || spawnFailed;
     } catch { /* Still running or uncertain. */ }
     let pane = "";
-    try { pane = await this.terminal(["capture-pane", "-p", "-S", "-80", "-t", `=${launch.tmuxTarget}:`]); } catch { /* No terminal is not proof of no dispatch. */ }
+    try { pane = await this.tmuxCommand(["capture-pane", "-p", "-S", "-80", "-t", `=${launch.tmuxTarget}:`]); } catch { /* No terminal is not proof of no dispatch. */ }
     // A shell can remain in t's pane after Claude exits. It cannot keep a link ready.
     let live = pane.length > 0 && !exited;
     let ownerChanged = false;
     if (live && native) {
       try {
-        const identity = await this.terminal(["show-environment", "-t", `=${launch.tmuxTarget}`, "CLAUDE_RESUME_ID"]);
+        const identity = await this.tmuxCommand(["show-environment", "-t", `=${launch.tmuxTarget}`, "CLAUDE_RESUME_ID"]);
         ownerChanged = identity.trim() !== `CLAUDE_RESUME_ID=${native.sessionId}`;
         live = !ownerChanged;
       } catch { live = false; }

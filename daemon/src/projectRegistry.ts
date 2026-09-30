@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import type { RuntimeBriefConfig } from "./config.js";
+import { gitCommonDirectory } from "./adapters/gitWorkspace.js";
 import type { ProjectConfig } from "./types.js";
 
 function slugify(input: string): string {
@@ -25,6 +26,20 @@ function isGitWorkingTreeRoot(candidate: string): boolean {
   }
 }
 
+/** A linked worktree is a workspace of its original repository, not a new project. */
+function discoveredOwner(candidate: string): string {
+  try {
+    if (fs.statSync(path.join(candidate, ".git")).isFile()) {
+      const common = gitCommonDirectory(candidate);
+      if (common && path.basename(common) === ".git") {
+        const owner = path.dirname(common);
+        if (gitCommonDirectory(owner) === common) return owner;
+      }
+    }
+  } catch { /* retain the trusted candidate if Git metadata is unavailable */ }
+  return candidate;
+}
+
 function uniqueDiscoveredId(base: string, projectPath: string, usedIds: Set<string>): string {
   if (!usedIds.has(base)) return base;
   const suffix = createHash("sha256").update(projectPath).digest("hex").slice(0, 8);
@@ -42,6 +57,7 @@ function uniqueDiscoveredId(base: string, projectPath: string, usedIds: Set<stri
 export function projectsForConfig(config: RuntimeBriefConfig): ProjectConfig[] {
   const projects = [...config.projects];
   const seenPaths = new Set(projects.map((project) => normalizedPath(project.path)));
+  const seenRepositories = new Set(projects.map(project => gitCommonDirectory(project.path)).filter(value => value !== null));
   const usedIds = new Set(projects.map((project) => project.id));
 
   for (const configuredRoot of config.project_roots) {
@@ -58,14 +74,19 @@ export function projectsForConfig(config: RuntimeBriefConfig): ProjectConfig[] {
     }
 
     for (const entry of entries) {
-      const projectPath = path.join(root, entry.name);
+      const candidate = path.join(root, entry.name);
+      if (!isGitWorkingTreeRoot(candidate)) continue;
+      const projectPath = discoveredOwner(candidate);
       const normalized = normalizedPath(projectPath);
-      if (seenPaths.has(normalized) || !isGitWorkingTreeRoot(projectPath)) continue;
+      const repository = gitCommonDirectory(projectPath);
+      if (seenPaths.has(normalized) || (repository && seenRepositories.has(repository))) continue;
 
-      const baseId = slugify(entry.name);
+      const name = path.basename(projectPath);
+      const baseId = slugify(name);
       const id = uniqueDiscoveredId(baseId, normalized, usedIds);
-      projects.push({ id, name: entry.name, path: normalized, allowed_actions: [] });
+      projects.push({ id, name, path: normalized, allowed_actions: [] });
       seenPaths.add(normalized);
+      if (repository) seenRepositories.add(repository);
       usedIds.add(id);
     }
   }

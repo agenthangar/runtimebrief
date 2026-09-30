@@ -24,6 +24,7 @@ import { runRuntimeBriefMcpStdio } from "./mcp/server.js";
 import { LaunchService, CLAUDE_LAUNCH_ACTION } from "./launches/service.js";
 import { LaunchStore } from "./launches/store.js";
 import { NativeClaudeProvider } from "./launches/claude.js";
+import { TNativeBackend } from "./launches/tNative.js";
 import { TLegacyBackend } from "./launches/tLegacy.js";
 import { installPinnedT } from "./launches/tDependency.js";
 
@@ -243,7 +244,8 @@ async function cmdStart(allowAll: boolean): Promise<void> {
   const analyst = createAnalystService(config, adapters, { iosReleases });
   const decisions = new DecisionStore();
   const launches = new LaunchService(config, new NativeClaudeProvider(), new LaunchStore(),
-    config.claude_session_backend === "t" ? new TLegacyBackend() : undefined);
+    config.claude_session_backend === "t" ? new TLegacyBackend() : undefined,
+    [new TNativeBackend("codex"), new TNativeBackend("cursor")]);
   const app = await startServer(
     { config, adapters, analyst, iosReleases, decisions, launches },
     { allowAllInterfaces: allowAll },

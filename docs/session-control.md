@@ -2,8 +2,9 @@
 
 Status: current-t compatibility backend and Remote Control UI implemented.
 Older background launches retain their verified native Desktop handoff.
-Codex and Cursor CLI paths and evidence readers have additional native checks;
-their phone launch/control backends and pre-existing Desktop control remain research.
+Claude, Codex, and Cursor support phone launch and continuation. Claude uses
+native Remote Control; Codex and Cursor use their live native terminals.
+Controlling pre-existing Desktop-owned conversations remains separate research.
 
 ## Default Claude flow through current t
 
@@ -14,7 +15,7 @@ into RuntimeBrief's private tools directory and verifies its archive checksum.
 the user's `t` executable are unchanged. The default config is
 `claude_session_backend: t`; `native` retains the legacy background launcher.
 
-On the phone, select **New Claude task**, choose a model and permission mode,
+On the phone, select **New task**, choose an agent, model, and permission mode,
 and start the task. **Remote Control** is on by default, with a local-only toggle.
 The daemon reserves a private SQLite receipt before bounded dispatch through
 the pinned public `t open` command. `t` creates its worktree and tmux session.
@@ -31,6 +32,11 @@ RuntimeBrief's private directory, outside the human worktree sweep. The actual
 workspace is recorded; local uncommitted edits are not copied into it.
 The evidence adapter associates external worktree transcripts with their
 owning Git repository, so these sessions appear in the project's brief too.
+
+Project identity is separate from the working directory. Automatic discovery
+collapses linked worktrees under their owning repository, preserving explicit
+project names and IDs. A numeric t slot is a workspace, not a new RuntimeBrief
+project. All three providers' evidence follows this rule.
 
 The receipt independently records `backend`, `launchState`, `activity`, and
 `remoteControl`. A tmux identity is not task acknowledgment: Claude's exact
@@ -72,57 +78,69 @@ composer, default-on toggle, receipt, and demo continuation button. Browser
 continuation requires Claude's trusted-device verification; a physical-phone
 launch and browser follow-up were not established by these checks.
 
-## Current t support for Codex and Cursor
+## Codex and Cursor through current t
 
-The providers have different native workflows. Testing another provider does
-not enable it in the Claude-specific phone composer or launch API.
+All source changes stay in RuntimeBrief. The pinned `t` source and dotfiles remain
+unchanged. Codex uses t's existing agent seam. Cursor uses a process-local shim
+in the private launch shell to extend its closed provider set; it still uses t's
+worktree and tmux lifecycle. The ordinary human `t open --cursor` and legacy
+`t cursor ls/resume` commands are not changed. Attach to the receipt's tmux target
+to continue the same live CLI from your Mac.
 
-| Provider | Current t entry point | RuntimeBrief in this PR |
-| --- | --- | --- |
-| Claude | `t open <repo> <slot> --claude` | Phone launch, durable receipt, project evidence, native Remote Control requested by default. |
-| Codex | `t open <repo> <slot> --codex`, then `t resume <repo> <slot>` | Reads native project/worktree evidence. Phone launch and Remote Control are not implemented. |
-| Cursor | `t cursor ls` and `t cursor resume <id>` operate on legacy saved chats. Fresh interactive chats in current Cursor's project store are not found. No `t open --cursor` dev slot. | Reads legacy and current native project/worktree evidence. Phone launch and Remote Control are not implemented. |
+The phone offers Claude Code, Codex, and Cursor. Remote Control is **on by
+default** for each, with an explicit local-only opt-out. Claude keeps its native
+Remote Control link. For Codex and Cursor, **Open terminal** uses the existing
+authenticated, project-scoped RuntimeBrief connection. It shows native output,
+sends a follow-up, and exposes Enter, arrow keys, Tab, Escape, and Ctrl-C for
+native trust, sign-in, approval prompts, and interruption. No provider cloud
+worker or public app-server transport is enabled. This does not claim automatic
+visibility in ChatGPT's or Cursor's mobile interfaces.
 
-Native Mac checks used the same pinned, unchanged `t` and a fictional Git
-repository. Codex completed its initial task and resumed the same native
-conversation through `t`, recalling the earlier reply. A `t app --dry-run`
-resolved that resumed conversation's exact Desktop link; actual Desktop
-handoff and phone continuation were not tested. Bundled Codex CLI 0.159.0
-passed; the separately installed 0.156.1 CLI rejected this Mac's configured
-model. A future launcher must check the selected native CLI and account/model
-compatibility rather than treating a successful process start as readiness.
+The native CLIs own models, execution, history, and approvals. Codex Manual uses
+its workspace-write sandbox with on-request approval; Plan uses its read-only
+sandbox. Cursor offers its native Agent, Plan, and Ask modes. Model defaults
+come from the Mac; an explicit native model identifier can be supplied. Bypass
+permissions is not offered for these two providers. Unsupported settings fail
+before a launch is reserved.
 
-Cursor completed native tasks. A legacy chat appeared in `t cursor ls` and
-resumed the saved ID through `t cursor resume`; continuation retained a marker
-submitted in the interactive CLI. However, a fresh interactive task from CLI
-2026.09.28-64d2043 was saved only in the project JSONL store. RuntimeBrief read
-it, but the pinned `t` neither listed it nor found it for resume, because its
-Cursor bridge reads only the legacy chat directory. Current Cursor support
-through unchanged `t` therefore remains incomplete.
+A private PTY runner keeps the native CLI alive after daemon or phone disconnects.
+Remote keys enter that PTY directly and can never reach t's launcher shell.
+Cursor creates an empty chat using its native `create-chat`, then starts that ID
+once. Codex's native read-only history index binds the exact unique worktree to
+its conversation, including the bundled CLI's `vscode` source. Initial-task
+acknowledgment still requires its native transcript to contain the prompt hash.
+A changed pane, competing conversation, missing ownership evidence, exited CLI,
+project opt-out, or local-only receipt disables remote input. No resume/replay
+is used to recover a stopped CLI.
 
-Separate fresh-chat resume probes lost earlier context, including initial
-`--print` tasks and a fresh interactive transcript followed by native
-`--resume --print`. Echoing the same ID is insufficient evidence of history
-continuity. Cursor changed from 2026.08.11-e8db854 to
-2026.09.28-64d2043 during setup; both old chat stores and new project JSONL were
-observed. These results do not establish seamless history migration or a
-reliable headless Cursor launch backend. RuntimeBrief does not manufacture
-legacy metadata to bypass these native/t compatibility limitations.
+Every terminal input has its own UUID. The daemon durably reserves a hash before
+sending keys. A lost acknowledgment stays uncertain; retrying the same UUID
+checks status without sending the keys again. Terminal content and input text
+are not stored in the receipt database or response cache. Native history and
+private tmux logs remain local. Polling occurs only while the phone is active,
+and failed refreshes disable writes to a stale screen.
 
-The native tests exposed and fixed evidence-reader gaps: Codex 0.159.0 completed
-message items now supply real prompts/replies; Cursor's current punctuation-
-normalized workspace keys resolve to existing folders, retaining ambiguity
-guards and older keys. All three readers associate external linked worktrees
-with their owning Git root, without assigning them to unrelated repositories
-or separately registered monorepo folders. RuntimeBrief follows the provider's
-saved history; it does not repair or reconstruct a missing native conversation.
+RuntimeBrief prefers the Codex CLI bundled with the desktop app when available,
+then Homebrew/local installations. `RUNTIMEBRIEF_CODEX_BINARY` and
+`RUNTIMEBRIEF_CURSOR_BINARY` select explicit executables. This avoids treating an
+older standalone CLI as equivalent to a newer bundled CLI with different model
+support. Install and sign in to each native CLI on your Mac; trust and account
+setup prompts remain visible in the native terminal.
 
-[Codex Remote](https://learn.chatgpt.com/docs/remote) has its own connected-
-computer and trusted-device setup. Native CLI creation/resume, a tmux slot,
-and a Desktop link do not prove that a session is reachable from a phone.
-Codex and Cursor phone visibility/continuation remain unverified here. Keep
-those capabilities unavailable until their native paths have passed an actual
-continuation test. Claude's default-on Remote Control behavior is unchanged.
+For Codex versions supporting native project metadata, RuntimeBrief finds the
+project whose root is the original repository, or creates it idempotently,
+then assigns the launched conversation through `thread/metadata/update`.
+The thread keeps its actual worktree cwd. This uses a short-lived local
+`app-server --stdio` helper; it neither starts another conversation nor changes
+the desktop app's transport or Remote Control settings. An unavailable or
+ambiguous native project API leaves grouping unconfirmed in the receipt.
+Claude and Cursor still control how their own native interfaces group external
+worktrees; RuntimeBrief does not rewrite their project databases.
+
+Native integration checks use fictional Git fixtures. Both providers completed
+an initial task and recalled its reply in the same live conversation through
+the authenticated bridge. These local checks are distinct from the simulator
+and Revyl UI checks and do not establish physical-iPhone networking.
 
 ## Legacy background flow
 

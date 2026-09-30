@@ -11,8 +11,8 @@ agent when the user needs to act. `t` owns the process, tmux, worktree, and dura
 session record. The agent owns conversation, tools, and approvals. Human `t`
 commands and the machine interface use the same lifecycle code and store.
 
-Start with Claude on the local Mac. Advertise other providers only after their
-adapters work. Remote Control is requested by default; local-only is an explicit
+The current RuntimeBrief compatibility adapter supports Claude, Codex, and
+Cursor on the local Mac. Advertise providers only after their adapters work. Remote Control is requested by default; local-only is an explicit
 opt-out. Existing background and t launches keep their original owner when
 this machine API becomes available.
 

@@ -36,7 +36,7 @@ function fixture() {
     cwd: project, projectRoot: project, backend: "t-legacy", promptHash: promptHash(prompt), requestedRemoteControl: true,
   };
   const backend = new TLegacyBackend({ root, claudeRoot });
-  const terminal = vi.spyOn(backend as unknown as { terminal(args: string[]): Promise<string> }, "terminal")
+  const terminal = vi.spyOn(backend as unknown as { tmuxCommand(args: string[]): Promise<string> }, "tmuxCommand")
     .mockImplementation(async args => args[0] === "show-environment" ? `CLAUDE_RESUME_ID=${nativeId}` : "native session");
   const write = (...records: object[]) => fs.writeFileSync(transcript, records.map(record => JSON.stringify({ sessionId: nativeId, cwd, ...record })).join("\n"));
   const user = { type: "user", message: { role: "user", content: prompt } };
