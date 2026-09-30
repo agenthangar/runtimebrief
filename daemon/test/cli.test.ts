@@ -54,6 +54,7 @@ describe("cli", () => {
     expect(raw).toContain("token_hash: scrypt:");
     const config = loadConfig();
     expect(config.server.host).toBe("127.0.0.1");
+    expect(config.claude_session_backend).toBe("t");
     expect(config.analyst.model).toBe("gpt-5.6-luna");
   });
 
@@ -85,6 +86,7 @@ describe("cli", () => {
       "add-project",
       "add-project-root",
       "install-service",
+      "install-t",
       "mcp",
     ];
 

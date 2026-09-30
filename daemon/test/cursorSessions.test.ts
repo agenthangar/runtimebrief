@@ -10,7 +10,7 @@ import {
   parseCursorSessionDir,
 } from "../src/adapters/cursorSessions.js";
 import type { ProjectConfig } from "../src/types.js";
-import { tmpdir } from "./helpers.js";
+import { git, makeFixtureRepo, tmpdir } from "./helpers.js";
 
 // Fixture layout mirrors the real cursor-agent chat store, verified against
 // a live session on this machine (see docs/adapters.md).
@@ -291,6 +291,31 @@ describe("CursorSessionsAdapter", () => {
     adapter = new CursorSessionsAdapter(root);
   });
   afterAll(() => fs.rmSync(root, { recursive: true, force: true }));
+
+  it("associates a native chat in an external worktree only with its owning repository", async () => {
+    const repo = makeFixtureRepo();
+    const other = makeFixtureRepo();
+    const storage = tmpdir("cursor-external-worktree");
+    const worktree = path.join(storage, "worktree");
+    try {
+      git(repo, "worktree", "add", "--detach", worktree);
+      writeSession(path.join(storage, "chats", "workspace-hash", SID), {
+        cwd: worktree,
+        withStore: true,
+        createdAtMs: Date.parse("2026-07-09T10:00:00Z"),
+        updatedAtMs: Date.parse("2026-07-09T10:03:00Z"),
+      });
+      const reader = new CursorSessionsAdapter(storage, null);
+      expect((await reader.transcriptPaths({ id: "repo", name: "Repo", path: repo }, 10)).map(ref => ref.id)).toEqual([SID]);
+      expect(await reader.transcriptPaths({ id: "other", name: "Other", path: other }, 10)).toEqual([]);
+      fs.mkdirSync(path.join(repo, "subproject"));
+      expect(await reader.transcriptPaths({ id: "subproject", name: "Subproject", path: path.join(repo, "subproject") }, 10)).toEqual([]);
+    } finally {
+      fs.rmSync(repo, { recursive: true, force: true });
+      fs.rmSync(other, { recursive: true, force: true });
+      fs.rmSync(storage, { recursive: true, force: true });
+    }
+  });
 
   it("discovers projects with matching sessions by meta.json cwd", async () => {
     expect(await adapter.discover(project)).toBe(true);

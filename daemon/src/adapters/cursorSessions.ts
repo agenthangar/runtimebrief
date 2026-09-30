@@ -6,6 +6,7 @@ import readline from "node:readline";
 import { isSensitivePath } from "../secretFilter.js";
 import type { ParsedSession } from "./claudeCodeSessions.js";
 import { cwdMatchesProject } from "./codexSessions.js";
+import { sharesGitRepository } from "./gitWorkspace.js";
 import type {
   ActivityEvent,
   ProjectConfig,
@@ -386,6 +387,7 @@ function cursorSessionMatchesProject(
   session: ParsedSession,
 ): boolean {
   if (cwdMatchesProject(workspacePath, projectPath)) return true;
+  if (sharesGitRepository(workspacePath, projectPath)) return true;
   if (!workspacePath || !cwdMatchesProject(projectPath, workspacePath)) return false;
   return session.filesTouched.some((candidate) => {
     const resolved = resolvedObservedPath(candidate, workspacePath);
@@ -448,8 +450,18 @@ function listProjectTranscriptFiles(projectsDir: string): CursorProjectTranscrip
     .slice(0, MAX_SCAN_SESSIONS);
 }
 
-function cursorWorkspaceKey(workspacePath: string): string {
-  return path.resolve(workspacePath).replace(/^[/\\]+/, "").replace(/[/\\]/g, "-");
+function normalizedCursorWorkspaceKey(value: string): string {
+  return value.replace(/[^a-zA-Z0-9]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
+}
+
+function cursorWorkspaceKeys(workspacePath: string): string[] {
+  const resolved = path.resolve(workspacePath);
+  // Current CLI keys normalize punctuation too; retain the older separator-only
+  // encoding without assuming either lossy key uniquely identifies a folder.
+  return [...new Set([
+    normalizedCursorWorkspaceKey(resolved),
+    resolved.replace(/^[/\\]+/, "").replace(/[/\\]/g, "-"),
+  ])];
 }
 
 function cursorProjectTranscriptMatchesProject(
@@ -468,7 +480,7 @@ function cursorProjectTranscriptMatchesProject(
   if (existingWorkspacePaths.length === 1) {
     workspacePath = existingWorkspacePaths[0]!;
   } else if (existingWorkspacePaths.length > 1) {
-    // Cursor replaces path separators with hyphens, so two real workspaces can
+    // Cursor normalizes separators and punctuation, so two real workspaces can
     // share one storage key. Only concrete absolute tool evidence can safely
     // choose between those candidates; pathless or relative-only records stay
     // unassigned rather than leaking onto both project cards.
@@ -477,7 +489,7 @@ function cursorProjectTranscriptMatchesProject(
     );
     if (evidenced.length === 1) workspacePath = evidenced[0]!;
   } else if (
-    workspaceKey === cursorWorkspaceKey(resolvedProject) &&
+    cursorWorkspaceKeys(resolvedProject).includes(workspaceKey) &&
     absoluteObservedPaths.some((observed) => cwdMatchesProject(observed, resolvedProject))
   ) {
     // The workspace may have been deleted since Cursor wrote the transcript.
@@ -494,7 +506,9 @@ function existingCursorWorkspacePaths(
   limit = 3,
 ): string[] {
   const root = path.resolve(filesystemRoot);
-  const rootKey = cursorWorkspaceKey(root);
+  const rootKeys = cursorWorkspaceKeys(root);
+  const rootKey = rootKeys.find((key) => !key || workspaceKey === key || workspaceKey.startsWith(`${key}-`));
+  if (rootKey === undefined) return [];
   let encodedTail = workspaceKey;
   if (rootKey) {
     if (workspaceKey === rootKey) return [root];
@@ -517,13 +531,12 @@ function existingCursorWorkspacePaths(
     }
     for (const entry of entries) {
       if (matches.length >= limit) return;
-      const parts = entry.name.split("-");
-      if (
-        tokenIndex + parts.length > tokens.length ||
-        parts.some((part, offset) => part !== tokens[tokenIndex + offset])
-      ) {
-        continue;
-      }
+      const encodings = [...new Set([entry.name, normalizedCursorWorkspaceKey(entry.name)])];
+      const matchingParts = encodings.map((key) => key.split("-")).filter((parts) =>
+        tokenIndex + parts.length <= tokens.length &&
+        parts.every((part, offset) => part === tokens[tokenIndex + offset]),
+      );
+      if (matchingParts.length === 0) continue;
       const child = path.join(directory, entry.name);
       let isDirectory = entry.isDirectory();
       if (!isDirectory && entry.isSymbolicLink()) {
@@ -534,9 +547,12 @@ function existingCursorWorkspacePaths(
         }
       }
       if (!isDirectory) continue;
-      const nextIndex = tokenIndex + parts.length;
-      if (nextIndex === tokens.length) matches.push(child);
-      else visit(child, nextIndex);
+      for (const parts of matchingParts) {
+        const nextIndex = tokenIndex + parts.length;
+        if (nextIndex === tokens.length) {
+          if (!matches.includes(child)) matches.push(child);
+        } else visit(child, nextIndex);
+      }
     }
   };
   visit(root, 0);

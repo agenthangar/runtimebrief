@@ -9,6 +9,10 @@ protocol RuntimeBriefDataSource: Sendable {
     func ask(projectID: String, question: String) async throws -> AnalystAnswer
     func claudeLaunches(projectID: String) async throws -> ClaudeLaunchList
     func startClaude(projectID: String, request: ClaudeLaunchRequest) async throws -> ClaudeLaunch
+    func sessions(projectID: String) async throws -> ClaudeLaunchList
+    func startSession(projectID: String, request: SessionLaunchRequest) async throws -> ClaudeLaunch
+    func terminal(projectID: String, launchID: String) async throws -> TerminalSnapshot
+    func sendInput(projectID: String, launchID: String, input: TerminalInput) async throws -> TerminalInputResult
     func openClaude(projectID: String, launchID: String) async throws -> ClaudeLaunch
     func streamStatus(projectID: String) -> AsyncThrowingStream<AnalystStreamEvent, Error>
     func streamAsk(
@@ -43,6 +47,11 @@ struct LiveRuntimeBriefDataSource: RuntimeBriefDataSource {
     func openClaude(projectID: String, launchID: String) async throws -> ClaudeLaunch {
         try await client.openClaude(projectID: projectID, launchID: launchID)
     }
+
+    func sessions(projectID: String) async throws -> ClaudeLaunchList { try await client.sessions(projectID: projectID) }
+    func startSession(projectID: String, request: SessionLaunchRequest) async throws -> ClaudeLaunch { try await client.startSession(projectID: projectID, request: request) }
+    func terminal(projectID: String, launchID: String) async throws -> TerminalSnapshot { try await client.terminal(projectID: projectID, launchID: launchID) }
+    func sendInput(projectID: String, launchID: String, input: TerminalInput) async throws -> TerminalInputResult { try await client.sendInput(projectID: projectID, launchID: launchID, input: input) }
 
     func project(id: String) async throws -> ProjectCard {
         try await client.project(id: id)

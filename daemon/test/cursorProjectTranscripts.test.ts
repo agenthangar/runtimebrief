@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { CursorSessionsAdapter } from "../src/adapters/cursorSessions.js";
 import type { ProjectConfig } from "../src/types.js";
-import { tmpdir } from "./helpers.js";
+import { git, makeFixtureRepo, tmpdir } from "./helpers.js";
 
 const WORKSPACE_FIXTURE_ROOT = path.join(
   os.tmpdir(),
@@ -27,6 +27,11 @@ type TranscriptRecord = Record<string, unknown>;
 
 function encodedWorkspacePath(workspacePath: string): string {
   return workspacePath.split(path.sep).filter(Boolean).join("-");
+}
+
+function useCurrentWorkspaceKey(root: string, workspace: string): void {
+  const key = workspace.replace(/[^a-zA-Z0-9]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
+  fs.renameSync(path.join(root, "projects", encodedWorkspacePath(workspace)), path.join(root, "projects", key));
 }
 
 function userMessage(text: string): TranscriptRecord {
@@ -127,6 +132,52 @@ describe("Cursor project transcript sessions", () => {
       fs.rmSync(root, { recursive: true, force: true });
     }
     fs.rmSync(WORKSPACE_FIXTURE_ROOT, { recursive: true, force: true });
+  });
+
+  it("discovers current punctuation-normalized keys and external Git worktrees", async () => {
+    const root = fixtureRoot("cursor-current-workspace-key");
+    const repo = makeFixtureRepo();
+    const worktree = path.join(WORKSPACE_FIXTURE_ROOT, "external_workspace.v2");
+    try {
+      git(repo, "worktree", "add", "--detach", worktree);
+      writeProjectTranscript(root, worktree, EXACT_ID, [
+        userMessage("Review the fictional external workspace"),
+        assistantMessage([{ type: "text", text: "Current transcript is visible." }]),
+        turnEnded("success"),
+      ], new Date("2026-08-20T12:00:00Z"));
+      useCurrentWorkspaceKey(root, worktree);
+      const adapter = new CursorSessionsAdapter(root, null);
+      expect((await adapter.transcriptPaths(project(repo), 10)).map(ref => ref.id)).toEqual([EXACT_ID]);
+      expect((await adapter.transcriptPaths(project(worktree), 10))[0]?.conclusion).toBe("Current transcript is visible.");
+      expect(await adapter.transcriptPaths(project(SIBLING), 10)).toEqual([]);
+      fs.mkdirSync(path.join(repo, "subproject"));
+      expect(await adapter.transcriptPaths(project(path.join(repo, "subproject")), 10)).toEqual([]);
+    } finally {
+      fs.rmSync(repo, { recursive: true, force: true });
+    }
+  });
+
+  it("requires concrete evidence when punctuation-normalized workspace keys collide", async () => {
+    const root = fixtureRoot("cursor-current-key-collision");
+    const workspace = path.join(PARENT_WORKSPACE, "current_workspace.v2");
+    const collision = path.join(PARENT_WORKSPACE, "current", "workspace", "v2");
+    fs.mkdirSync(workspace, { recursive: true });
+    fs.mkdirSync(collision, { recursive: true });
+    const file = writeProjectTranscript(root, workspace, EXACT_ID, [
+      userMessage("Discuss the fictional workspace"),
+      assistantMessage([{ type: "text", text: "A pathless conversation." }]),
+    ], new Date("2026-08-20T12:00:00Z"));
+    useCurrentWorkspaceKey(root, workspace);
+    const adapter = new CursorSessionsAdapter(root, null);
+    expect(await adapter.transcriptPaths(project(workspace), 10)).toEqual([]);
+    expect(await adapter.transcriptPaths(project(collision), 10)).toEqual([]);
+    const current = file.replace(encodedWorkspacePath(workspace), workspace.replace(/[^a-zA-Z0-9]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, ""));
+    fs.appendFileSync(current, JSON.stringify(assistantMessage([
+      { type: "tool_use", name: "Read", input: { path: path.join(workspace, "app.ts") } },
+    ])) + "\n");
+    const refreshed = new CursorSessionsAdapter(root, null);
+    expect((await refreshed.transcriptPaths(project(workspace), 10)).map(ref => ref.id)).toEqual([EXACT_ID]);
+    expect(await refreshed.transcriptPaths(project(collision), 10)).toEqual([]);
   });
 
   it("parses an exact-project transcript into a complete session result", async () => {

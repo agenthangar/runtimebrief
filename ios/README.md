@@ -133,7 +133,7 @@ selectors. Install and sign in to Claude Code and Claude Desktop on your Mac.
 All registered projects allow tasks by default, including projects discovered
 later under a trusted root.
 
-1. Open a project and tap **New Claude task** in its **Claude Code** section.
+1. Open a project and tap **New task** in its **Claude Code** section.
 2. Choose **Claude default**, **Fable**, **Opus**, **Sonnet**, or **Haiku**.
    Claude default uses the Mac's configured model; named choices use Claude's
    model aliases. Availability depends on the installed Claude version and
@@ -199,3 +199,12 @@ RuntimeBriefSiriTests/        iOS 27 system App Intents integration tests
 
 The app icon's generation and licensing provenance is documented in
 [ASSET_PROVENANCE.md](ASSET_PROVENANCE.md).
+
+
+Coding agents use the same task composer. Claude continues through native
+Remote Control; Codex and Cursor continue in their live terminals through the
+RuntimeBrief connection. Remote Control defaults on. The terminal renderer is
+pinned to SwiftTerm 1.5.1 (MIT); snapshots are read-only and cannot open links,
+read/write the clipboard, or send automatic terminal replies. Input goes through
+explicit controls with a durable request ID. Demo terminals use fictional
+in-memory data and never connect to a Mac.

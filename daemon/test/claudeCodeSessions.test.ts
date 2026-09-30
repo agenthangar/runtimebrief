@@ -8,7 +8,7 @@ import {
   parseClaudeSessionFile,
 } from "../src/adapters/claudeCodeSessions.js";
 import type { ProjectConfig } from "../src/types.js";
-import { tmpdir } from "./helpers.js";
+import { git, makeFixtureRepo, tmpdir } from "./helpers.js";
 
 // Fixture records mirror the real Claude Code 2.1.x JSONL shape, verified
 // against a live transcript on this machine (see docs/adapters.md).
@@ -368,5 +368,27 @@ describe("ClaudeCodeSessionsAdapter", () => {
     const recent = await adapter.recentActivity(project, new Date("2026-07-05T00:00:00Z"));
     expect(recent).toHaveLength(1);
     expect(recent[0]!.kind).toBe("session");
+  });
+
+  it("associates external Git worktree sessions with their repository without mixing other repositories or monorepo folders", async () => {
+    const repo = makeFixtureRepo();
+    const other = makeFixtureRepo();
+    const storage = tmpdir("external-claude");
+    const worktree = path.join(storage, "t-worktree");
+    try {
+      git(repo, "worktree", "add", "--detach", worktree);
+      const transcripts = path.join(storage, "projects", encodeProjectPath(worktree));
+      fs.mkdirSync(transcripts, { recursive: true });
+      fs.writeFileSync(path.join(transcripts, `${SID}.jsonl`), userLine("Review the fictional worktree", "2026-07-10T09:00:00Z", { cwd: worktree }));
+      const reader = new ClaudeCodeSessionsAdapter(storage);
+      expect((await reader.transcriptPaths({ id: "repo", name: "Repo", path: repo }, 10)).map(ref => ref.id)).toEqual([SID]);
+      expect(await reader.transcriptPaths({ id: "other", name: "Other", path: other }, 10)).toEqual([]);
+      fs.mkdirSync(path.join(repo, "subproject"));
+      expect(await reader.transcriptPaths({ id: "subproject", name: "Subproject", path: path.join(repo, "subproject") }, 10)).toEqual([]);
+    } finally {
+      fs.rmSync(repo, { recursive: true, force: true });
+      fs.rmSync(other, { recursive: true, force: true });
+      fs.rmSync(storage, { recursive: true, force: true });
+    }
   });
 });

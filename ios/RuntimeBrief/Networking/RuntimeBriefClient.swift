@@ -105,6 +105,27 @@ struct RuntimeBriefClient: Sendable {
         try await launchRequest(path: "/v1/projects/\(escape(projectID))/claude-launches", body: JSONEncoder().encode(request))
     }
 
+    func sessions(projectID: String) async throws -> ClaudeLaunchList {
+        do { return try await getJSON("/v1/projects/\(escape(projectID))/sessions") }
+        catch RuntimeBriefError.notFound { return try await claudeLaunches(projectID: projectID) }
+    }
+
+    func startSession(projectID: String, request: SessionLaunchRequest) async throws -> ClaudeLaunch {
+        do { return try await launchRequest(path: "/v1/projects/\(escape(projectID))/sessions", body: JSONEncoder().encode(request)) }
+        catch RuntimeBriefError.notFound where request.provider == .claude {
+            guard let model = ClaudeModel(rawValue: request.model), let mode = ClaudePermissionMode(rawValue: request.permissionMode) else { throw RuntimeBriefError.notFound }
+            return try await startClaude(projectID: projectID, request: ClaudeLaunchRequest(requestId: request.requestId, prompt: request.prompt, model: model, permissionMode: mode, remoteControl: request.remoteControl))
+        }
+    }
+
+    func terminal(projectID: String, launchID: String) async throws -> TerminalSnapshot {
+        try await getJSON("/v1/projects/\(escape(projectID))/sessions/\(escape(launchID))/terminal")
+    }
+
+    func sendInput(projectID: String, launchID: String, input: TerminalInput) async throws -> TerminalInputResult {
+        try await launchRequest(path: "/v1/projects/\(escape(projectID))/sessions/\(escape(launchID))/input", body: JSONEncoder().encode(input))
+    }
+
     func openClaude(projectID: String, launchID: String) async throws -> ClaudeLaunch {
         try await launchRequest(path: "/v1/projects/\(escape(projectID))/claude-launches/\(escape(launchID))/open", body: Data("{}".utf8))
     }
@@ -213,6 +234,10 @@ struct RuntimeBriefClient: Sendable {
     private func getJSON<T: Decodable>(_ path: String) async throws -> T {
         let request = try makeRequest(path: path)
         let (data, response) = try await perform(request)
+        if let http = response as? HTTPURLResponse, [403, 409, 503].contains(http.statusCode),
+           let failure = try? JSONDecoder().decode(LaunchFailure.self, from: data), let message = failure.message {
+            throw RuntimeBriefError.launch(message)
+        }
         try check(response)
         return try decode(data)
     }
