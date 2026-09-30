@@ -5,12 +5,30 @@ import XCTest
 /// still a separate physical-device check.
 final class SiriVoiceRoutingUITests: XCTestCase {
     @MainActor
-    func testRecognizedStatusRequestsReachProjectBrief() async throws {
-        let key = "RUNTIMEBRIEF_E2E_SIRI_ROUTING"
-        let enabled = ProcessInfo.processInfo.environment[key]
-            ?? Bundle(for: Self.self).object(forInfoDictionaryKey: key) as? String
-        guard enabled == "1" else { throw XCTSkip("Enable recognized-text Siri routing on a Siri-enabled device.") }
+    func testRecognizedAttentionRequestReachesIntent() async throws {
+        try requireRoutingTest()
+        let app = XCUIApplication()
+        app.launchEnvironment["RUNTIMEBRIEF_E2E_CLEAR_STATE"] = "1"
+        app.launchEnvironment["RUNTIMEBRIEF_E2E_DEMO"] = "1"
+        app.launch()
+        XCTAssertTrue(app.staticTexts["demo-data-banner"].waitForExistence(timeout: 10))
+        try await Task.sleep(for: .seconds(10))
 
+        XCUIDevice.shared.siriService.activate(voiceRecognitionText: "What needs attention in RuntimeBrief")
+        let screenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        screenshot.name = "Siri attention route"
+        screenshot.lifetime = .keepAlways
+        add(screenshot)
+        let answer = XCUIDevice.shared.siriService.staticTexts.matching(
+            NSPredicate(format: "label CONTAINS[c] %@", "Catalog Builder")
+        ).firstMatch
+        XCTAssertTrue(answer.waitForExistence(timeout: 30),
+                      "Siri did not route the parameter-free attention request. \(XCUIDevice.shared.siriService.debugDescription)")
+    }
+
+    @MainActor
+    func testRecognizedStatusRequestsReachProjectBrief() async throws {
+        try requireRoutingTest()
         let app = XCUIApplication()
         app.launchEnvironment["RUNTIMEBRIEF_E2E_CLEAR_STATE"] = "1"
         app.launch()
@@ -46,5 +64,12 @@ final class SiriVoiceRoutingUITests: XCTestCase {
             guard matched else { return }
             app.activate()
         }
+    }
+
+    private func requireRoutingTest() throws {
+        let key = "RUNTIMEBRIEF_E2E_SIRI_ROUTING"
+        let enabled = ProcessInfo.processInfo.environment[key]
+            ?? Bundle(for: Self.self).object(forInfoDictionaryKey: key) as? String
+        guard enabled == "1" else { throw XCTSkip("Enable recognized-text Siri routing on a Siri-enabled device.") }
     }
 }

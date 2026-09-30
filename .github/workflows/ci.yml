@@ -80,6 +80,8 @@ jobs:
         run: |
           device_id="$(xcrun simctl list devices available --json | python3 -c 'import json,sys; devices=json.load(sys.stdin)["devices"]; print(next(d["udid"] for runtime, entries in devices.items() if ".iOS-27-" in runtime for d in entries if d["name"].startswith("iPhone") and d["isAvailable"]))')"
           echo "IOS_TEST_DEVICE=$device_id" >> "$GITHUB_ENV"
+      - name: Boot and settle the simulator before UI testing
+        run: xcrun simctl bootstatus "$IOS_TEST_DEVICE" -b
       - name: Route recognized status phrases through Siri
         run: >-
           xcodebuild -project ios/RuntimeBrief.xcodeproj
