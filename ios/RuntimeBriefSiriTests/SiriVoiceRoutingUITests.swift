@@ -55,7 +55,7 @@ final class SiriVoiceRoutingUITests: XCTestCase {
             initial.name = "Siri response: \(request)"
             initial.lifetime = .keepAlways
             add(initial)
-            let expected = request.contains("Sample Tracker") ? "Export validation is ready to review" : "You have 3 projects"
+            let expected = request.contains("Sample Tracker") ? "24 demo checks pass" : "You have 3 projects"
             let answer = XCUIDevice.shared.siriService.staticTexts.matching(
                 NSPredicate(format: "label CONTAINS[c] %@", expected)
             ).firstMatch

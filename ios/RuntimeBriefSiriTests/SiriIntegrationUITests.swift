@@ -43,8 +43,9 @@ final class SiriIntegrationUITests: XCTestCase {
         let statusResult = try await status.run()
         let text: String = try statusResult.value
         XCTAssertTrue(text.contains("Fictional demo"))
-        XCTAssertTrue(text.contains("Export validation is ready to review"))
-        XCTAssertTrue(text.contains("Evidence updated"))
+        XCTAssertTrue(text.contains("Sample Tracker, analyzed"))
+        XCTAssertTrue(text.contains("24 demo checks pass"))
+        XCTAssertFalse(text.contains("[demo-evidence-"))
 
         let overviewResult = try await definitions.intents["GetProjectStatusIntent"].makeIntent().run()
         let overview: String = try overviewResult.value
