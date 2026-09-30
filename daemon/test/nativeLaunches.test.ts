@@ -43,6 +43,16 @@ describe("native provider sessions and remote terminal", () => {
     expect(conflict.statusCode).toBe(409);
   });
 
+  it.each(["codex", "cursor"])("preserves explicit model and bypass choices for %s without replaying", async provider => {
+    const f = setup(); const body = task(provider, { model: "example-model", permissionMode: "bypassPermissions", reasoningEffort: "medium" });
+    const first = await f.app.inject({ method: "POST", url: sessions, headers: authHeaders(), payload: body });
+    expect(first.statusCode).toBe(202);
+    expect(first.json()).toMatchObject({ model: "example-model", permissionMode: "bypassPermissions", reasoningEffort: "medium", requestedRemoteControl: true });
+    expect((await f.app.inject({ method: "POST", url: sessions, headers: authHeaders(), payload: body })).json().id).toBe(first.json().id);
+    for (const changed of [{ model: "other-model" }, { permissionMode: "manual" }, { reasoningEffort: "high" }]) expect((await f.app.inject({ method: "POST", url: sessions, headers: authHeaders(), payload: { ...body, ...changed } })).statusCode).toBe(409);
+    expect(f.backends.find(b => b.provider === provider)!.create).toHaveBeenCalledTimes(1);
+  });
+
   it("protects input with auth, project scope, opt-out, and native permission modes", async () => {
     const f = setup();
     const receipt = (await f.app.inject({ method: "POST", url: sessions, headers: authHeaders(), payload: task("cursor", { remoteControl: false }) })).json();
@@ -50,7 +60,7 @@ describe("native provider sessions and remote terminal", () => {
     expect((await f.app.inject({ method: "POST", url: `${sessions}/${receipt.id}/input`, payload: input })).statusCode).toBe(401);
     expect((await f.app.inject({ method: "POST", url: `${sessions}/${receipt.id}/input`, headers: authHeaders(), payload: input })).statusCode).toBe(409);
     expect((await f.app.inject({ method: "GET", url: `/v1/projects/other/sessions/${receipt.id}/terminal`, headers: authHeaders() })).statusCode).toBe(404);
-    for (const provider of ["codex", "cursor"]) expect((await f.app.inject({ method: "POST", url: sessions, headers: authHeaders(), payload: task(provider, { permissionMode: "bypassPermissions" }) })).statusCode).toBe(400);
+    for (const provider of ["codex", "cursor"]) expect((await f.app.inject({ method: "POST", url: sessions, headers: authHeaders(), payload: task(provider, { permissionMode: "acceptEdits" }) })).statusCode).toBe(400);
     f.config.projects[0]!.claude_launch_enabled = false;
     expect((await f.app.inject({ method: "POST", url: sessions, headers: authHeaders(), payload: task("codex") })).statusCode).toBe(403);
     expect(f.backends[1]!.input).not.toHaveBeenCalled();

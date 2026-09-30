@@ -11,7 +11,7 @@ actor DemoClaudeTasks {
         ClaudeLaunchList(
             capability: ClaudeLaunchCapability(available: true, message: "Try a fictional Claude task. Demo mode never sends work to a Mac."),
             launches: tasks.filter { $0.projectId == projectID },
-            providers: AgentProvider.allCases.map { AgentCapability(id: $0, available: true, message: "Try a fictional \($0.label) task. Demo mode never sends work to a Mac.") }
+            providers: AgentProvider.allCases.map { AgentCapability(id: $0, available: true, message: "Try a fictional \($0.label) task. Demo mode never sends work to a Mac.", models: $0 == .claude ? ClaudeModel.allCases.filter { $0 != .default }.map { AgentModel(id: $0.rawValue, label: $0.label, reasoningEfforts: ["low", "medium", "high"]) } : [AgentModel(id: "demo-model", label: "Demo model", reasoningEfforts: ["low", "medium", "high"])], permissionModes: $0 == .claude ? $0.modes : $0 == .codex ? ["manual", "auto", "plan", "bypassPermissions", "dontAsk"] : ["manual", "auto", "plan", "ask", "bypassPermissions"], defaultModelLabel: $0 == .claude ? "opus" : "demo-model", defaultReasoningLabel: "medium") }
         )
     }
 
@@ -35,6 +35,7 @@ actor DemoClaudeTasks {
         launch.provider = request.provider
         launch.model = request.model
         launch.permissionMode = request.permissionMode
+        launch.reasoningEffort = request.reasoningEffort
         launch.backend = request.provider == .claude ? "t-legacy" : "t-\(request.provider.rawValue)"
         tasks[0] = launch
         screens[launch.id] = "Demo \(request.provider.label) terminal\r\n\r\nFictional conversation. No Mac is connected.\r\n\r\n> "

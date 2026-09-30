@@ -72,9 +72,10 @@ export class TLegacyBackend implements ClaudeSessionBackend {
         // t currently fetches/branches from origin/main. Never silently use the shared checkout.
       }
     } catch { return { available: false, message: "t needs tmux, Claude Code, and a Git project with origin/main on your Mac." }; }
-    const auth = await this.native.capability();
-    return auth.available ? { available: true, message: "Starts Claude in an isolated t worktree on your Mac. Remote Control is requested by default; Claude handles permissions and setup." } : auth;
+    const auth = await this.native.capability(cwd);
+    return auth.available ? { ...auth, message: "Starts Claude in an isolated t worktree on your Mac. Remote Control is requested by default; Claude handles permissions and setup." } : auth;
   }
+  resolveSettings(cwd: string, options: import("./types.js").ClaudeLaunchOptions) { return this.native.resolveSettings(cwd, options); }
 
   protected directory(launch: ClaudeLaunch): string {
     tSlot(launch.id);
@@ -100,7 +101,8 @@ export class TLegacyBackend implements ClaudeSessionBackend {
       provider: this.provider, token: randomUUID(),
       nativeDirectories: Object.fromEntries(["XDG_CONFIG_HOME", "XDG_CACHE_HOME", "XDG_STATE_HOME", "CODEX_HOME"].map(key => [key, process.env[key] ?? null])),
       binary: this.binary, name: launch.name, prompt,
-      model: launch.model ?? "default", permissionMode: launch.permissionMode ?? "manual",
+      model: launch.effectiveModel ?? launch.model ?? "default", permissionMode: launch.permissionMode ?? "manual",
+      reasoningEffort: launch.effectiveReasoningEffort ?? launch.reasoningEffort ?? "default",
       remoteControl: launch.requestedRemoteControl !== false,
     }), { flag: "wx", mode: 0o600 });
     // t's logging stays native, but the file is private even on an existing tmux server.

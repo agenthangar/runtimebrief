@@ -3,7 +3,7 @@ import fs from "node:fs";
 import type { RuntimeBriefConfig } from "../config.js";
 import { projectsForConfig } from "../projectRegistry.js";
 import { LaunchStore } from "./store.js";
-import { DEFAULT_LAUNCH_OPTIONS, CLAUDE_MODELS, CLAUDE_PERMISSION_MODES, LaunchError, type ClaudeLaunchOptions, type ClaudeLaunch, type ClaudeProvider, type NativeClaudeSession, type ClaudeSessionBackend, type SessionProvider } from "./types.js";
+import { DEFAULT_LAUNCH_OPTIONS, MODEL_ID, REASONING_EFFORTS, permissionModes, LaunchError, type ClaudeLaunchOptions, type ClaudeLaunch, type ClaudeProvider, type NativeClaudeSession, type ClaudeSessionBackend, type SessionProvider } from "./types.js";
 import { promptHash } from "./tLegacy.js";
 
 export const CLAUDE_LAUNCH_ACTION = "launch-claude";
@@ -68,9 +68,9 @@ export class LaunchService {
   async start(projectId: string, requestId: string, prompt: string, options: ClaudeLaunchOptions = DEFAULT_LAUNCH_OPTIONS): Promise<ClaudeLaunch> {
     const project = this.project(projectId, true);
     const provider: SessionProvider = options.provider ?? "claude";
-    const modes: readonly string[] = provider === "claude" ? CLAUDE_PERMISSION_MODES : provider === "cursor" ? ["manual", "plan", "ask"] : ["manual", "plan"];
-    if (!modes.includes(options.permissionMode) || !/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/.test(options.model)
-      || (provider === "claude" && !CLAUDE_MODELS.includes(options.model as never))) {
+    const modes: readonly string[] = permissionModes(provider);
+    if (!modes.includes(options.permissionMode) || !MODEL_ID.test(options.model)
+      || (options.reasoningEffort !== undefined && !(REASONING_EFFORTS as readonly string[]).includes(options.reasoningEffort))) {
       throw new LaunchError(400, "unsupported_settings", "This agent does not support those launch settings.");
     }
     const backend = provider === "claude" ? this.backend : [...this.backends.values()].find(value => value.provider === provider);
@@ -79,6 +79,7 @@ export class LaunchService {
     const identity: unknown[] = [projectId, prompt];
     if (provider !== "claude") identity.push("provider", provider);
     if (options.model !== "default" || options.permissionMode !== "manual") identity.push(options.model, options.permissionMode);
+    if (options.reasoningEffort && options.reasoningEffort !== "default") identity.push("reasoningEffort", options.reasoningEffort);
     if (options.remoteControl === false) identity.push("remoteControl", false);
     const fingerprint = createHash("sha256").update(JSON.stringify(identity)).digest("hex");
     const previous = this.store.byRequest(requestId, fingerprint);
@@ -97,16 +98,28 @@ export class LaunchService {
     if (backend) {
       const capability = await backend.capability(cwd);
       if (!capability.available) throw new LaunchError(409, "requires_setup", capability.message);
+      if (options.model !== "default" && capability.models?.length && !capability.models.some(model => model.id === options.model || (provider === "claude" && model.id.replace(/\[1m\]$/, "") === options.model))) throw new LaunchError(400, "unsupported_settings", "This model is not available in the native harness. Refresh the model list.");
+      if (options.reasoningEffort && options.reasoningEffort !== "default" && capability.models?.length) {
+        const selected = options.model === "default" ? capability.defaultModelLabel : options.model;
+        const model = capability.models.find(model => model.id === selected);
+        if (model && !model.reasoningEfforts?.includes(options.reasoningEffort)) throw new LaunchError(400, "unsupported_settings", "This model does not support that reasoning level.");
+      }
       // Capability checks yield. Another request may have reserved while we checked.
       const reserved = this.store.byRequest(requestId, fingerprint);
       if (reserved) return this.pending.get(requestId) ?? reserved;
     }
+    const resolver = backend ?? this.provider;
+    const resolved = await resolver.resolveSettings?.(cwd, options);
+    const alreadyReserved = this.store.byRequest(requestId, fingerprint);
+    if (alreadyReserved) return this.pending.get(requestId) ?? alreadyReserved;
     const id = randomUUID();
     const receipt: ClaudeLaunch = {
       provider, id, projectId, name: `RuntimeBrief ${project.name} ${id}`,
       createdAt: new Date().toISOString(), cwd, nativeId: null, sessionId: null, openedAt: null,
       state: "starting", message: `Checking ${provider} on your Mac…`,
       model: options.model, permissionMode: options.permissionMode,
+      ...(options.reasoningEffort && options.reasoningEffort !== "default" ? { reasoningEffort: options.reasoningEffort } : {}),
+      ...(resolved ? { effectiveModel: resolved.model, effectiveReasoningEffort: resolved.reasoningEffort } : {}),
       ...(backend ? {
         backend: backend.id, projectRoot: cwd, projectName: project.name, promptHash: promptHash(prompt),
         launchState: "starting" as const, activity: "unknown" as const,
@@ -143,7 +156,8 @@ export class LaunchService {
     // Never persist the prompt or include subprocess output in API errors/logs.
     try {
       receipt.nativeId = await this.provider.start(receipt.cwd, receipt.name, prompt, {
-        model: receipt.model ?? "default", permissionMode: receipt.permissionMode ?? "manual",
+        model: receipt.effectiveModel ?? receipt.model ?? "default", permissionMode: receipt.permissionMode ?? "manual",
+        ...((receipt.effectiveReasoningEffort ?? receipt.reasoningEffort) && (receipt.effectiveReasoningEffort ?? receipt.reasoningEffort) !== "default" ? { reasoningEffort: receipt.effectiveReasoningEffort ?? receipt.reasoningEffort } : {}),
       });
       receipt.message = "Claude accepted the task. Waiting for session status…";
       this.store.save(receipt);

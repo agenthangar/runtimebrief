@@ -4,6 +4,7 @@ import path from "node:path";
 import net from "node:net";
 import { execFileSync } from "node:child_process";
 import pty from "node-pty";
+import { nativeSessionArgs } from "../dist/launches/nativeOptions.js";
 import { parseTerminalInput } from "../dist/launches/terminalInput.js";
 
 process.umask(0o077);
@@ -63,17 +64,13 @@ for (const key of ["XDG_CONFIG_HOME", "XDG_CACHE_HOME", "XDG_STATE_HOME", "CODEX
 }
 delete env.RB_T_CONFIG;
 try {
-  let args = payload.model === "default" ? [] : ["--model", payload.model];
+  const args = nativeSessionArgs(payload.provider, payload.model, payload.permissionMode, payload.reasoningEffort);
   if (payload.provider === "cursor") {
     // Cursor assigns the ID itself. Starting that empty chat is not a history replay.
     const sessionId = execFileSync(payload.binary, ["create-chat"], { cwd, env, timeout: 30000, encoding: "utf8" }).trim();
     if (!/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/.test(sessionId)) throw Error("No native ID");
     fs.writeFileSync(path.join(directory, "native.json"), JSON.stringify({ sessionId, cwd }), { flag: "wx", mode: 0o600 });
     args.push("--resume", sessionId);
-    if (payload.permissionMode !== "manual") args.push("--mode", payload.permissionMode);
-  } else {
-    // Explicit native sandbox/approval policy; never silently grant permission.
-    args.push("--sandbox", payload.permissionMode === "plan" ? "read-only" : "workspace-write", "--ask-for-approval", "on-request");
   }
   args.push("--", payload.prompt);
   child = pty.spawn(payload.binary, args, { cwd, env, cols: process.stdout.columns || 80, rows: process.stdout.rows || 24 });

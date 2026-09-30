@@ -65,7 +65,22 @@ final class AgentSessionUITests: XCTestCase {
             XCTAssertTrue(newTask.waitForExistence(timeout: 10)); newTask.tap()
             app.buttons["session-provider-picker"].tap()
             app.buttons[provider].tap()
-            XCTAssertEqual(app.switches["claude-remote-control-toggle"].value as? String, "1")
+            let remoteToggle = app.switches["claude-remote-control-toggle"]
+            for _ in 0..<4 where !remoteToggle.isHittable { app.swipeUp() }
+            XCTAssertEqual(remoteToggle.value as? String, "1")
+            app.swipeDown()
+            let modelPicker = app.buttons["session-model-picker"]
+            modelPicker.tap(); app.buttons["Demo model"].tap()
+            XCTAssertTrue(modelPicker.label.contains("Demo model"))
+            let reasoning = app.buttons["session-reasoning-picker"]
+            XCTAssertTrue(reasoning.label.contains("Default"))
+            reasoning.tap(); app.buttons["High"].tap()
+            XCTAssertTrue(reasoning.label.contains("High"))
+            let permissions = app.buttons["session-permissions-picker"]
+            permissions.tap(); app.buttons["Bypass"].tap()
+            XCTAssertTrue(permissions.label.contains("Bypass"))
+            let options = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+            options.name = "\(provider) selected model and Bypass"; options.lifetime = .keepAlways; add(options)
             let prompt = app.textFields["claude-task-prompt"]
             prompt.tap(); prompt.typeText("Inspect the fictional native terminal")
             app.buttons["start-claude-task"].tap()

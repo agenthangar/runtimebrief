@@ -4,10 +4,22 @@ export const CLAUDE_MODELS = ["default", "fable", "opus", "sonnet", "haiku"] as 
 export const CLAUDE_PERMISSION_MODES = ["manual", "auto", "acceptEdits", "plan", "bypassPermissions", "dontAsk"] as const;
 export const SESSION_PROVIDERS = ["claude", "codex", "cursor"] as const;
 export type SessionProvider = typeof SESSION_PROVIDERS[number];
+export const NATIVE_PERMISSION_MODES = {
+  codex: ["manual", "auto", "plan", "bypassPermissions", "dontAsk"],
+  cursor: ["manual", "auto", "plan", "ask", "bypassPermissions"],
+} as const;
+export function permissionModes(provider: SessionProvider): readonly string[] {
+  return provider === "claude" ? CLAUDE_PERMISSION_MODES : NATIVE_PERMISSION_MODES[provider];
+}
+export const REASONING_EFFORTS = ["default", "none", "minimal", "low", "medium", "high", "xhigh", "max", "ultra"] as const;
+export const MODEL_ID = /^[A-Za-z0-9][A-Za-z0-9._:/\[\],=+-]{0,255}$/;
+export interface AgentModel { id: string; label: string; reasoningEfforts?: string[] }
+export interface ResolvedSettings { model: string; reasoningEffort: string; defaultModelLabel?: string; defaultReasoningLabel?: string }
 export interface ClaudeLaunchOptions {
   provider?: SessionProvider;
   model: string;
   permissionMode: string;
+  reasoningEffort?: string;
   remoteControl?: boolean;
 }
 export const DEFAULT_LAUNCH_OPTIONS: ClaudeLaunchOptions = { model: "default", permissionMode: "manual" };
@@ -26,6 +38,9 @@ export interface ClaudeLaunch {
   openedAt: string | null;
   model?: ClaudeLaunchOptions["model"];
   permissionMode?: ClaudeLaunchOptions["permissionMode"];
+  reasoningEffort?: string;
+  effectiveModel?: string;
+  effectiveReasoningEffort?: string;
   /** Absent on old receipts: the native background launcher owns those forever. */
   backend?: string;
   projectRoot?: string;
@@ -48,6 +63,7 @@ export interface ClaudeSessionBackend {
   readonly id: string;
   readonly provider?: SessionProvider;
   capability(cwd?: string): Promise<LaunchCapability>;
+  resolveSettings?(cwd: string, options: ClaudeLaunchOptions): Promise<ResolvedSettings>;
   create(launch: ClaudeLaunch, prompt: string): Promise<void>;
   get(launch: ClaudeLaunch): Promise<ClaudeLaunch>;
   open(launch: ClaudeLaunch): Promise<void>;
@@ -66,6 +82,11 @@ export interface TerminalSnapshot {
 export interface LaunchCapability {
   available: boolean;
   message: string;
+  models?: AgentModel[];
+  modelsMessage?: string;
+  permissionModes?: readonly string[];
+  defaultModelLabel?: string;
+  defaultReasoningLabel?: string;
 }
 
 export interface NativeClaudeSession {
@@ -80,7 +101,8 @@ export interface NativeClaudeSession {
 }
 
 export interface ClaudeProvider {
-  capability(): Promise<LaunchCapability>;
+  capability(cwd?: string): Promise<LaunchCapability>;
+  resolveSettings?(cwd: string, options: ClaudeLaunchOptions): Promise<ResolvedSettings>;
   start(cwd: string, name: string, prompt: string, options?: ClaudeLaunchOptions): Promise<string>;
   sessions(): Promise<NativeClaudeSession[]>;
   desktopHas(sessionID: string): boolean;

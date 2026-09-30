@@ -26,7 +26,18 @@ final class DemoModeUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["demo-detail-banner"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.buttons["brief-section-toggle"].exists)
         XCTAssertTrue(app.buttons["ios-release-section-toggle"].exists)
+        for id in ["brief", "ios-release", "analyst", "ask", "sessions", "commits"] {
+            let toggle = app.buttons["\(id)-section-toggle"]
+            for _ in 0..<4 where !toggle.isHittable { app.swipeUp() }
+            XCTAssertTrue(toggle.exists)
+            XCTAssertEqual(toggle.value as? String, "Collapsed")
+        }
+        app.swipeDown(); app.swipeDown()
+        let brief = app.buttons["brief-section-toggle"]
+        brief.tap(); XCTAssertEqual(brief.value as? String, "Expanded")
+        brief.tap(); XCTAssertEqual(brief.value as? String, "Collapsed")
         keepScreenshot(named: "02-project-brief")
+        app.buttons["analyst-section-toggle"].tap()
 
         let analyst = app.buttons["generate-analyst-update"]
         for _ in 0..<4 where !analyst.exists { app.swipeUp() }
@@ -35,6 +46,7 @@ final class DemoModeUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Demo response"].waitForExistence(timeout: 5))
         keepScreenshot(named: "03-analyst-update")
 
+        app.buttons["ask-section-toggle"].tap()
         let question = app.textFields["demo-question-field"]
         for _ in 0..<4 where !question.exists { app.swipeUp() }
         XCTAssertTrue(question.waitForExistence(timeout: 5))

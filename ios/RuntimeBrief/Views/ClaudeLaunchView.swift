@@ -133,12 +133,12 @@ private struct ClaudeTaskComposer: View {
     let providers: [AgentCapability]
     @Environment(\.dismiss) private var dismiss
     @State private var provider: AgentProvider = .claude
-    @State private var nativeModel = ""
+    @State private var nativeModel = "default"
     @State private var nativeMode = "manual"
     @State private var prompt = ""
     @State private var sending = false
     @State private var errorMessage: String?
-    @State private var model: ClaudeModel = .default
+    @State private var reasoningEffort = "default"
     @State private var permissionMode: ClaudePermissionMode = .manual
     @State private var remoteControl = true
     @FocusState private var focused: Bool
@@ -149,7 +149,14 @@ private struct ClaudeTaskComposer: View {
     }
 
     private var capability: AgentCapability? { providers.first { $0.id == provider } }
-    private var selectedModel: String { provider == .claude ? model.rawValue : (nativeModel.isEmpty ? "default" : nativeModel) }
+    private var selectedModel: String { nativeModel }
+    private var modelChoices: [AgentModel] {
+        capability?.models ?? (provider == .claude ? ClaudeModel.allCases.filter { $0 != .default }.map { AgentModel(id: $0.rawValue, label: $0.label) } : [])
+    }
+    private var reasoningChoices: [String] {
+        let id = selectedModel == "default" ? capability?.defaultModelLabel : selectedModel
+        return modelChoices.first { $0.id == id }?.reasoningEfforts ?? []
+    }
     private var selectedMode: String { provider == .claude ? permissionMode.rawValue : nativeMode }
 
     var body: some View {
@@ -176,14 +183,35 @@ private struct ClaudeTaskComposer: View {
                         ForEach(AgentProvider.allCases) { Text($0.label).tag($0) }
                     }
                     .accessibilityIdentifier("session-provider-picker")
-                    .onChange(of: provider) { nativeMode = "manual"; nativeModel = "" }
+                    .onChange(of: provider) { nativeMode = "manual"; permissionMode = .manual; nativeModel = "default"; reasoningEffort = "default" }
                     if let capability { Text(capability.message).font(.caption).foregroundStyle(capability.available ? Color.secondary : Color.orange) }
-                    if provider == .claude {
-                    Picker("Model", selection: $model) {
-                        ForEach(ClaudeModel.allCases) { Text($0.label).tag($0) }
+                    Picker("Model", selection: $nativeModel) {
+                        Text("\(provider.label) default").tag("default")
+                        ForEach(modelChoices) { Text($0.label).tag($0.id) }
                     }
-                    .accessibilityIdentifier("claude-model-picker")
                     .pickerStyle(.menu)
+                    .accessibilityIdentifier(provider == .claude ? "claude-model-picker" : "session-model-picker")
+                    .onChange(of: nativeModel) { reasoningEffort = "default" }
+                    if selectedModel == "default", let label = capability?.defaultModelLabel {
+                        Text("Default: \(label)").font(.caption).foregroundStyle(.secondary)
+                    }
+                    if let message = capability?.modelsMessage {
+                        Text(message).font(.caption).foregroundStyle(.secondary)
+                    } else if capability?.models == nil && provider != .claude {
+                        Text("Update RuntimeBrief on your Mac to load available models.").font(.caption).foregroundStyle(.secondary)
+                    }
+                    if !reasoningChoices.isEmpty {
+                        Picker("Reasoning", selection: $reasoningEffort) {
+                            Text("Default (\(selectedModel == "default" ? (capability?.defaultReasoningLabel?.capitalized ?? "Native") : "Mac settings"))").tag("default")
+                            ForEach(reasoningChoices, id: \.self) { Text($0 == "xhigh" ? "Extra High" : $0.capitalized).tag($0) }
+                        }
+                        .pickerStyle(.menu)
+                        .accessibilityIdentifier("session-reasoning-picker")
+                    } else if capability?.models != nil {
+                        LabeledContent("Reasoning", value: "Native default")
+                        Text("This model doesn’t expose a reasoning setting.").font(.caption).foregroundStyle(.secondary)
+                    }
+                    if provider == .claude {
                     Picker("Permissions", selection: $permissionMode) {
                         ForEach(ClaudePermissionMode.allCases) { Text($0.label).tag($0) }
                     }
@@ -193,14 +221,13 @@ private struct ClaudeTaskComposer: View {
                         .font(.caption)
                         .foregroundStyle(permissionMode == .bypassPermissions ? .orange : .secondary)
                     } else {
-                        TextField("Model (blank uses Mac default)", text: $nativeModel)
-                            .textInputAutocapitalization(.never).autocorrectionDisabled()
-                            .accessibilityIdentifier("session-model-field")
                         Picker("Permissions", selection: $nativeMode) {
-                            ForEach(provider.modes, id: \.self) { Text($0.capitalized).tag($0) }
-                        }.accessibilityIdentifier("session-permissions-picker")
-                        Text(provider == .codex ? "Manual uses Codex's workspace sandbox and native approval prompts. Plan uses its read-only sandbox." : "Cursor handles permission prompts. Plan and Ask use Cursor's native modes.")
-                            .font(.caption).foregroundStyle(.secondary)
+                            ForEach(capability?.permissionModes ?? provider.modes, id: \.self) { Text(provider.permissionLabel($0)).tag($0) }
+                        }
+                        .pickerStyle(.menu)
+                        .accessibilityIdentifier("session-permissions-picker")
+                        Text(provider.permissionExplanation(nativeMode))
+                            .font(.caption).foregroundStyle(nativeMode == "bypassPermissions" ? .orange : .secondary)
                     }
                     Toggle("Remote Control", isOn: $remoteControl)
                         .accessibilityIdentifier("claude-remote-control-toggle")
@@ -249,16 +276,16 @@ private struct ClaudeTaskComposer: View {
         defer { sending = false }
         let prompt = taskPrompt
         let scope = RuntimeBriefModeStore.isDemoEnabled ? "demo" : (ServerSettings.load().baseURL?.absoluteString ?? "unconfigured")
-        let request = SessionLaunchDraft.request(projectID: project.id, scope: scope, prompt: prompt, provider: provider, model: selectedModel, permissionMode: selectedMode, remoteControl: remoteControl)
+        let request = SessionLaunchDraft.request(projectID: project.id, scope: scope, prompt: prompt, provider: provider, model: selectedModel, permissionMode: selectedMode, reasoningEffort: reasoningEffort, remoteControl: remoteControl)
         do {
             let receipt = try await source.startSession(projectID: project.id, request: request)
             if receipt.state == "failed" {
-                SessionLaunchDraft.clear(projectID: project.id, scope: scope, prompt: prompt, provider: provider, model: selectedModel, permissionMode: selectedMode, remoteControl: remoteControl)
+                SessionLaunchDraft.clear(projectID: project.id, scope: scope, prompt: prompt, provider: provider, model: selectedModel, permissionMode: selectedMode, reasoningEffort: reasoningEffort, remoteControl: remoteControl)
                 errorMessage = receipt.message
             } else {
                 // Keep uncertain requests stable across reconnects and app restarts.
                 if receipt.state != "unknown" {
-                    SessionLaunchDraft.clear(projectID: project.id, scope: scope, prompt: prompt, provider: provider, model: selectedModel, permissionMode: selectedMode, remoteControl: remoteControl)
+                    SessionLaunchDraft.clear(projectID: project.id, scope: scope, prompt: prompt, provider: provider, model: selectedModel, permissionMode: selectedMode, reasoningEffort: reasoningEffort, remoteControl: remoteControl)
                 }
                 dismiss()
             }
@@ -293,26 +320,27 @@ enum ClaudeLaunchDraft {
 
 
 enum SessionLaunchDraft {
-    private static func key(projectID: String, scope: String, prompt: String, provider: AgentProvider, model: String, permissionMode: String, remoteControl: Bool) -> String {
-        let identity = [scope, projectID, prompt, provider.rawValue, model, permissionMode, String(remoteControl)]
+    private static func key(projectID: String, scope: String, prompt: String, provider: AgentProvider, model: String, permissionMode: String, reasoningEffort: String, remoteControl: Bool) -> String {
+        var identity = [scope, projectID, prompt, provider.rawValue, model, permissionMode, String(remoteControl)]
+        if reasoningEffort != "default" { identity += ["reasoningEffort", reasoningEffort] }
         let digest = SHA256.hash(data: try! JSONEncoder().encode(identity)).map { String(format: "%02x", $0) }.joined()
         return "runtimebrief.session.request.\(digest)"
     }
-    static func request(projectID: String, scope: String, prompt: String, provider: AgentProvider, model: String = "default", permissionMode: String = "manual", remoteControl: Bool = true, defaults: UserDefaults = .standard) -> SessionLaunchRequest {
-        if provider == .claude, let modelValue = ClaudeModel(rawValue: model), let mode = ClaudePermissionMode(rawValue: permissionMode) {
+    static func request(projectID: String, scope: String, prompt: String, provider: AgentProvider, model: String = "default", permissionMode: String = "manual", reasoningEffort: String = "default", remoteControl: Bool = true, defaults: UserDefaults = .standard) -> SessionLaunchRequest {
+        if provider == .claude, reasoningEffort == "default", let modelValue = ClaudeModel(rawValue: model), let mode = ClaudePermissionMode(rawValue: permissionMode) {
             let legacy = ClaudeLaunchDraft.request(projectID: projectID, scope: scope, prompt: prompt, model: modelValue, permissionMode: mode, remoteControl: remoteControl, defaults: defaults)
-            return SessionLaunchRequest(requestId: legacy.requestId, prompt: prompt, provider: provider, model: model, permissionMode: permissionMode, remoteControl: remoteControl)
+            return SessionLaunchRequest(requestId: legacy.requestId, prompt: prompt, provider: provider, model: model, reasoningEffort: reasoningEffort == "default" ? nil : reasoningEffort, permissionMode: permissionMode, remoteControl: remoteControl)
         }
-        let key = key(projectID: projectID, scope: scope, prompt: prompt, provider: provider, model: model, permissionMode: permissionMode, remoteControl: remoteControl)
+        let key = key(projectID: projectID, scope: scope, prompt: prompt, provider: provider, model: model, permissionMode: permissionMode, reasoningEffort: reasoningEffort, remoteControl: remoteControl)
         let id = defaults.string(forKey: key) ?? UUID().uuidString.lowercased()
         defaults.set(id, forKey: key)
-        return SessionLaunchRequest(requestId: id, prompt: prompt, provider: provider, model: model, permissionMode: permissionMode, remoteControl: remoteControl)
+        return SessionLaunchRequest(requestId: id, prompt: prompt, provider: provider, model: model, reasoningEffort: reasoningEffort == "default" ? nil : reasoningEffort, permissionMode: permissionMode, remoteControl: remoteControl)
     }
-    static func clear(projectID: String, scope: String, prompt: String, provider: AgentProvider, model: String, permissionMode: String, remoteControl: Bool, defaults: UserDefaults = .standard) {
-        if provider == .claude, let modelValue = ClaudeModel(rawValue: model), let mode = ClaudePermissionMode(rawValue: permissionMode) {
+    static func clear(projectID: String, scope: String, prompt: String, provider: AgentProvider, model: String, permissionMode: String, reasoningEffort: String = "default", remoteControl: Bool, defaults: UserDefaults = .standard) {
+        if provider == .claude, reasoningEffort == "default", let modelValue = ClaudeModel(rawValue: model), let mode = ClaudePermissionMode(rawValue: permissionMode) {
             ClaudeLaunchDraft.clear(projectID: projectID, scope: scope, prompt: prompt, model: modelValue, permissionMode: mode, remoteControl: remoteControl, defaults: defaults)
         } else {
-            defaults.removeObject(forKey: key(projectID: projectID, scope: scope, prompt: prompt, provider: provider, model: model, permissionMode: permissionMode, remoteControl: remoteControl))
+            defaults.removeObject(forKey: key(projectID: projectID, scope: scope, prompt: prompt, provider: provider, model: model, permissionMode: permissionMode, reasoningEffort: reasoningEffort, remoteControl: remoteControl))
         }
     }
 }

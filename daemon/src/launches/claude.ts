@@ -6,14 +6,17 @@ import path from "node:path";
 import { z } from "zod";
 import { DEFAULT_LAUNCH_OPTIONS, type ClaudeLaunchOptions, type ClaudeLaunch, type ClaudeProvider, type LaunchCapability } from "./types.js";
 import { desktopHasSession, handoffToDesktop, type DesktopHandoff } from "./desktop.js";
+import { discoverClaudeModels } from "./claudeModels.js";
+import { NativeModelCatalog } from "./nativeModels.js";
+import { resolveClaudeSettings } from "./nativeSettings.js";
 
 const exec = promisify(execFile);
-export type ClaudeCommand = (file: string, args: string[], cwd?: string) => Promise<string>;
+export type ClaudeCommand = (file: string, args: string[], cwd?: string, env?: Record<string, string>) => Promise<string>;
 
-const run: ClaudeCommand = async (file, args, cwd) => {
+const run: ClaudeCommand = async (file, args, cwd, env) => {
   const { stdout } = await exec(file, args, {
     ...(cwd ? { cwd } : {}), timeout: 15_000, maxBuffer: 2 * 1024 * 1024,
-    env: { ...process.env, NO_COLOR: "1" },
+    env: { ...process.env, NO_COLOR: "1", ...env },
   });
   return stdout;
 };
@@ -39,6 +42,8 @@ export function resolveClaudeBinary(): string {
 
 export class NativeClaudeProvider implements ClaudeProvider {
   private readiness: { checkedAt: number; value: Promise<LaunchCapability> } | undefined;
+  private readonly catalogs = new Map<string, NativeModelCatalog>();
+  resolveSettings(cwd: string, options: ClaudeLaunchOptions) { return Promise.resolve(resolveClaudeSettings(cwd, options)); }
   constructor(
     private readonly binary = resolveClaudeBinary(),
     private readonly command = run,
@@ -46,11 +51,14 @@ export class NativeClaudeProvider implements ClaudeProvider {
     readonly desktopHas = desktopHasSession,
   ) {}
 
-  async capability(): Promise<LaunchCapability> {
-    if (this.readiness && Date.now() - this.readiness.checkedAt < 10_000) return this.readiness.value;
-    const value = this.checkCapability();
-    this.readiness = { checkedAt: Date.now(), value };
-    return value;
+  async capability(cwd?: string): Promise<LaunchCapability> {
+    if (!this.readiness || Date.now() - this.readiness.checkedAt >= 10_000) this.readiness = { checkedAt: Date.now(), value: this.checkCapability() };
+    const readiness = await this.readiness.value;
+    if (!readiness.available) return readiness;
+    const key = cwd ?? "";
+    if (!this.catalogs.has(key)) this.catalogs.set(key, new NativeModelCatalog(() => discoverClaudeModels(this.binary, cwd)));
+    const defaults = resolveClaudeSettings(cwd ?? process.cwd(), DEFAULT_LAUNCH_OPTIONS);
+    return { ...readiness, ...await this.catalogs.get(key)!.get(), defaultModelLabel: defaults.defaultModelLabel, defaultReasoningLabel: defaults.defaultReasoningLabel } as LaunchCapability;
   }
 
   private async checkCapability(): Promise<LaunchCapability> {
@@ -75,7 +83,9 @@ export class NativeClaudeProvider implements ClaudeProvider {
     // argv + -- ensures prompts cannot become shell syntax or CLI flags.
     const output = await this.command(this.binary,
       ["--bg", "--permission-mode", options.permissionMode,
-        ...(options.model === "default" ? [] : ["--model", options.model]), "--name", name, "--", prompt], cwd);
+        ...(options.model === "default" ? [] : ["--model", options.model]),
+        ...(options.reasoningEffort && options.reasoningEffort !== "default" ? ["--effort", options.reasoningEffort] : []), "--name", name, "--", prompt], cwd,
+        ...(options.reasoningEffort && options.reasoningEffort !== "default" ? [{ CLAUDE_CODE_EFFORT_LEVEL: options.reasoningEffort }] : []));
     const id = /backgrounded\s*·\s*([a-f0-9]{8})\b/.exec(output)?.[1];
     if (!id) throw new Error("Claude did not acknowledge a background session");
     return id;
