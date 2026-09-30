@@ -1,7 +1,7 @@
 import Foundation
 
 /// Server URL lives in UserDefaults; the token lives in the Keychain only.
-struct ServerSettings: Sendable {
+struct ServerSettings: Sendable, Equatable {
     var baseURL: URL?
     var token: String?
 
@@ -36,13 +36,13 @@ struct ServerSettings: Sendable {
         guard let url = normalizeURL(trimmed) else {
             throw RuntimeBriefError.invalidServerURL
         }
-        UserDefaults.standard.set(url.absoluteString, forKey: urlKey)
         let trimmedToken = token.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmedToken.isEmpty {
             Keychain.delete(account: tokenAccount)
         } else {
             try Keychain.save(trimmedToken, account: tokenAccount)
         }
+        UserDefaults.standard.set(url.absoluteString, forKey: urlKey)
     }
 
     #if DEBUG

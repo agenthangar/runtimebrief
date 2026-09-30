@@ -17,8 +17,9 @@ open RuntimeBrief.xcodeproj
 
 Select the `RuntimeBrief` scheme, pick a simulator, build and run. A simulator
 needs no Apple team or bundle-identifier change.
-Requires Xcode 26+ (Swift 6, iOS 26 SDK). Run the unit tests with **⌘U**
-(they use Swift Testing and a mocked transport — no daemon needed).
+Requires Xcode 27+ (Swift 6, iOS 27 SDK); the app still runs on iOS 26.
+Run the unit and UI tests with **⌘U**. Unit tests use Swift Testing and a
+mocked transport; bundled demo and settings UI tests need no daemon.
 
 On an unconfigured install, **Explore Demo** opens a bundled, fully offline
 portfolio made only from hand-authored fictional data. Demo mode never reads
@@ -65,32 +66,116 @@ personal signing change local; do not commit it or change the production
    Tap an iOS project to also see its local Xcode version/build, latest
    TestFlight build, and newest App Store version/state. The analyst runs only
    after you tap **Generate analyst update** or ask a question.
-5. Say: *"Hey Siri, what's the state of \<project\> in RuntimeBrief"*. Siri
-   shortcut phrases register after the first app launch.
+5. Say: *"Hey Siri, what's the state of \<project\> in RuntimeBrief"*. App
+   Shortcuts register after the first launch; a successful refresh supplies
+   project names for personalized phrases.
 
-## Start a Claude task
+## Siri and Search
 
-Use iOS build 16 or newer and an updated daemon for the model and permission
-selectors. Install and sign in to Claude Code and Claude Desktop on your Mac.
+| Action | Example phrase | Shortcuts output |
+| --- | --- | --- |
+| Project status | What's the status of Sample Tracker in RuntimeBrief? | Brief text |
+| Needs attention | What needs attention in RuntimeBrief? | Project entities |
+| List projects | List my RuntimeBrief projects | Project entities |
+| Open project | Open Sample Tracker in RuntimeBrief | Opens project detail |
+| Ask the analyst | Ask RuntimeBrief a question about Sample Tracker | Answer text |
+| Start coding session | Start a Codex session in RuntimeBrief | Session receipt ID |
+
+**Start Coding Session** supports Claude Code, Codex, and Cursor through the
+same `/sessions` API and `t` launchers as the app. Siri asks for the project,
+agent, and task, then confirms the destination and settings before writing.
+The device must be locally authenticated. Advanced Shortcuts parameters offer
+the Mac's current model choices, reasoning, permissions (Manual by default),
+and Remote Control (on by default). Unsupported or unavailable choices stop
+before a launch. The action validates the live project rather than trusting
+an offline snapshot. Changing the connection during confirmation stops it.
+
+The spoken result distinguishes starting, working, needs-input, ready-to-review,
+failed, and uncertain receipts from Remote Control readiness. A lost response
+or uncertain receipt retains the same durable request ID across retries,
+including retries from the app. After a confirmed receipt, repeating the task
+creates a new session. Demo launches remain fictional and never contact a Mac.
+
+Status, attention, and list actions read `/v1/projects` with a five-second
+network timeout. They never start an analyst. Spotlight maintenance runs
+separately so a slow index cannot delay the answer. Status includes the evidence
+timestamp; attention distinguishes missing briefs from available briefs with
+no attention items. A connection failure can use the saved portfolio with an
+explicit saved-data warning and timestamp. Authentication and configuration
+failures stop the action instead of returning cached data.
+
+Answers include a Siri card and reusable Shortcuts values. Asking a question
+remains an explicit analyst action. Existing custom actions work on iOS 26;
+iOS 27 also exposes the system opening schema. Project rows and detail views
+provide entity context for requests about visible content.
+
+**Settings → Siri & Search → Make Projects Discoverable** controls Spotlight
+indexing, on-screen entity annotations, and opening
+donations. This setting applies immediately, independently of saving a Mac
+connection. The index includes names, branches, brief headlines, states, and
+evidence times. Turning discovery off, entering demo mode, changing the Mac
+connection, or removing projects reconciles the index. Demo data is never
+indexed or donated. Explicit shortcuts and their project choosers remain
+available when discovery is disabled, including in the fictional demo.
+
+Generate the project before testing:
+
+```sh
+xcodegen generate --spec ios/project.yml
+xcodebuild test -project ios/RuntimeBrief.xcodeproj -scheme RuntimeBrief \
+  -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=27.0'
+xcodebuild test -project ios/RuntimeBrief.xcodeproj -scheme RuntimeBriefSiri \
+  -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=27.0'
+```
+
+The regular scheme covers offline fallback, authentication failures, stale
+refresh rejection, actual intent results, real Spotlight indexing/removal,
+discovery write ordering, and UI preference persistence. The iOS 27-only Siri
+scheme uses `AppIntentsTesting` across processes to query entities, run actions,
+inspect returned values, open a project, and inspect on-screen annotations,
+including opting out while keeping explicit project selection usable.
+CodeQL uses its supported Xcode 26.6 / Swift 6.3 toolchain, including all session
+creation code. The iOS 27 SDK opening schema, on-screen annotations, and reindexing hooks compile with
+Swift 6.4 and are covered by the Xcode 27 build and system integration tests.
+If the runtime rejects this framework with security error 803, those tests
+explicitly skip; other errors fail. Existing live daemon and Claude tests need
+their separately documented E2E configuration.
+
+Session tests exercise the real client encoding and `/sessions` endpoint for
+all three providers, confirmation cancellation, invalid settings, removed
+projects, authorization/setup failures, uncertain retries, and demo isolation.
+Cloud Shortcuts checks cover the actual parameter chooser and confirmation UI.
+For opt-in native Siri coverage, set `RUNTIMEBRIEF_E2E_SIRI_LIVE=1` plus
+`RUNTIMEBRIEF_E2E_SERVER_URL`, `RUNTIMEBRIEF_E2E_TOKEN`, and
+`RUNTIMEBRIEF_E2E_PROJECT_ID` for an isolated daemon and disposable Git fixture.
+Run `SiriIntegrationUITests/testLiveSiriCreatesNativeSessions`. It checks real
+project-scoped `t` receipts for each provider; native workspace trust, sign-in,
+and final task completion need separate observation on the fixture.
+
+Before release, test spoken requests and the Siri card on a physical iOS 27
+device with Siri configured, including ambiguous names, an offline Mac, and
+discovery opt-out. A simulator test does not verify speech recognition or
+Apple Intelligence routing.
+
+## Start a coding task
+
+Use an updated daemon with the `t` session launchers. Install and sign in to
+the coding agents you want to use on your Mac.
 All registered projects allow tasks by default, including projects discovered
 later under a trusted root.
 
-1. Open a project and tap **New task** in its **Claude Code** section.
-2. Choose **Claude default**, **Fable**, **Opus**, **Sonnet**, or **Haiku**.
-   Claude default uses the Mac's configured model; named choices use Claude's
-   model aliases. Availability depends on the installed Claude version and
-   account.
-3. Choose **Manual** (the default), **Auto**, **Accept Edits**, **Plan**,
-   **Bypass**, or **Pre-approved Only**. The explanation below the selector
-   describes the mode. Bypass runs tools without permission prompts; select
-   it only for trusted work. Auto also depends on the selected model/account.
-4. Enter a task of 10–8,000 characters and tap **Start in Claude Code**.
+1. Open a project and tap **New task** in its **Coding agents** section.
+2. Choose Claude Code, Codex, or Cursor, then a model offered by its native
+   harness. Native default uses the Mac's configured model and reasoning.
+3. Choose permissions and, where supported, reasoning. Manual is the default;
+   the explanation describes the selected mode. Remote Control starts on.
+4. Enter a task of 10–8,000 characters and tap **Start in** the selected agent.
    The button remains visible above the keyboard. The receipt shows status
    and the original model/permission choices under **Started with**.
-5. Tap **Open in Claude Desktop** to move the saved conversation to the Mac
-   app. This stops any current background response. Select the RuntimeBrief
-   task in Desktop, check its permission mode, and send a follow-up to continue.
-   Desktop may reset the permission mode during handoff.
+5. Continue Claude through its Remote Control link, or open the Codex/Cursor
+   terminal when its connection is ready. Legacy Claude receipts may offer
+   Desktop handoff; that stops a current response and Desktop can apply its
+   own permissions.
 
 Claude keeps working when the phone disconnects. If a request has an uncertain
 result, refresh its receipt before starting another task. Retrying the same
@@ -130,9 +215,11 @@ RuntimeBrief/
 ├── Networking/               RuntimeBriefClient (async/await + SSE), Keychain,
 │                             ServerSettings, SSEParser
 ├── Views/                    Projects list, project detail, settings
-└── Intents/                  ProjectEntity + fuzzy query, GetProjectStatus,
-                              AskProject, ListProjects, AppShortcuts, snippets
+└── Intents/                  ProjectEntity + search discovery, navigation,
+                              brief actions, AppShortcuts, snippets
 RuntimeBriefTests/            Swift Testing suites with a mocked transport
+RuntimeBriefUITests/          Demo and settings UI tests; optional live tests
+RuntimeBriefSiriTests/        iOS 27 system App Intents integration tests
 ```
 
 ## Asset provenance

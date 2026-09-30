@@ -8,6 +8,7 @@ struct RuntimeBriefApp: App {
             RuntimeBriefModeStore.setDemoEnabled(false)
             ProjectsStore.resetPersistedSnapshotForUITesting()
             ServerSettings.resetForUITesting()
+            UserDefaults.standard.removeObject(forKey: ProjectDiscoverySettings.key)
         }
         #endif
     }

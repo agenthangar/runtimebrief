@@ -1,7 +1,9 @@
 import SwiftUI
+import AppIntents
 
 struct ProjectDetailView: View {
     let project: ProjectSummary
+    @AppStorage(ProjectDiscoverySettings.key) private var discoveryEnabled = true
 
     @State private var card: ProjectCard?
     @State private var statusText = ""
@@ -60,6 +62,7 @@ struct ProjectDetailView: View {
             .padding()
         }
         .scrollDismissesKeyboard(.interactively)
+        .projectEntityContext(project, enabled: discoveryEnabled)
         .navigationTitle(project.name)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -69,7 +72,9 @@ struct ProjectDetailView: View {
             }
         }
         .task {
+            let fromIntent = ProjectNavigation.shared.consumeIntentNavigation(for: project.id)
             await loadCard()
+            if !fromIntent { await ProjectDiscovery.donateOpen(project) }
         }
     }
 

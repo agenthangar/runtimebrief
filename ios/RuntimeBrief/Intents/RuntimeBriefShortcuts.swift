@@ -3,6 +3,36 @@ import AppIntents
 struct RuntimeBriefShortcuts: AppShortcutsProvider {
     static var appShortcuts: [AppShortcut] {
         AppShortcut(
+            intent: StartSessionIntent(),
+            phrases: [
+                "Start a coding session in \(.applicationName)",
+                "Start a \(\.$provider) session in \(.applicationName)",
+                "Start a task for \(\.$project) in \(.applicationName)",
+            ],
+            shortTitle: "Start Coding Session",
+            systemImageName: "terminal"
+        )
+        AppShortcut(
+            intent: GetAttentionIntent(),
+            phrases: [
+                "What needs attention in \(.applicationName)",
+                "Which projects need attention in \(.applicationName)",
+                "Show my blockers in \(.applicationName)",
+            ],
+            shortTitle: "Needs Attention",
+            systemImageName: "exclamationmark.bubble"
+        )
+        AppShortcut(
+            intent: OpenProjectIntent(),
+            phrases: [
+                "Open a project in \(.applicationName)",
+                "Open \(\.$target) in \(.applicationName)",
+                "Show \(\.$target) in \(.applicationName)",
+            ],
+            shortTitle: "Open Project",
+            systemImageName: "shippingbox"
+        )
+        AppShortcut(
             intent: GetProjectStatusIntent(),
             phrases: [
                 // Keep at least one phrase without \(\.$project): shortcuts whose
@@ -40,15 +70,3 @@ struct RuntimeBriefShortcuts: AppShortcutsProvider {
         )
     }
 }
-
-// ---------------------------------------------------------------------------
-// FUTURE CLIENT SEAMS (the daemon records decisions but never executes them):
-//
-//   struct ApproveActionIntent: AppIntent { ... }
-//     Confirms a pending Action proposed by the analyst (see the
-//     Action/Decision sketch in daemon/src/types.ts). Requires the daemon's
-//     decision endpoint.
-//
-//   Live Activity for long analyst runs: start when /ask streaming begins,
-//     update with streamed chunk progress, end with the final answer.
-// ---------------------------------------------------------------------------

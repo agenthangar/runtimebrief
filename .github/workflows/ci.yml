@@ -28,7 +28,10 @@ jobs:
       - run: npm run build
 
   ios:
-    runs-on: macos-latest
+    # macos-latest still selects Xcode 26. The Siri system schema and testing
+    # framework require the iOS 27 SDK on GitHub's dedicated Xcode image.
+    runs-on: xcode-27
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - run: brew install gitleaks xcodegen
@@ -36,11 +39,29 @@ jobs:
         run: /bin/bash scripts/verify-release-privacy.sh
       - run: xcodegen generate
         working-directory: ios
-      - name: Build and test without signing
+      - run: xcodebuild -version
+      - name: Select an available iOS 27 iPhone
+        run: |
+          device_id="$(xcrun simctl list devices available --json | python3 -c 'import json,sys; devices=json.load(sys.stdin)["devices"]; print(next(d["udid"] for runtime, entries in devices.items() if ".iOS-27-" in runtime for d in entries if d["name"].startswith("iPhone") and d["isAvailable"]))')"
+          echo "IOS_TEST_DEVICE=$device_id" >> "$GITHUB_ENV"
+      - name: Build and test on simulator
+        # Xcode 27 can wait ten minutes collecting simulator sysdiagnoses even
+        # after all tests pass. Keep test results and attached screenshots.
         run: >-
           xcodebuild -project ios/RuntimeBrief.xcodeproj
           -scheme RuntimeBrief
           -sdk iphonesimulator
-          -destination 'platform=iOS Simulator,OS=latest,name=iPhone 17 Pro'
-          CODE_SIGNING_ALLOWED=NO
+          -destination "platform=iOS Simulator,id=${IOS_TEST_DEVICE}"
+          -collect-test-diagnostics never
+          CODE_SIGN_IDENTITY=-
+          test
+      - name: Test Siri through system App Intents
+        run: >-
+          xcodebuild -project ios/RuntimeBrief.xcodeproj
+          -scheme RuntimeBriefSiri
+          -sdk iphonesimulator
+          -destination "platform=iOS Simulator,id=${IOS_TEST_DEVICE}"
+          -skip-testing:RuntimeBriefSiriTests/SiriIntegrationUITests/testLiveSiriCreatesNativeSessions
+          -collect-test-diagnostics never
+          CODE_SIGN_IDENTITY=-
           test

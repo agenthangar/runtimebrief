@@ -1,4 +1,5 @@
 import SwiftUI
+import AppIntents
 
 struct ProjectsListView: View {
     @Environment(\.scenePhase) private var scenePhase
@@ -9,9 +10,10 @@ struct ProjectsListView: View {
     @State private var showingSavedBrief = false
     @State private var lastSavedAt: Date?
     @State private var isDemoMode = RuntimeBriefModeStore.isDemoEnabled
+    @State private var navigation = ProjectNavigation.shared
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $navigation.path) {
             Group {
                 if projects.isEmpty && !isLoading {
                     emptyState
@@ -127,6 +129,8 @@ struct ProjectsListView: View {
 
     private func loadSavedThenRefresh() async {
         let snapshot = await ProjectsStore.shared.cachedSnapshot()
+        // Honor a disabled preference or demo mode even when the Mac is offline.
+        await ProjectDiscovery.shared.synchronize(projects: snapshot.projects)
         if projects.isEmpty {
             projects = snapshot.projects
             lastSavedAt = snapshot.fetchedAt
@@ -135,16 +139,22 @@ struct ProjectsListView: View {
     }
 
     private func enterDemo() {
+        navigation.path = []
         RuntimeBriefModeStore.setDemoEnabled(true)
         isDemoMode = true
         projects = DemoData.projects
         errorMessage = nil
         showingSavedBrief = false
         lastSavedAt = nil
-        Task { await ProjectsStore.shared.invalidate() }
+        Task {
+            await ProjectsStore.shared.invalidate()
+            await ProjectDiscovery.shared.synchronize(projects: [])
+            RuntimeBriefShortcuts.updateAppShortcutParameters()
+        }
     }
 
     private func exitDemo() {
+        navigation.path = []
         RuntimeBriefModeStore.setDemoEnabled(false)
         isDemoMode = false
         projects = []
@@ -160,6 +170,7 @@ struct ProjectsListView: View {
 
 private struct ProjectRow: View {
     let project: ProjectSummary
+    @AppStorage(ProjectDiscoverySettings.key) private var discoveryEnabled = true
     var body: some View {
         VStack(alignment: .leading, spacing: 7) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
@@ -198,5 +209,6 @@ private struct ProjectRow: View {
         .padding(.vertical, 7)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("project-row-\(project.id)")
+        .projectEntityContext(project, enabled: discoveryEnabled)
     }
 }

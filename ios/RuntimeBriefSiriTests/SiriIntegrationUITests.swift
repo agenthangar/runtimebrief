@@ -1,0 +1,189 @@
+import AppIntentsTesting
+import XCTest
+
+/// Runs through the on-device App Intents stack, across process boundaries.
+/// Spoken recognition still requires a physical Apple Intelligence device.
+final class SiriIntegrationUITests: XCTestCase {
+    @MainActor
+    private func launchDemo() -> XCUIApplication {
+        let app = XCUIApplication()
+        app.launchEnvironment["RUNTIMEBRIEF_E2E_CLEAR_STATE"] = "1"
+        app.launchEnvironment["RUNTIMEBRIEF_E2E_DEMO"] = "1"
+        app.launch()
+        XCTAssertTrue(app.staticTexts["demo-data-banner"].waitForExistence(timeout: 10))
+        return app
+    }
+
+    @MainActor
+    func testSiriActionsReturnReusableValuesThroughSystemStack() async throws {
+        guard #available(iOS 27.0, *) else { throw XCTSkip("AppIntentsTesting requires iOS 27.") }
+        _ = launchDemo()
+        let definitions = IntentDefinitions(bundleIdentifier: "com.backbrief.app")
+        try await requireSystemTesting(definitions)
+        let projects = try await definitions.entities["ProjectEntity"].entities(matching: "sample tracker")
+        XCTAssertEqual(projects.count, 1)
+        let project = try XCTUnwrap(projects.first)
+        let name: String = try project.name
+        XCTAssertEqual(name, "Sample Tracker")
+
+        let status = definitions.intents["GetProjectStatusIntent"].makeIntent(project: project)
+        let statusResult = try await status.run()
+        let text: String = try statusResult.value
+        XCTAssertTrue(text.contains("Fictional demo"))
+        XCTAssertTrue(text.contains("Export validation is ready to review"))
+        XCTAssertTrue(text.contains("Evidence updated"))
+
+        let attentionResult = try await definitions.intents["GetAttentionIntent"].makeIntent().run()
+        let attention: [AnyAppEntity] = try attentionResult.value
+        XCTAssertEqual(attention.count, 1)
+        let attentionName: String = try XCTUnwrap(attention.first).name
+        XCTAssertEqual(attentionName, "Catalog Builder")
+
+        let listResult = try await definitions.intents["ListProjectsIntent"].makeIntent().run()
+        let listed: [AnyAppEntity] = try listResult.value
+        XCTAssertEqual(listed.count, 3)
+
+        let answerResult = try await definitions.intents["AskProjectIntent"]
+            .makeIntent(project: project, question: "Did the checks pass?").run()
+        let answer: String = try answerResult.value
+        XCTAssertTrue(answer.contains("fictional demo response"))
+    }
+
+    @MainActor
+    func testSiriOpenNavigatesToCorrectProjectAndPublishesOnscreenContext() async throws {
+        guard #available(iOS 27.0, *) else { throw XCTSkip("AppIntentsTesting requires iOS 27.") }
+        let app = launchDemo()
+        let definitions = IntentDefinitions(bundleIdentifier: "com.backbrief.app")
+        try await requireSystemTesting(definitions)
+        let entity = definitions.entities["ProjectEntity"]
+        let projects = try await entity.entities(matching: "catalog builder")
+        let project = try XCTUnwrap(projects.first)
+        _ = try await definitions.intents["OpenProjectWithSiriIntent"].makeIntent(target: project).run()
+        XCTAssertTrue(app.navigationBars["Catalog Builder"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["brief-section-toggle"].exists)
+        let annotations = try await entity.viewAnnotations()
+        XCTAssertTrue(annotations.contains { $0.entity.identifier == project.identifier })
+        // The private live cache and fictional demo are never donated to search.
+        let indexed = try await entity.spotlightQuery()
+        XCTAssertTrue(indexed.isEmpty)
+    }
+
+    @MainActor
+    func testSessionCreationThroughSystemStack() async throws {
+        guard #available(iOS 27.0, *) else { throw XCTSkip("AppIntentsTesting requires iOS 27.") }
+        _ = launchDemo()
+        let definitions = IntentDefinitions(bundleIdentifier: "com.backbrief.app")
+        try await requireSystemTesting(definitions)
+        let projects = try await definitions.entities["ProjectEntity"].entities(matching: "sample tracker")
+        let project = try XCTUnwrap(projects.first)
+        for provider in ["claude", "codex", "cursor"] {
+            let result = try await definitions.intents["StartSessionIntent"].makeIntent(
+                project: project, provider: definitions.enums["AgentProvider"].makeCase(provider),
+                task: "Inspect the fictional export for \(provider)", model: "default",
+                permissions: definitions.enums["SiriSessionPermission"].makeCase("manual"),
+                reasoning: definitions.enums["SiriReasoningEffort"].makeCase("default"), remoteControl: true
+            ).run()
+            let receiptID: String = try result.value
+            XCTAssertNotNil(UUID(uuidString: receiptID))
+
+        }
+    }
+
+    /// Opt-in only: use a disposable Git repository and isolated daemon. Native
+    /// sign-in and workspace trust remain with the installed coding agents.
+    @MainActor
+    func testLiveSiriCreatesNativeSessions() async throws {
+        func setting(_ name: String) -> String? {
+            let value = ProcessInfo.processInfo.environment[name] ?? Bundle(for: Self.self).object(forInfoDictionaryKey: name) as? String
+            return value?.isEmpty == false && value?.hasPrefix("$(") == false ? value : nil
+        }
+        guard setting("RUNTIMEBRIEF_E2E_SIRI_LIVE") == "1",
+              let server = setting("RUNTIMEBRIEF_E2E_SERVER_URL"),
+              let token = setting("RUNTIMEBRIEF_E2E_TOKEN"),
+              let projectID = setting("RUNTIMEBRIEF_E2E_PROJECT_ID") else {
+            throw XCTSkip("Configure a disposable native-session fixture for live Siri creation.")
+        }
+        let app = XCUIApplication()
+        app.launchEnvironment["RUNTIMEBRIEF_E2E_CLEAR_STATE"] = "1"
+        app.launchEnvironment["RUNTIMEBRIEF_E2E_SERVER_URL"] = server
+        app.launchEnvironment["RUNTIMEBRIEF_E2E_TOKEN"] = token
+        app.launch()
+        XCTAssertTrue(app.buttons["project-link-\(projectID)"].waitForExistence(timeout: 20))
+        let definitions = IntentDefinitions(bundleIdentifier: "com.backbrief.app")
+        try await requireSystemTesting(definitions)
+        let project = definitions.entities["ProjectEntity"].makeReference(identifier: projectID)
+        let runID = UUID().uuidString
+        for provider in ["claude", "codex", "cursor"] {
+            let result = try await definitions.intents["StartSessionIntent"].makeIntent(
+                project: project, provider: definitions.enums["AgentProvider"].makeCase(provider),
+                task: "Read README.md and reply exactly RUNTIMEBRIEF_SIRI_\(provider.uppercased())_OK. Do not change files or run shell commands. Fixture run \(runID).",
+                model: "default", permissions: definitions.enums["SiriSessionPermission"].makeCase("plan"),
+                reasoning: definitions.enums["SiriReasoningEffort"].makeCase("default"), remoteControl: true
+            ).run()
+            let receiptID: String = try result.value
+            XCTAssertNotNil(UUID(uuidString: receiptID))
+            var request = URLRequest(url: try XCTUnwrap(URL(string: "\(server)/v1/projects/\(projectID)/sessions")))
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+            var receipt: [String: Any] = [:]
+            for _ in 0..<4 {
+                let (data, response) = try await URLSession.shared.data(for: request)
+                XCTAssertEqual((response as? HTTPURLResponse)?.statusCode, 200)
+                let body = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+                let launches = try XCTUnwrap(body["launches"] as? [[String: Any]])
+                receipt = try XCTUnwrap(launches.first { $0["id"] as? String == receiptID })
+                if receipt["state"] as? String != "unknown" { break }
+                try await Task.sleep(for: .seconds(2))
+            }
+            XCTAssertEqual(receipt["provider"] as? String, provider)
+            XCTAssertEqual(receipt["projectId"] as? String, projectID)
+            XCTAssertEqual(receipt["requestedRemoteControl"] as? Bool, true)
+            XCTAssertEqual(receipt["backend"] as? String, provider == "claude" ? "t-legacy" : "t-\(provider)")
+            XCTAssertNotEqual(receipt["state"] as? String, "failed")
+            XCTAssertNotEqual(receipt["state"] as? String, "unknown")
+        }
+    }
+
+    @MainActor
+    func testDiscoveryOptOutHidesContextButKeepsExplicitShortcutsUsable() async throws {
+        guard #available(iOS 27.0, *) else { throw XCTSkip("AppIntentsTesting requires iOS 27.") }
+        let app = XCUIApplication()
+        app.launchEnvironment["RUNTIMEBRIEF_E2E_CLEAR_STATE"] = "1"
+        app.launch()
+        app.buttons["connect-your-mac"].tap()
+        let toggle = app.switches["siri-discovery-toggle"]
+        XCTAssertTrue(toggle.waitForExistence(timeout: 5))
+        toggle.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)).tap()
+        XCTAssertEqual(toggle.value as? String, "0")
+        app.buttons["Cancel"].tap()
+        app.buttons["explore-demo"].tap()
+        XCTAssertTrue(app.staticTexts["demo-data-banner"].waitForExistence(timeout: 5))
+
+        let definitions = IntentDefinitions(bundleIdentifier: "com.backbrief.app")
+        try await requireSystemTesting(definitions)
+        let entity = definitions.entities["ProjectEntity"]
+        let choices = try await entity.suggestedEntities()
+        XCTAssertEqual(choices.count, 3, "An explicit project chooser must still work after opting out.")
+        let matches = try await entity.entities(matching: "catalog builder")
+        let project = try XCTUnwrap(matches.first)
+        _ = try await definitions.intents["OpenProjectWithSiriIntent"].makeIntent(target: project).run()
+        XCTAssertTrue(app.navigationBars["Catalog Builder"].waitForExistence(timeout: 10))
+        let annotations = try await entity.viewAnnotations()
+        XCTAssertFalse(annotations.contains { $0.entity.identifier == project.identifier })
+        let indexed = try await entity.spotlightQuery()
+        XCTAssertTrue(indexed.isEmpty)
+    }
+
+    @available(iOS 27.0, *)
+    @MainActor
+    private func requireSystemTesting(_ definitions: IntentDefinitions) async throws {
+        do {
+            _ = try await definitions.entities["ProjectEntity"].suggestedEntities()
+        } catch {
+            let failure = error as NSError
+            if failure.domain == "AppIntentsServicesSecurityErrorDomain", failure.code == 803 {
+                throw XCTSkip("This iOS 27 runtime rejects AppIntentsTesting: \(failure.localizedDescription)")
+            }
+            throw error
+        }
+    }
+}
