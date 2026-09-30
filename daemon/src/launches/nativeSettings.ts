@@ -61,7 +61,7 @@ export function resolveClaudeSettings(cwd: string, options: ClaudeLaunchOptions,
     const project = read(path.join(cwd, ".claude/settings.json"));
     const local = read(path.join(cwd, ".claude/settings.local.json"));
     const managed = read("/Library/Application Support/ClaudeCode/managed-settings.json");
-    const settings = { ...user, ...project, ...local, ...managed, modelSettings: { ...user.modelSettings, ...project.modelSettings, ...local.modelSettings, ...managed.modelSettings } };
+    const settings: Record<string, any> = { ...user, ...project, ...local, ...managed, modelSettings: { ...user.modelSettings, ...project.modelSettings, ...local.modelSettings, ...managed.modelSettings } };
     const env = { ...process.env, ...user.env, ...project.env, ...local.env, ...managed.env };
     const model = env.ANTHROPIC_MODEL ?? settings.model ?? env.ANTHROPIC_DEFAULT_MODEL;
     const selected = options.model === "default" ? model ?? "opus" : options.model;

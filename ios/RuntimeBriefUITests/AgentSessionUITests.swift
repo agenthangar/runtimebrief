@@ -73,7 +73,7 @@ final class AgentSessionUITests: XCTestCase {
             modelPicker.tap(); app.buttons["Demo model"].tap()
             XCTAssertTrue(modelPicker.label.contains("Demo model"))
             let reasoning = app.buttons["session-reasoning-picker"]
-            XCTAssertTrue(reasoning.label.contains("Medium"))
+            XCTAssertTrue(reasoning.label.contains("Default"))
             reasoning.tap(); app.buttons["High"].tap()
             XCTAssertTrue(reasoning.label.contains("High"))
             let permissions = app.buttons["session-permissions-picker"]
