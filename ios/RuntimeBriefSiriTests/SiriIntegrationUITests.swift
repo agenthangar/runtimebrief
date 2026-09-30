@@ -46,6 +46,10 @@ final class SiriIntegrationUITests: XCTestCase {
         XCTAssertTrue(text.contains("Export validation is ready to review"))
         XCTAssertTrue(text.contains("Evidence updated"))
 
+        let overviewResult = try await definitions.intents["GetProjectStatusIntent"].makeIntent().run()
+        let overview: String = try overviewResult.value
+        XCTAssertTrue(overview.contains("Status for 3 projects"))
+
         let attentionResult = try await definitions.intents["GetAttentionIntent"].makeIntent().run()
         let attention: [AnyAppEntity] = try attentionResult.value
         XCTAssertEqual(attention.count, 1)

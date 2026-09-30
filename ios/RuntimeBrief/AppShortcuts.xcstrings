@@ -111,6 +111,26 @@
         }
       }
     },
+    "Run ${applicationName} project status": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Run ${applicationName} project status"
+          }
+        }
+      }
+    },
+    "Show ${applicationName} status": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show ${applicationName} status"
+          }
+        }
+      }
+    },
     "Show ${target} in ${applicationName}": {
       "localizations": {
         "en": {
@@ -127,6 +147,26 @@
           "stringUnit": {
             "state": "translated",
             "value": "Show my blockers in ${applicationName}"
+          }
+        }
+      }
+    },
+    "Show project status in ${applicationName}": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show project status in ${applicationName}"
+          }
+        }
+      }
+    },
+    "Show the status of ${project} in ${applicationName}": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show the status of ${project} in ${applicationName}"
           }
         }
       }
@@ -237,6 +277,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "What's the status of ${project} in ${applicationName}"
+          }
+        }
+      }
+    },
+    "What's the status of my ${project} app in ${applicationName}": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "What's the status of my ${project} app in ${applicationName}"
           }
         }
       }

@@ -8,6 +8,18 @@ struct SiriIntentFailure: LocalizedError {
 /// Formatting is shared by voice responses, Shortcuts output, and snippets.
 /// Fetching the snapshot never invokes /status or /ask.
 enum SiriBrief {
+    static func overview(_ snapshot: ProjectsStore.BriefSnapshot) -> String {
+        guard !snapshot.projects.isEmpty else {
+            return prefix(snapshot) + "No projects are registered yet. Add projects on your Mac."
+        }
+        let count = snapshot.projects.count
+        let summaries = snapshot.projects.prefix(4).map { project in
+            "\(project.name): \(project.brief?.headline ?? "No brief available.")"
+        }.joined(separator: " ")
+        let remaining = count > 4 ? " Open RuntimeBrief for the remaining \(count - 4)." : ""
+        return prefix(snapshot) + "Status for \(count) project\(count == 1 ? "" : "s"). \(summaries)\(remaining)"
+    }
+
     static func project(_ project: ProjectSummary, snapshot: ProjectsStore.BriefSnapshot) -> String {
         var text = "\(project.name): \(project.brief?.headline ?? "No project brief is available.")"
         let attention = project.brief?.claims.filter { $0.category == .attention } ?? []

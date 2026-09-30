@@ -74,7 +74,7 @@ personal signing change local; do not commit it or change the production
 
 | Action | Example phrase | Shortcuts output |
 | --- | --- | --- |
-| Project status | What's the status of Sample Tracker in RuntimeBrief? | Brief text |
+| Project status | Show Runtime Brief status; or What's the status of Sample Tracker in RuntimeBrief? | Brief text |
 | Needs attention | What needs attention in RuntimeBrief? | Project entities |
 | List projects | List my RuntimeBrief projects | Project entities |
 | Open project | Open Sample Tracker in RuntimeBrief | Opens project detail |
@@ -96,6 +96,9 @@ or uncertain receipt retains the same durable request ID across retries,
 including retries from the app. After a confirmed receipt, repeating the task
 creates a new session. Demo launches remain fictional and never contact a Mac.
 
+Status without a project reads brief headlines for up to four configured
+projects immediately; a named project reads its own evidence-backed brief.
+The project must appear in RuntimeBrief before Siri can resolve its name.
 Status, attention, and list actions read `/v1/projects` with a five-second
 network timeout. They never start an analyst. Spotlight maintenance runs
 separately so a slow index cannot delay the answer. Status includes the evidence
@@ -110,9 +113,12 @@ iOS 27 also exposes the system opening schema. Project rows and detail views
 provide entity context for requests about visible content.
 
 Shortcut vocabulary refreshes at launch and after a successful project refresh.
-The English `AppShortcuts.xcstrings` catalog contains the spoken phrases, and
-"Runtime Brief" is an alternative app name. Status also supports "Can you tell
-me the status of the Sample Tracker app from RuntimeBrief." Background entity
+The English `AppShortcuts.xcstrings` catalog contains the spoken phrases.
+The visible name remains RuntimeBrief while `CFBundleSpokenName` supplies
+"Runtime Brief" for Siri's speech recognition. The short, parameter-free
+"Show Runtime Brief status" phrase avoids needing Siri to choose an entity.
+Status also supports "Can you tell me the status of the Sample Tracker app
+from RuntimeBrief." Background entity
 suggestions return no names on connection/setup errors so a vocabulary failure
 does not abort registration of every shortcut. Explicit reads still report
 connection errors and authenticate normally.

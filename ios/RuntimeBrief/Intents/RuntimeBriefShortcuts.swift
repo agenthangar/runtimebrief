@@ -39,9 +39,14 @@ struct RuntimeBriefShortcuts: AppShortcutsProvider {
                 // every phrase embeds a parameter stay hidden until parameter
                 // values have been donated via updateAppShortcutParameters().
                 "Get a project status in \(.applicationName)",
+                "Show project status in \(.applicationName)",
+                "Run \(.applicationName) project status",
+                "Show \(.applicationName) status",
                 "What's the state of my project in \(.applicationName)",
                 "What's the state of \(\.$project) in \(.applicationName)",
                 "What's the status of \(\.$project) in \(.applicationName)",
+                "What's the status of my \(\.$project) app in \(.applicationName)",
+                "Show the status of \(\.$project) in \(.applicationName)",
                 "Tell me the status of \(\.$project) from \(.applicationName)",
                 "Can you tell me the status of the \(\.$project) app from \(.applicationName)",
                 "Get the status of \(\.$project) using \(.applicationName)",

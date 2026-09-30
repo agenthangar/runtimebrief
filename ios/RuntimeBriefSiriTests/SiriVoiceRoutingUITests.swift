@@ -45,20 +45,18 @@ final class SiriVoiceRoutingUITests: XCTestCase {
 
         for request in [
             "Get a project status in RuntimeBrief",
+            "Show Runtime Brief status",
             "What's the status of Sample Tracker in RuntimeBrief",
             "Can you tell me the status of the Sample Tracker app from RuntimeBrief",
         ] {
             XCUIDevice.shared.siriService.activate(voiceRecognitionText: request)
-            if request == "Get a project status in RuntimeBrief" {
-                let choice = XCUIDevice.shared.siriService.buttons["Sample Tracker"]
-                if choice.waitForExistence(timeout: 5) { choice.tap() }
-            }
             let initial = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
             initial.name = "Siri response: \(request)"
             initial.lifetime = .keepAlways
             add(initial)
+            let expected = request.contains("Sample Tracker") ? "Export validation is ready to review" : "Status for 3 projects"
             let answer = XCUIDevice.shared.siriService.staticTexts.matching(
-                NSPredicate(format: "label CONTAINS[c] %@", "Export validation is ready to review")
+                NSPredicate(format: "label CONTAINS[c] %@", expected)
             ).firstMatch
             let matched = answer.waitForExistence(timeout: 30)
             let screenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())

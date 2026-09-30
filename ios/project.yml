@@ -11,7 +11,7 @@ settings:
     SWIFT_VERSION: "6.0"
     SWIFT_STRICT_CONCURRENCY: complete
     CODE_SIGN_STYLE: Automatic
-    CURRENT_PROJECT_VERSION: 22
+    CURRENT_PROJECT_VERSION: 23
     MARKETING_VERSION: "1.0.2"
 packages:
   SwiftTerm:
@@ -42,6 +42,9 @@ targets:
       path: RuntimeBrief/Info.plist
       properties:
         CFBundleDisplayName: RuntimeBrief
+        # Siri transcribes the product name as two words. Keep the visual brand
+        # while supplying its spoken form to the system.
+        CFBundleSpokenName: Runtime Brief
         INAlternativeAppNames:
           - INAlternativeAppName: Runtime Brief
             INAlternativeAppNamePronunciationHint: Runtime Brief

@@ -12,7 +12,7 @@ struct GetProjectStatusIntent: AppIntent {
     static let openAppWhenRun = false
 
     @Parameter(title: "Project")
-    var project: ProjectEntity
+    var project: ProjectEntity?
 
     static var parameterSummary: some ParameterSummary {
         Summary("Get the status of \(\.$project)")
@@ -21,12 +21,19 @@ struct GetProjectStatusIntent: AppIntent {
     func perform() async throws -> some IntentResult & ProvidesDialog & ReturnsValue<String> & ShowsSnippetView {
         do {
             let snapshot = try await ProjectsStore.shared.briefSnapshot()
-            guard let current = snapshot.projects.first(where: { $0.id == project.id }) else {
-                throw RuntimeBriefError.notFound
+            if let project {
+                guard let current = snapshot.projects.first(where: { $0.id == project.id }) else {
+                    throw RuntimeBriefError.notFound
+                }
+                let text = SiriBrief.project(current, snapshot: snapshot)
+                return .result(value: text, dialog: IntentDialog(stringLiteral: text),
+                               view: StatusSnippetView(projectName: current.name, branch: current.branch, answer: text))
             }
-            let text = SiriBrief.project(current, snapshot: snapshot)
+            // A spoken shortcut without a project should answer immediately.
+            // The system may not offer an entity picker from Siri on every OS.
+            let text = SiriBrief.overview(snapshot)
             return .result(value: text, dialog: IntentDialog(stringLiteral: text),
-                           view: StatusSnippetView(projectName: current.name, branch: current.branch, answer: text))
+                           view: StatusSnippetView(projectName: "Projects", branch: nil, answer: text))
         } catch {
             throw SiriIntentFailure(message: unreachableMessage(for: error))
         }

@@ -82,6 +82,10 @@ struct SiriBriefTests {
         #expect(projects.count == 1)
         #expect(projects.first?.name == "Catalog Builder")
         #expect(SiriBrief.attention(snapshot).hasPrefix("Fictional demo."))
+        #expect(SiriBrief.overview(snapshot).contains("Status for 3 projects."))
+        #expect(SiriBrief.overview(snapshot).contains("Sample Tracker: Export validation is ready to review"))
+        let empty = ProjectsStore.BriefSnapshot(projects: [], fetchedAt: nil, isSaved: false, isDemo: false)
+        #expect(SiriBrief.overview(empty).contains("No projects are registered yet"))
     }
 
     @Test func entityExposesUsefulMetadataWithoutPathsOrCredentials() {
@@ -187,6 +191,9 @@ struct SiriBriefTests {
         let statusResult = try await status.perform()
         #expect(statusResult.value?.contains("Export validation is ready to review") == true)
         #expect(statusResult.value?.hasPrefix("Fictional demo.") == true)
+        status.project = nil
+        let overviewResult = try await status.perform()
+        #expect(overviewResult.value?.contains("Status for 3 projects") == true)
         let attentionResult = try await GetAttentionIntent().perform()
         #expect(attentionResult.value?.map(\.name) == ["Catalog Builder"])
         let listResult = try await ListProjectsIntent().perform()
