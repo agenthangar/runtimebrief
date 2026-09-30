@@ -55,11 +55,13 @@ actor ProjectDiscovery {
     @MainActor
     static func donateOpen(_ project: ProjectSummary) async {
         guard isLiveDiscoveryEnabled else { return }
+        #if compiler(>=6.4)
         if #available(iOS 27.0, *) {
             _ = try? await OpenProjectWithSiriIntent(target: ProjectEntity(summary: project)).donate()
-        } else {
-            _ = try? await OpenProjectIntent(target: ProjectEntity(summary: project)).donate()
+            return
         }
+        #endif
+        _ = try? await OpenProjectIntent(target: ProjectEntity(summary: project)).donate()
     }
 
     static var isLiveDiscoveryEnabled: Bool {

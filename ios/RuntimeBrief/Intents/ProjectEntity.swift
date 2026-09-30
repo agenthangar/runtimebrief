@@ -49,6 +49,7 @@ struct ProjectEntity: AppEntity, IndexedEntity {
     }
 }
 
+#if compiler(>=6.4)
 @available(iOS 27.0, *)
 extension ProjectQuery: IndexedEntityQuery {
     func reindexEntities(for identifiers: [String], indexDescription: CSSearchableIndexDescription) async throws {
@@ -65,6 +66,7 @@ extension ProjectQuery: IndexedEntityQuery {
         await ProjectDiscovery.shared.synchronize(projects: projects)
     }
 }
+#endif
 
 /// Resolves projects by name with fuzzy matching, backed by a short-lived
 /// cache of /v1/projects so repeated Siri resolutions don't hammer the Mac.

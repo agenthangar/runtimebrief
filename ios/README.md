@@ -133,6 +133,9 @@ discovery write ordering, and UI preference persistence. The iOS 27-only Siri
 scheme uses `AppIntentsTesting` across processes to query entities, run actions,
 inspect returned values, open a project, and inspect on-screen annotations,
 including opting out while keeping explicit project selection usable.
+CodeQL uses its supported Xcode 26.6 / Swift 6.3 toolchain, including all session
+creation code. The iOS 27-only opening schema and reindexing hooks compile with
+Swift 6.4 and are covered by the Xcode 27 build and system integration tests.
 If the runtime rejects this framework with security error 803, those tests
 explicitly skip; other errors fail. Existing live daemon and Claude tests need
 their separately documented E2E configuration.

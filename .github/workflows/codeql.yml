@@ -29,7 +29,9 @@ jobs:
             runner: ubuntu-latest
           - language: swift
             build-mode: manual
-            runner: xcode-27
+            # CodeQL currently supports Swift through 6.3. The release and
+            # system App Intents tests use Xcode 27 in ci.yml.
+            runner: macos-26
 
     steps:
       - name: Check out repository
@@ -42,6 +44,12 @@ jobs:
             /usr/sbin/softwareupdate --install-rosetta --agree-to-license
           fi
           /usr/bin/arch -x86_64 /usr/bin/true
+
+      - name: Select the supported Swift security analysis toolchain
+        if: matrix.language == 'swift'
+        run: |
+          sudo xcode-select --switch /Applications/Xcode_26.6.app
+          xcodebuild -version
 
       - name: Generate the Xcode project
         if: matrix.language == 'swift'

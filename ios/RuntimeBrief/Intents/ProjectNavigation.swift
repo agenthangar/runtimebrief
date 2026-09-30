@@ -40,6 +40,7 @@ struct OpenProjectIntent: AppIntent {
 
 /// iOS 26 keeps its custom opening action; iOS 27 additionally exposes the
 /// system's schema for conversational content access.
+#if compiler(>=6.4)
 @available(iOS 27.0, *)
 @AppIntent(schema: .system.open)
 struct OpenProjectWithSiriIntent: OpenIntent {
@@ -55,6 +56,7 @@ struct OpenProjectWithSiriIntent: OpenIntent {
         return .result()
     }
 }
+#endif
 
 @MainActor
 private func openProject(_ entity: ProjectEntity) async throws {
