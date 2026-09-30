@@ -71,20 +71,25 @@ final class AgentSessionUITests: XCTestCase {
             app.swipeDown()
             let modelPicker = app.buttons["session-model-picker"]
             modelPicker.tap(); app.buttons["Demo model"].tap()
-            XCTAssertTrue(modelPicker.label.contains("Demo model"))
+            assertSelection(modelPicker, contains: "Demo model")
             let reasoning = app.buttons["session-reasoning-picker"]
-            XCTAssertTrue(reasoning.label.contains("Default"))
+            assertSelection(reasoning, contains: "Default")
             reasoning.tap(); app.buttons["High"].tap()
-            XCTAssertTrue(reasoning.label.contains("High"))
+            assertSelection(reasoning, contains: "High")
             let permissions = app.buttons["session-permissions-picker"]
             permissions.tap(); app.buttons["Bypass"].tap()
-            XCTAssertTrue(permissions.label.contains("Bypass"))
+            assertSelection(permissions, contains: "Bypass")
             let options = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
             options.name = "\(provider) selected model and Bypass"; options.lifetime = .keepAlways; add(options)
             let prompt = app.textFields["claude-task-prompt"]
             prompt.tap(); prompt.typeText("Inspect the fictional native terminal")
             app.buttons["start-claude-task"].tap()
             XCTAssertTrue(newTask.waitForExistence(timeout: 10))
+            let settings = app.staticTexts.matching(NSPredicate(
+                format: "label BEGINSWITH %@ AND label CONTAINS %@ AND label CONTAINS %@",
+                "Started with", "demo-model", "Bypass"
+            )).firstMatch
+            XCTAssertTrue(settings.waitForExistence(timeout: 10), "The receipt must preserve the chosen model and permissions.")
             let terminal = app.buttons["open-session-terminal"].firstMatch
             for _ in 0..<4 where !terminal.isHittable { app.swipeUp() }
             XCTAssertTrue(terminal.waitForExistence(timeout: 10)); terminal.tap()
@@ -100,5 +105,15 @@ final class AgentSessionUITests: XCTestCase {
             app.buttons["Done"].tap()
             app.terminate()
         }
+    }
+
+    @MainActor
+    private func assertSelection(_ picker: XCUIElement, contains value: String,
+                                 file: StaticString = #filePath, line: UInt = #line) {
+        // SwiftUI can publish the menu selection after XCTest's idle check.
+        // Wait for the actual selected value; an incorrect/reset value still fails.
+        let selected = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label CONTAINS %@", value), object: picker)
+        let result = XCTWaiter.wait(for: [selected], timeout: 10)
+        XCTAssertEqual(result, .completed, "Expected selection \(value); observed \(picker.label)", file: file, line: line)
     }
 }
