@@ -203,10 +203,13 @@ private struct ClaudeTaskComposer: View {
                     if !reasoningChoices.isEmpty {
                         Picker("Reasoning", selection: $reasoningEffort) {
                             Text("Default (\(selectedModel == "default" ? (capability?.defaultReasoningLabel?.capitalized ?? "Native") : "Mac settings"))").tag("default")
-                            ForEach(reasoningChoices, id: \.self) { Text($0.capitalized).tag($0) }
+                            ForEach(reasoningChoices, id: \.self) { Text($0 == "xhigh" ? "Extra High" : $0.capitalized).tag($0) }
                         }
                         .pickerStyle(.menu)
                         .accessibilityIdentifier("session-reasoning-picker")
+                    } else if capability?.models != nil {
+                        LabeledContent("Reasoning", value: "Native default")
+                        Text("This model doesn’t expose a reasoning setting.").font(.caption).foregroundStyle(.secondary)
                     }
                     if provider == .claude {
                     Picker("Permissions", selection: $permissionMode) {

@@ -108,8 +108,8 @@ levels. Codex uses a session `model_reasoning_effort` override, Claude uses
 Default preserves the harness's configured model and reasoning. When neither
 is configured, RuntimeBrief prefers the latest available Sol for Codex, the
 latest Opus alias for Claude, and the latest available Grok for Cursor. Medium
-is the reasoning fallback when supported. These are process-local choices;
-RuntimeBrief never edits harness configuration. Unknown/unreadable defaults
+is the reasoning fallback when supported. RuntimeBrief passes choices to the
+native CLI and never directly edits harness configuration. Unknown/unreadable defaults
 remain under native ownership. Catalogs refresh every five minutes; discovery failures
 retain Default and explain how to recover.
 
