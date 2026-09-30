@@ -24,6 +24,7 @@
           "activity": "waiting_input",
           "message": "Complete the native workspace trust dialog on your Mac.",
           "requestedSettings": {},
+          "requestedRemoteControl": true,
           "remoteControl": {
             "state": "requires_setup",
             "url": null,
@@ -133,6 +134,7 @@
           "activity": "unknown",
           "message": "Launch reserved.",
           "requestedSettings": {},
+          "requestedRemoteControl": true,
           "remoteControl": {"state":"unknown","url":null,"checkedAt":null,"message":null},
           "terminal": null
         }
@@ -161,6 +163,7 @@
           "activity": "busy",
           "message": "The native agent accepted the initial prompt.",
           "requestedSettings": {},
+          "requestedRemoteControl": true,
           "remoteControl": {
             "state": "ready",
             "url": "https://example.com/session/1",
@@ -194,6 +197,7 @@
           "activity": "busy",
           "message": "The native agent accepted the initial prompt.",
           "requestedSettings": {},
+          "requestedRemoteControl": true,
           "remoteControl": {
             "state": "ready",
             "url": "https://example.com/session/1",
@@ -231,6 +235,7 @@
           "activity": "busy",
           "message": "The native agent accepted the initial prompt.",
           "requestedSettings": {},
+          "requestedRemoteControl": true,
           "remoteControl": {
             "state": "requires_setup",
             "url": null,
@@ -264,6 +269,7 @@
           "activity": "unknown",
           "message": "The native agent accepted the initial prompt.",
           "requestedSettings": {},
+          "requestedRemoteControl": true,
           "remoteControl": {
             "state": "unknown",
             "url": null,
@@ -292,6 +298,7 @@
           "activity": "unknown",
           "message": "Launch failed; no automatic replay.",
           "requestedSettings": {},
+          "requestedRemoteControl": true,
           "remoteControl": {"state":"unknown","url":null,"checkedAt":null,"message":null},
           "terminal": null
         }
@@ -315,6 +322,7 @@
           "activity": "unknown",
           "message": "Launch unknown; no automatic replay.",
           "requestedSettings": {},
+          "requestedRemoteControl": true,
           "remoteControl": {"state":"unknown","url":null,"checkedAt":null,"message":null},
           "terminal": null
         }
@@ -408,6 +416,7 @@
           "activity": "busy",
           "message": "The native agent accepted the initial prompt.",
           "requestedSettings": {},
+          "requestedRemoteControl": true,
           "remoteControl": {
             "state": "unavailable",
             "url": "https://example.com/session/1",
@@ -441,6 +450,7 @@
           "activity": "busy",
           "message": "The native agent accepted the initial prompt.",
           "requestedSettings": {},
+          "requestedRemoteControl": true,
           "remoteControl": {"state":"ready","url":"javascript:alert(1)","checkedAt":"2026-09-24T12:00:00Z","message":null},
           "terminal": {"socketName":"agent-sessions","sessionName":"task-1","paneId":"%1"}
         }
@@ -473,6 +483,7 @@
           "activity": "busy",
           "message": "The native agent accepted the initial prompt.",
           "requestedSettings": {},
+          "requestedRemoteControl": true,
           "remoteControl": {
             "state": "ready",
             "url": "https://example.com/session/1",

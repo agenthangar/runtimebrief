@@ -65,6 +65,9 @@ for (const method of ['operations.get', 'continuation.get', 'continuation.prepar
 }
 rejects('Unsupported version', value => { value.version = 2; });
 rejects('Unneeded call ID', value => { value.callId = 'call-1'; });
+rejects('Recorded remote preference must be a boolean', value => {
+  value.result.requestedRemoteControl = 'true';
+}, {version: 1, method: 'sessions.get', ok: true, result: session});
 for (const field of ['branch', 'baseCommit']) {
   rejects(`Worktree without ${field}`, value => { value.result.workspace[field] = null; },
     {version: 1, method: 'sessions.get', ok: true, result: session});
@@ -127,6 +130,32 @@ for (const state of schema.$defs.RemoteControl.properties.state.enum) {
     }
   }
 }
+
+// Check remote readiness against the whole session, including uncertain delivery.
+// Remote reachability and observed activity are independent of initial-prompt acceptance.
+for (const launchState of schema.$defs.Session.properties.launchState.enum) {
+  for (const activity of schema.$defs.Session.properties.activity.enum) {
+    for (const state of schema.$defs.RemoteControl.properties.state.enum) {
+      for (const identity of [false, true]) {
+        const value = structuredClone(session);
+        Object.assign(value, {launchState, activity,
+          nativeConversationId: identity ? session.nativeConversationId : null,
+          remoteControl: {state, url: state === 'ready' ? session.remoteControl.url : null,
+            checkedAt: session.observedAt, message: null},
+        });
+        const expected = (launchState !== 'started' || identity) && (state !== 'ready' || identity);
+        assert.equal(validateSession(value), expected,
+          `Joint state combination: ${JSON.stringify({launchState, activity, state, identity})}`);
+        combinations++;
+      }
+    }
+  }
+}
+
+// A launch preference remains readable after the user changes native settings.
+const changedRemotePreference = structuredClone(session);
+changedRemotePreference.requestedRemoteControl = false;
+assert(validateSession(changedRemotePreference), 'Native state must not overwrite the saved launch preference');
 
 assert.equal(schema.$defs.CreateParams.properties.remoteControl.default, true);
 assert(!schema.$defs.CreateParams.required.includes('remoteControl'));

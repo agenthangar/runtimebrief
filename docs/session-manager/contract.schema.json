@@ -102,6 +102,7 @@
         "activity": {"type":"string","enum":["busy","idle","waiting_input","waiting_approval","exited","unknown"]},
         "message": {"$ref":"#/$defs/Text"},
         "requestedSettings": {"$ref":"#/$defs/Settings"},
+        "requestedRemoteControl": {"type":"boolean","description":"Normalized launch preference, independent of the currently observed remote state."},
         "remoteControl": {"$ref":"#/$defs/RemoteControl"},
         "terminal": {"anyOf":[{"$ref":"#/$defs/Terminal"},{"type":"null"}]}
       },
@@ -117,6 +118,7 @@
         "activity",
         "message",
         "requestedSettings",
+        "requestedRemoteControl",
         "remoteControl",
         "terminal"
       ],
