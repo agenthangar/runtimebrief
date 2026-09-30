@@ -73,7 +73,10 @@ final class ClaudeLaunchUITests: XCTestCase {
         let start = app.buttons["start-claude-task"]
         XCTAssertTrue(start.waitForExistence(timeout: 5))
         XCTAssertFalse(start.isEnabled)
-        XCTAssertEqual(app.switches["claude-remote-control-toggle"].value as? String, "1")
+        let remoteToggle = app.switches["claude-remote-control-toggle"]
+        for _ in 0..<4 where !remoteToggle.isHittable { app.swipeUp() }
+        XCTAssertEqual(remoteToggle.value as? String, "1")
+        app.swipeDown()
         app.buttons["claude-model-picker"].tap()
         app.buttons["Sonnet"].tap()
         app.buttons["claude-permissions-picker"].tap()

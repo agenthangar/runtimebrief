@@ -12,6 +12,8 @@ struct ClaudeLaunch: Decodable, Identifiable, Sendable, Equatable {
     let cwd: String
     let openedAt: Date?
     var model: String? = nil
+    var reasoningEffort: String? = nil
+    var effectiveReasoningEffort: String? = nil
     var permissionMode: String? = nil
     var backend: String? = nil
     var tmuxTarget: String? = nil
@@ -98,16 +100,23 @@ struct AgentCapability: Decodable, Equatable, Sendable, Identifiable {
     let models: [AgentModel]?
     let modelsMessage: String?
     let permissionModes: [String]?
+    let defaultModelLabel: String?
+    let defaultReasoningLabel: String?
 
-    init(id: AgentProvider, available: Bool, message: String, models: [AgentModel]? = nil, modelsMessage: String? = nil, permissionModes: [String]? = nil) {
+    init(id: AgentProvider, available: Bool, message: String, models: [AgentModel]? = nil, modelsMessage: String? = nil, permissionModes: [String]? = nil, defaultModelLabel: String? = nil, defaultReasoningLabel: String? = nil) {
         self.id = id; self.available = available; self.message = message
         self.models = models; self.modelsMessage = modelsMessage; self.permissionModes = permissionModes
+        self.defaultModelLabel = defaultModelLabel; self.defaultReasoningLabel = defaultReasoningLabel
     }
 }
 
 struct AgentModel: Decodable, Equatable, Identifiable, Sendable {
     let id: String
     let label: String
+    let reasoningEfforts: [String]?
+    init(id: String, label: String, reasoningEfforts: [String]? = nil) {
+        self.id = id; self.label = label; self.reasoningEfforts = reasoningEfforts
+    }
 }
 
 extension AgentProvider {
@@ -132,6 +141,7 @@ struct SessionLaunchRequest: Encodable, Sendable {
     let prompt: String
     var provider: AgentProvider = .claude
     var model: String = "default"
+    var reasoningEffort: String? = nil
     var permissionMode: String = "manual"
     var remoteControl: Bool = true
 }

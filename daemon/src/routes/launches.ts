@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { FastifyInstance } from "fastify";
 import type { ServerDeps } from "../server.js";
-import { CLAUDE_MODELS, CLAUDE_PERMISSION_MODES, permissionModes, SESSION_PROVIDERS, LaunchError } from "../launches/types.js";
+import { CLAUDE_MODELS, CLAUDE_PERMISSION_MODES, permissionModes, REASONING_EFFORTS, MODEL_ID, SESSION_PROVIDERS, LaunchError } from "../launches/types.js";
 import { parseTerminalInput } from "../launches/terminalInput.js";
 
 const startSchema = z.object({
@@ -16,12 +16,12 @@ const startSchema = z.object({
 
 const sessionSchema = startSchema.extend({
   provider: z.enum(SESSION_PROVIDERS).default("claude"),
-  model: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/).default("default"),
+  model: z.string().regex(MODEL_ID).default("default"),
+  reasoningEffort: z.enum(REASONING_EFFORTS).optional(),
   permissionMode: z.string().default("manual"),
 }).superRefine((body, context) => {
   const modes: readonly string[] = permissionModes(body.provider);
   if (!modes.includes(body.permissionMode)) context.addIssue({ code: "custom", message: "Unsupported permission mode" });
-  if (body.provider === "claude" && !CLAUDE_MODELS.includes(body.model as never)) context.addIssue({ code: "custom", message: "Unsupported model" });
 });
 const inputSchema = z.object({ requestId: z.uuid().transform(value => value.toLowerCase()), data: z.string().refine(value => parseTerminalInput(value) !== null) }).strict();
 
@@ -43,7 +43,7 @@ export function registerLaunchRoutes(app: FastifyInstance, deps: ServerDeps): vo
       if (!deps.launches) return reply.code(503).send({ error: "launch_unavailable" });
       const body = sessionSchema.safeParse(req.body);
       if (!body.success) return reply.code(400).send({ error: "invalid_request", message: "Check the agent, model, permissions, and task description." });
-      return reply.code(202).send(await deps.launches.start(req.params.id, body.data.requestId, body.data.prompt, { provider: body.data.provider, model: body.data.model, permissionMode: body.data.permissionMode, remoteControl: body.data.remoteControl !== false }));
+      return reply.code(202).send(await deps.launches.start(req.params.id, body.data.requestId, body.data.prompt, { provider: body.data.provider, model: body.data.model, permissionMode: body.data.permissionMode, ...(body.data.reasoningEffort ? { reasoningEffort: body.data.reasoningEffort } : {}), remoteControl: body.data.remoteControl !== false }));
     });
     routes.get<{ Params: { id: string; launchId: string } }>("/v1/projects/:id/sessions/:launchId/terminal", async (req, reply) => {
       if (!deps.launches) return reply.code(503).send({ error: "launch_unavailable" });

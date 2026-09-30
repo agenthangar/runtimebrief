@@ -1,41 +1,70 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { withCodexApi } from "./codexApi.js";
-import type { AgentModel } from "./types.js";
+import { MODEL_ID, type AgentModel } from "./types.js";
 
 const exec = promisify(execFile);
-const modelId = /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/;
 function choices(models: AgentModel[]): AgentModel[] {
-  return [...new Map(models.filter(value => modelId.test(value.id) && value.id !== "default" && value.label.trim() && !/[\u0000-\u001f\u007f]/.test(value.label))
-    .map(value => [value.id, { id: value.id, label: value.label.trim().slice(0, 160) }])).values()];
+  return [...new Map(models.filter(value => MODEL_ID.test(value.id) && value.id !== "default" && value.label.trim() && !/[\u0000-\u001f\u007f]/.test(value.label))
+    .map(value => [value.id, { ...value, label: value.label.trim().slice(0, 160) }])).values()];
+}
+
+const versions = (id: string) => (id.match(/\d+(?:\.\d+)*/)?.[0] ?? "0").split(".").map(Number);
+function newest(a: AgentModel, b: AgentModel) {
+  const x = versions(a.id), y = versions(b.id);
+  for (let i = 0; i < Math.max(x.length, y.length); i++) { const difference = (y[i] ?? 0) - (x[i] ?? 0); if (difference) return difference; }
+  return 0;
+}
+export function orderNativeModels(provider: "codex" | "cursor", models: AgentModel[]): AgentModel[] {
+  const priority = (id: string) => provider === "codex" ? (/astra/.test(id) ? 0 : /sol/.test(id) ? 1 : 2) : (/grok/.test(id) ? 0 : 1);
+  const effort = (id: string) => /-medium(?:-fast)?$/.test(id) ? 0 : /-high(?:-fast)?$/.test(id) ? 1 : 2;
+  return [...models].sort((a, b) => priority(a.id) - priority(b.id) || newest(a, b) || effort(a.id) - effort(b.id));
+}
+export function fallbackModel(provider: "codex" | "cursor", models: AgentModel[]): string {
+  const family = models.filter(value => provider === "codex" ? /sol/.test(value.id) : /grok/.test(value.id));
+  family.sort(newest);
+  const latest = family[0];
+  if (!latest) return "default";
+  if (provider === "cursor") {
+    const base = latest.id.replace(/-(?:none|minimal|low|medium|high|xhigh|max)(?:-fast)?$/, "");
+    return family.find(value => value.id === `${base}-medium`)?.id ?? latest.id;
+  }
+  return latest.id;
 }
 
 export function parseCursorModels(output: string): AgentModel[] {
   // The native CLI prints one slug - display name per line, optionally marked current/default.
   const clean = output.replace(/\u001b\[[0-9;]*[A-Za-z]/g, "");
-  return choices(clean.split(/\r?\n/).flatMap(line => {
+  const models = choices(clean.split(/\r?\n/).flatMap(line => {
     const match = /^([A-Za-z0-9][A-Za-z0-9._:/-]{0,127}) - (.+)$/.exec(line.trim());
     return match ? [{ id: match[1]!, label: match[2]!.replace(/ \((?:current|default)(?:, (?:current|default))*\)$/, "") }] : [];
   }));
+  return models.map(value => {
+    const match = /-(none|minimal|low|medium|high|xhigh|max)(-fast)?$/.exec(value.id);
+    if (!match) return value;
+    const base = value.id.slice(0, match.index), fast = match[2] ?? "";
+    const reasoningEfforts = ["none", "minimal", "low", "medium", "high", "xhigh", "max"].filter(effort => models.some(model => model.id === `${base}-${effort}${fast}`));
+    return { ...value, reasoningEfforts };
+  });
 }
 
 export async function discoverNativeModels(provider: "codex" | "cursor", binary: string): Promise<AgentModel[]> {
   if (provider === "cursor") {
     const { stdout } = await exec(binary, ["--list-models"], { timeout: 10000, maxBuffer: 1024 * 1024, env: { ...process.env, NO_COLOR: "1" } });
-    return parseCursorModels(stdout);
+    return orderNativeModels(provider, parseCursorModels(stdout));
   }
   return withCodexApi(binary, async request => {
     const models: AgentModel[] = [];
     const seen = new Set<string>();
     let cursor: string | null = null;
     do {
-      const page: { data: { model: string; displayName: string; hidden: boolean }[]; nextCursor?: string | null } = await request("model/list", { limit: 100, cursor, includeHidden: false });
-      models.push(...page.data.filter(value => !value.hidden).map(value => ({ id: value.model, label: value.displayName })));
+      const page: { data: { model: string; displayName: string; hidden: boolean; supportedReasoningEfforts?: { reasoningEffort: string }[] }[]; nextCursor?: string | null } = await request("model/list", { limit: 100, cursor, includeHidden: false });
+      models.push(...page.data.filter(value => !value.hidden).map(value => ({ id: value.model, label: value.displayName, ...(value.supportedReasoningEfforts ? { reasoningEfforts: value.supportedReasoningEfforts.map(e => e.reasoningEffort) } : {}) })));
       cursor = page.nextCursor ?? null;
       if (cursor && seen.has(cursor)) throw Error("Invalid model pagination");
       if (cursor) seen.add(cursor);
     } while (cursor);
-    return choices(models);
+    return orderNativeModels(provider, choices(models));
   });
 }
 

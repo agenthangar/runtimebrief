@@ -64,7 +64,7 @@ for (const key of ["XDG_CONFIG_HOME", "XDG_CACHE_HOME", "XDG_STATE_HOME", "CODEX
 }
 delete env.RB_T_CONFIG;
 try {
-  const args = nativeSessionArgs(payload.provider, payload.model, payload.permissionMode);
+  const args = nativeSessionArgs(payload.provider, payload.model, payload.permissionMode, payload.reasoningEffort);
   if (payload.provider === "cursor") {
     // Cursor assigns the ID itself. Starting that empty chat is not a history replay.
     const sessionId = execFileSync(payload.binary, ["create-chat"], { cwd, env, timeout: 30000, encoding: "utf8" }).trim();

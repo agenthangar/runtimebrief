@@ -44,12 +44,12 @@ describe("native provider sessions and remote terminal", () => {
   });
 
   it.each(["codex", "cursor"])("preserves explicit model and bypass choices for %s without replaying", async provider => {
-    const f = setup(); const body = task(provider, { model: "example-model", permissionMode: "bypassPermissions" });
+    const f = setup(); const body = task(provider, { model: "example-model", permissionMode: "bypassPermissions", reasoningEffort: "medium" });
     const first = await f.app.inject({ method: "POST", url: sessions, headers: authHeaders(), payload: body });
     expect(first.statusCode).toBe(202);
-    expect(first.json()).toMatchObject({ model: "example-model", permissionMode: "bypassPermissions", requestedRemoteControl: true });
+    expect(first.json()).toMatchObject({ model: "example-model", permissionMode: "bypassPermissions", reasoningEffort: "medium", requestedRemoteControl: true });
     expect((await f.app.inject({ method: "POST", url: sessions, headers: authHeaders(), payload: body })).json().id).toBe(first.json().id);
-    for (const changed of [{ model: "other-model" }, { permissionMode: "manual" }]) expect((await f.app.inject({ method: "POST", url: sessions, headers: authHeaders(), payload: { ...body, ...changed } })).statusCode).toBe(409);
+    for (const changed of [{ model: "other-model" }, { permissionMode: "manual" }, { reasoningEffort: "high" }]) expect((await f.app.inject({ method: "POST", url: sessions, headers: authHeaders(), payload: { ...body, ...changed } })).statusCode).toBe(409);
     expect(f.backends.find(b => b.provider === provider)!.create).toHaveBeenCalledTimes(1);
   });
 

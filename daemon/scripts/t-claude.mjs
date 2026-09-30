@@ -20,9 +20,10 @@ fs.unlinkSync(file);
 const child = spawn(payload.binary, [
   ...args, "--name", payload.name, "--permission-mode", payload.permissionMode,
   ...(payload.model === "default" ? [] : ["--model", payload.model]),
+  ...(payload.reasoningEffort && payload.reasoningEffort !== "default" ? ["--effort", payload.reasoningEffort] : []),
   ...(payload.remoteControl ? ["--remote-control", payload.name] : ["--settings", '{"remoteControlAtStartup":false,"disableRemoteControl":true}']),
   "--", payload.prompt,
-], { stdio: "inherit" });
+], { stdio: "inherit", env: { ...process.env, ...(payload.reasoningEffort && payload.reasoningEffort !== "default" ? { CLAUDE_CODE_EFFORT_LEVEL: payload.reasoningEffort } : {}) } });
 function finished(code, spawnFailed = false) {
   fs.writeFileSync(path.join(directory, "exit.json"), JSON.stringify({ code, spawnFailed }), { mode: 0o600 });
   process.exit(code ?? 1);

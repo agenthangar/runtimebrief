@@ -99,8 +99,18 @@ visibility in ChatGPT's or Cursor's mobile interfaces.
 The native CLIs own models, execution, history, and approvals. Codex Manual uses
 its workspace-write sandbox with on-request approval; Plan uses its read-only
 sandbox. Model menus load each native account's catalog from the Mac (Codex
-`model/list`, Cursor `--list-models`). Default inherits the Mac configuration
-without overriding it. Catalogs refresh every five minutes; discovery failures
+`model/list`, Cursor `--list-models`, Claude native SDK initialization without a
+prompt or model turn). The phone offers only those available model choices,
+with preferred families first. Each model exposes its supported reasoning
+levels. Codex uses a session `model_reasoning_effort` override, Claude uses
+`--effort`, and Cursor selects an available effort variant.
+
+Default preserves the harness's configured model and reasoning. When neither
+is configured, RuntimeBrief prefers the latest available Sol for Codex, the
+latest Opus alias for Claude, and the latest available Grok for Cursor. Medium
+is the reasoning fallback when supported. These are process-local choices;
+RuntimeBrief never edits harness configuration. Unknown/unreadable defaults
+remain under native ownership. Catalogs refresh every five minutes; discovery failures
 retain Default and explain how to recover.
 
 | Permission | Codex | Cursor |

@@ -17,3 +17,8 @@ it("maps supported modes without inventing native mode names or trust flags", ()
   expect(nativeSessionArgs("cursor", "default", "ask")).toEqual(["--mode", "ask"]);
   for (const provider of ["codex", "cursor"] as const) expect(() => nativeSessionArgs(provider, "default", "acceptEdits")).toThrow();
 });
+
+it("sends Codex effort as a native config override and Cursor effort as an advertised variant", () => {
+  expect(nativeSessionArgs("codex", "gpt-example", "manual", "medium")).toContain('model_reasoning_effort="medium"');
+  expect(nativeSessionArgs("cursor", "grok-4.7-high-fast", "manual", "medium")).toEqual(["--model", "grok-4.7-medium-fast"]);
+});

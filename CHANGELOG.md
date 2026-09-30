@@ -2,7 +2,10 @@
 
 ## 1.0.2 (19) — 2026-09-30
 
-- Select Codex and Cursor models from the native account catalog in a menu.
+- Select Claude, Codex, and Cursor models from each native harness catalog.
+  Put preferred models first and offer the model’s supported reasoning levels.
+- Preserve configured harness defaults. Otherwise prefer latest Sol, Opus,
+  or Grok for their respective harnesses, with Medium reasoning when supported.
 - Add explicit Auto and Bypass permission choices, with native policy mappings.
   Keep Manual permissions and Remote Control on as the defaults.
 - Open project summary sections collapsed, with a tap to expand their details.

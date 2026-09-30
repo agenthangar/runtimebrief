@@ -15,12 +15,13 @@ struct AgentSessionTests {
     @Test func selectedNativeOptionsAreSentAndChangeRetryIdentity() async throws {
         let defaults = UserDefaults(suiteName: "options-\(UUID())")!
         for provider in [AgentProvider.codex, .cursor] {
-            let selected = SessionLaunchDraft.request(projectID: "fixture", scope: "fixture", prompt: "Inspect the fictional options", provider: provider, model: "demo-model", permissionMode: "bypassPermissions", defaults: defaults)
+            let selected = SessionLaunchDraft.request(projectID: "fixture", scope: "fixture", prompt: "Inspect the fictional options", provider: provider, model: "demo-model", permissionMode: "bypassPermissions", reasoningEffort: "medium", defaults: defaults)
             let standard = SessionLaunchDraft.request(projectID: "fixture", scope: "fixture", prompt: "Inspect the fictional options", provider: provider, defaults: defaults)
             #expect(selected.requestId != standard.requestId)
             let json = try JSONSerialization.jsonObject(with: JSONEncoder().encode(selected)) as! [String: Any]
             #expect(json["model"] as? String == "demo-model")
             #expect(json["permissionMode"] as? String == "bypassPermissions")
+            #expect(json["reasoningEffort"] as? String == "medium")
             #expect(json["remoteControl"] as? Bool == true)
             let launch = await DemoClaudeTasks.shared.start(projectID: "fixture", request: selected)
             #expect(launch.model == "demo-model" && launch.permissionMode == "bypassPermissions")

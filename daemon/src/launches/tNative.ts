@@ -7,6 +7,7 @@ import { promisify } from "node:util";
 import Database from "better-sqlite3";
 import { bindCodexProject } from "./codexProject.js";
 import { discoverNativeModels, NativeModelCatalog } from "./nativeModels.js";
+import { resolveCodexSettings, resolveCursorSettings } from "./nativeSettings.js";
 import { TLegacyBackend, promptHash, tSlot, tTarget, type TLegacyOptions } from "./tLegacy.js";
 import { hasPinnedT } from "./tDependency.js";
 import { parseCodexSessionFile } from "../adapters/codexSessions.js";
@@ -50,7 +51,13 @@ export class TNativeBackend extends TLegacyBackend {
       await exec(this.binary, ["--version"], { timeout: 10000 });
       if (cwd) await exec("/usr/bin/git", ["-C", cwd, "rev-parse", "--verify", "refs/remotes/origin/main"], { timeout: 3000 });
     } catch { return { available: false, message: `Install ${this.provider} and tmux on your Mac, and use a Git project with origin/main.` }; }
-    return { available: true, message: `Starts ${this.provider} in a t worktree. Remote terminal control is on by default; the native agent handles sign-in and permissions.`, permissionModes: NATIVE_PERMISSION_MODES[this.provider], ...await this.models.get() };
+    const catalog = await this.models.get();
+    const defaults = await this.resolveSettings(cwd ?? process.cwd(), { model: "default", permissionMode: "manual" });
+    return { available: true, message: `Starts ${this.provider} in a t worktree. Remote terminal control is on by default; the native agent handles sign-in and permissions.`, permissionModes: NATIVE_PERMISSION_MODES[this.provider], ...catalog, ...(defaults.defaultModelLabel ? { defaultModelLabel: defaults.defaultModelLabel } : {}), ...(defaults.defaultReasoningLabel ? { defaultReasoningLabel: defaults.defaultReasoningLabel } : {}) };
+  }
+  override async resolveSettings(cwd: string, options: import("./types.js").ClaudeLaunchOptions) {
+    const catalog = await this.models.get();
+    return this.provider === "codex" ? resolveCodexSettings(this.binary, cwd, options, catalog.models) : resolveCursorSettings(options, catalog.models);
   }
 
   private runner(launch: ClaudeLaunch): Runner {
