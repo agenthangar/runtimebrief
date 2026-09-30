@@ -209,6 +209,6 @@ private struct ProjectRow: View {
         .padding(.vertical, 7)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("project-row-\(project.id)")
-        .appEntityIdentifier(discoveryEnabled ? EntityIdentifier(for: ProjectEntity(summary: project)) : nil)
+        .projectEntityContext(project, enabled: discoveryEnabled)
     }
 }

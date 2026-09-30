@@ -97,7 +97,8 @@ including retries from the app. After a confirmed receipt, repeating the task
 creates a new session. Demo launches remain fictional and never contact a Mac.
 
 Status, attention, and list actions read `/v1/projects` with a five-second
-network timeout. They never start an analyst. Status includes the evidence
+network timeout. They never start an analyst. Spotlight maintenance runs
+separately so a slow index cannot delay the answer. Status includes the evidence
 timestamp; attention distinguishes missing briefs from available briefs with
 no attention items. A connection failure can use the saved portfolio with an
 explicit saved-data warning and timestamp. Authentication and configuration
@@ -134,7 +135,7 @@ scheme uses `AppIntentsTesting` across processes to query entities, run actions,
 inspect returned values, open a project, and inspect on-screen annotations,
 including opting out while keeping explicit project selection usable.
 CodeQL uses its supported Xcode 26.6 / Swift 6.3 toolchain, including all session
-creation code. The iOS 27-only opening schema and reindexing hooks compile with
+creation code. The iOS 27 SDK opening schema, on-screen annotations, and reindexing hooks compile with
 Swift 6.4 and are covered by the Xcode 27 build and system integration tests.
 If the runtime rejects this framework with security error 803, those tests
 explicitly skip; other errors fail. Existing live daemon and Claude tests need

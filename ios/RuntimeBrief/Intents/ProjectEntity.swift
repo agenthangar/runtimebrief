@@ -202,11 +202,17 @@ actor ProjectsStore {
         // whose every phrase embeds \(\.$project) are never registered and the
         // spoken project name can't be resolved.
         RuntimeBriefShortcuts.updateAppShortcutParameters()
-        await discovery?.synchronize(projects: fresh)
+        await discovery?.schedule(projects: fresh) {
+            await self.isCurrent(revision: startingRevision, isDemo: isDemo)
+        }
         guard startingRevision == revision, isDemo == RuntimeBriefModeStore.isDemoEnabled else {
             throw CancellationError()
         }
         return fresh
+    }
+
+    private func isCurrent(revision: Int, isDemo: Bool) -> Bool {
+        revision == self.revision && isDemo == RuntimeBriefModeStore.isDemoEnabled
     }
 
     func cachedSnapshot() -> (projects: [ProjectSummary], fetchedAt: Date?) {

@@ -133,18 +133,24 @@ struct SiriBriefTests {
         #expect(await store.cachedSnapshot().projects.isEmpty)
     }
 
-    @Test func clearingConnectionRejectsARefreshAwaitingSpotlight() async throws {
+    @Test(.timeLimit(.minutes(1))) func slowSpotlightDoesNotDelayReadsOrRestoreQueuedDataAfterClear() async throws {
         let index = BlockingProjectIndex()
         let store = ProjectsStore(defaults: UserDefaults(suiteName: "siri-tests-\(UUID().uuidString)")!,
                                   discovery: ProjectDiscovery(index: index))
         let (live, _) = try source(projects: DemoData.projects)
         let refresh = Task { try await store.refresh(dataSource: live) }
         while await !index.started { await Task.yield() }
+        // The index is still blocked, but the read must already be usable.
+        #expect(try await refresh.value.count == 3)
+        let (newer, _) = try source(projects: Array(DemoData.projects.prefix(1)))
+        #expect(try await store.briefSnapshot(dataSource: newer).projects.count == 1)
         let clear = Task { await store.clear() }
         while await !store.cachedSnapshot().projects.isEmpty { await Task.yield() }
         await index.resume()
         await clear.value
-        await #expect(throws: CancellationError.self) { _ = try await refresh.value }
+        #expect(await store.cachedSnapshot().projects.isEmpty)
+        // The queued one-project write must be rejected after the clear.
+        #expect(await index.writes.map(\.count) == [3, 0])
     }
 
     @MainActor @Test func actualIntentsReturnBriefsEntitiesAndNavigateInOfflineDemo() async throws {
@@ -174,10 +180,12 @@ struct SiriBriefTests {
         #expect(try await ask.perform().value?.contains("fictional demo response") == true)
         _ = try await OpenProjectIntent(target: project).perform()
         #expect(ProjectNavigation.shared.path.map(\.id) == [project.id])
+        #if compiler(>=6.4)
         if #available(iOS 27.0, *) {
             _ = try await OpenProjectWithSiriIntent(target: project).perform()
             #expect(ProjectNavigation.shared.path.map(\.id) == [project.id])
         }
+        #endif
         status.project = ProjectEntity(id: "missing", name: "Missing")
         await #expect(throws: SiriIntentFailure.self) { _ = try await status.perform() }
     }
@@ -229,8 +237,10 @@ private actor BlockingProjectsTransport: HTTPTransport {
 
 private actor BlockingProjectIndex: ProjectSearchIndex {
     var started = false
+    var writes: [[String]] = []
     private var continuation: CheckedContinuation<Void, Never>?
     func replace(with projects: [ProjectEntity]) async throws {
+        writes.append(projects.map(\.id))
         guard !started else { return }
         await withCheckedContinuation { continuation in
             self.continuation = continuation

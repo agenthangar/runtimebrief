@@ -31,10 +31,22 @@ actor ProjectDiscovery {
     init(index: any ProjectSearchIndex) { self.index = index }
 
     func synchronize(projects: [ProjectSummary], enabled: Bool? = nil, isDemo: Bool? = nil) async {
+        await enqueue(projects: projects, enabled: enabled, isDemo: isDemo).value
+    }
+
+    /// Enqueue maintenance without making a Siri read wait for Spotlight.
+    /// Revalidate queued data when its turn arrives, after any slow older write.
+    func schedule(projects: [ProjectSummary], isCurrent: @escaping @Sendable () async -> Bool) {
+        _ = enqueue(projects: projects, isCurrent: isCurrent)
+    }
+
+    private func enqueue(projects: [ProjectSummary], enabled: Bool? = nil, isDemo: Bool? = nil,
+                         isCurrent: @escaping @Sendable () async -> Bool = { true }) -> Task<Void, Never> {
         let previous = pending
         let index = index
         let task = Task {
             await previous?.value
+            guard await isCurrent() else { return }
             let canIndex = (enabled ?? ProjectDiscoverySettings.isEnabled)
                 && !(isDemo ?? RuntimeBriefModeStore.isDemoEnabled)
             let entities = canIndex ? projects.map(ProjectEntity.init(summary:)) : []
@@ -43,7 +55,7 @@ actor ProjectDiscovery {
             try? await index.replace(with: entities)
         }
         pending = task
-        await task.value
+        return task
     }
 
     static func updateFromSavedProjects() async {

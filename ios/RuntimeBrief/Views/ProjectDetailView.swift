@@ -62,7 +62,7 @@ struct ProjectDetailView: View {
             .padding()
         }
         .scrollDismissesKeyboard(.interactively)
-        .appEntityIdentifier(discoveryEnabled ? EntityIdentifier(for: ProjectEntity(summary: project)) : nil)
+        .projectEntityContext(project, enabled: discoveryEnabled)
         .navigationTitle(project.name)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
