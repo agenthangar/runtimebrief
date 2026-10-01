@@ -16,12 +16,12 @@ function setup(projectCount = 1) {
   const config = testConfig({ projects: Array.from({ length: projectCount }, (_, index) => ({ id: index === 0 ? "fixture" : `fixture-${index}`, name: `Fixture ${index}`, path: root, allowed_actions: [] })) });
   const provider: ClaudeProvider = { capability: async () => ({ available: true, message: "Ready" }), start: vi.fn(), sessions: async () => [], desktopHas: () => false, open: vi.fn() };
   const store = new LaunchStore(path.join(root, "receipts.db"));
-  const backends: ClaudeSessionBackend[] = (["codex", "cursor"] as const).map(provider => ({
+  const backends: ClaudeSessionBackend[] = (["codex", "cursor", "claude"] as const).map(provider => ({
     id: `native-${provider}`, provider, capability: async () => ({ available: true, message: "Ready" }),
     create: vi.fn(async () => {}), get: vi.fn(async receipt => ({ ...receipt, state: "running", remoteControl: { state: receipt.requestedRemoteControl === false ? "disabled" : "ready", url: null, observedAt: new Date().toISOString() } })),
     open: vi.fn(), terminal: vi.fn(async () => ({ screen: "Fictional", cols: 80, rows: 24, writable: true, message: "Ready" })), input: vi.fn(async () => {}),
   }));
-  const service = new LaunchService(config, provider, store, undefined, backends);
+  const service = new LaunchService(config, provider, store, backends[2], backends);
   const app = buildServer({ config, adapters: [], analyst: {} as never, launches: service });
   cleanup.push(() => app.close());
   return { config, app, service, backends, store, root };
@@ -30,6 +30,19 @@ const task = (provider: string, extra = {}) => ({ provider, requestId: randomUUI
 const sessions = "/v1/projects/fixture/sessions";
 
 describe("native provider sessions and remote terminal", () => {
+  it.each(["claude", "codex", "cursor"])("accepts short, trimmed %s tasks without a minimum description length", async provider => {
+    const f = setup();
+    for (const prompt of ["x", "ok", "  go  ", "x".repeat(8000)]) {
+      const response = await f.app.inject({ method: "POST", url: sessions, headers: authHeaders(), payload: { ...task(provider), prompt } });
+      expect(response.statusCode).toBe(202);
+      expect(f.backends.find(b => b.provider === provider)!.create).toHaveBeenLastCalledWith(expect.objectContaining({ provider, workspaceKind: "project" }), prompt.trim());
+    }
+    for (const prompt of ["", " \n\t ", "/command", "bad\u0007prompt", "x".repeat(8001)]) {
+      expect((await f.app.inject({ method: "POST", url: sessions, headers: authHeaders(), payload: { ...task(provider), prompt } })).statusCode).toBe(400);
+    }
+    expect(f.backends.find(b => b.provider === provider)!.create).toHaveBeenCalledTimes(4);
+    expect(f.store.list("fixture")).toHaveLength(4);
+  });
   it("serves cached cards while provider health and reconciliation are pending", async () => {
     const f = setup();
     const receipt = await f.service.start("fixture", randomUUID(), "Inspect the fictional workflow", { provider: "codex", model: "default", permissionMode: "manual" });

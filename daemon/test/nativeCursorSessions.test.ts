@@ -39,4 +39,24 @@ describe("native Cursor conversation evidence", () => {
     expect(parsed.state).toBe("interrupted"); expect(parsed.finalAssistantText).toBeNull();
     expect(parsed.stateReason).toContain("stopped");
   });
+  it("surfaces selected-project ACP sessions without a UUID worktree and keeps other projects separate", async () => {
+    const f = fixture();
+    fs.rmSync(f.cwd, { recursive: true, force: true });
+    fs.writeFileSync(f.file, JSON.stringify({ ...f.value, cwd: f.repo, projectRoot: f.repo, workspaceKind: "project" }));
+    const parsed = await parseNativeCursorSnapshot(f.file, f.root);
+    expect(parsed).toMatchObject({ sessionId: f.nativeID, cwd: fs.realpathSync(f.repo), state: "completed", finalAssistantText: "The fictional export is ready." });
+    expect(await nativeCursorRefs(fixtureProject(f.repo), f.root, 10)).toHaveLength(1);
+    const other = makeFixtureRepo(); cleanup.push(other);
+    expect(await nativeCursorRefs(fixtureProject(other), f.root, 10)).toEqual([]);
+    fs.writeFileSync(f.file, JSON.stringify({ ...f.value, cwd: other, projectRoot: f.repo, workspaceKind: "project" }));
+    await expect(parseNativeCursorSnapshot(f.file, f.root)).rejects.toThrow("mismatch");
+    expect(await nativeCursorRefs(fixtureProject(other), f.root, 10)).toEqual([]);
+  });
+  it("supports exact project-folder evidence without Git metadata", async () => {
+    const f = fixture(), plain = tmpdir("plain-cursor-project"); cleanup.push(plain);
+    fs.writeFileSync(f.file, JSON.stringify({ ...f.value, cwd: plain, projectRoot: plain, workspaceKind: "project" }));
+    expect(await nativeCursorRefs(fixtureProject(plain), f.root, 10)).toHaveLength(1);
+    fs.writeFileSync(f.file, JSON.stringify({ ...f.value, cwd: plain, projectRoot: plain, workspaceKind: "unexpected" }));
+    expect(await nativeCursorRefs(fixtureProject(plain), f.root, 10)).toEqual([]);
+  });
 });

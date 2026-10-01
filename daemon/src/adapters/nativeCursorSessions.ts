@@ -37,7 +37,8 @@ async function ownerLive(file: string, cwd: string) {
 export async function parseNativeCursorSnapshot(file: string, root = configDir()): Promise<ParsedSession> {
   if (!isNativeCursorSnapshot(file, root)) throw Error("Invalid native snapshot path");
   const value = json(file);
-  const cwd = fs.realpathSync(path.join(root, "native-worktrees", path.basename(path.dirname(file))));
+  if (value.workspaceKind !== undefined && !["project", "worktree"].includes(value.workspaceKind)) throw Error("Invalid native workspace kind");
+  const cwd = fs.realpathSync(value.workspaceKind === "project" ? value.projectRoot : path.join(root, "native-worktrees", path.basename(path.dirname(file))));
   if (value.provider !== "cursor" || !uuid.test(value.sessionId) || fs.realpathSync(value.cwd) !== cwd
     || !Array.isArray(value.messages) || value.messages.length > 200) throw Error("Native workspace identity mismatch");
   const messages = value.messages.filter((m: any) => typeof m.text === "string");
@@ -61,7 +62,11 @@ export async function nativeCursorRefs(project: ProjectConfig, root: string, lim
   try { entries = fs.readdirSync(path.join(root, "native-launches")).filter(id => uuid.test(id)); } catch { return []; }
   const candidates = entries.flatMap(id => {
     const file = path.join(root, "native-launches", id, "state.json");
-    try { const value = json(file); return value.provider === "cursor" && sharesGitRepository(value.cwd, project.path) ? [{ file, time: fs.statSync(file).mtimeMs }] : []; } catch { return []; }
+    try {
+      const value = json(file);
+      const matchesProject = fs.realpathSync(value.cwd) === fs.realpathSync(project.path) || sharesGitRepository(value.cwd, project.path);
+      return value.provider === "cursor" && matchesProject ? [{ file, time: fs.statSync(file).mtimeMs }] : [];
+    } catch { return []; }
   }).sort((a, b) => b.time - a.time).slice(0, limit);
   const refs = await Promise.all(candidates.map(async ({ file }): Promise<TranscriptRef[]> => {
     try {

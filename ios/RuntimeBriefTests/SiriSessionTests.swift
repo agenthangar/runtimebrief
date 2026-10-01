@@ -43,6 +43,33 @@ struct SiriSessionTests {
         }
     }
 
+    @Test func shortTasksReachConfirmationAndDispatchForEveryProvider() async throws {
+        for provider in AgentProvider.allCases {
+            for task in ["x", "  ok  "] {
+                let transport = SessionTransport(provider: provider)
+                var confirmed = false
+                _ = try await SiriSessionLauncher.run(project: project, provider: provider, task: task,
+                    source: source(transport), scope: "fixture", isDemo: false, defaults: defaults()) { _, prompt in
+                    #expect(prompt == task.trimmingCharacters(in: .whitespacesAndNewlines))
+                    confirmed = true
+                }
+                #expect(confirmed)
+                let post = try #require(transport.recorder.requests.last)
+                #expect(post.httpMethod == "POST")
+                let body = try JSONSerialization.jsonObject(with: #require(post.httpBody)) as! [String: Any]
+                #expect(body["prompt"] as? String == task.trimmingCharacters(in: .whitespacesAndNewlines))
+            }
+            let transport = SessionTransport(provider: provider)
+            await #expect(throws: SiriIntentFailure.self) {
+                try await SiriSessionLauncher.run(project: project, provider: provider, task: " \n\t ",
+                    source: source(transport), scope: "fixture", isDemo: false, defaults: defaults()) { _, _ in
+                    Issue.record("An empty task reached confirmation")
+                }
+            }
+            #expect(transport.recorder.requests.isEmpty)
+        }
+    }
+
     @Test func cancellationDoesNotWriteOrReserveRetryIdentity() async throws {
         let transport = SessionTransport(provider: .codex)
         let storage = defaults()

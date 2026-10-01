@@ -138,6 +138,14 @@ describe("native Claude launch lifecycle", () => {
 });
 
 describe("Claude launch API", () => {
+  it("accepts a short task through the legacy Claude endpoint", async () => {
+    const { config, service, provider } = setup();
+    const app = buildServer({ config, adapters: [], analyst: {} as never, launches: service });
+    service.close = () => {}; cleanups.push(() => app.close());
+    const response = await app.inject({ method: "POST", url: "/v1/projects/fixture/claude-launches", headers: authHeaders(), payload: { requestId: randomUUID(), prompt: "  ok  " } });
+    expect(response.statusCode).toBe(202);
+    expect(provider.start).toHaveBeenCalledWith(expect.any(String), expect.any(String), "ok", expect.any(Object));
+  });
   it("authenticates both mutations and rejects unsafe input before spawning", async () => {
     const { config, service, provider } = setup();
     const app = buildServer({ config, adapters: [], analyst: {} as never, launches: service });
@@ -205,15 +213,15 @@ describe("replaceable session backend", () => {
     expect(receipts[0]).toMatchObject({ backend: "native-claude", requestedRemoteControl: true, projectRoot: fs.realpathSync(f.dir) });
   });
 
-  it("persists the Codex project workspace before dispatch so background reads cannot infer a UUID worktree", async () => {
-    const f = setup(); const codex = backend(); Object.assign(codex, { id: "native-codex", provider: "codex" });
-    const service = new LaunchService(f.config, f.provider, f.store, undefined, [codex]);
-    vi.mocked(codex.create).mockImplementation(async receipt => {
+  it.each(["claude", "codex", "cursor"] as const)("persists the %s project workspace before dispatch so background reads cannot infer a UUID worktree", async provider => {
+    const f = setup(); const native = backend(); Object.assign(native, { id: `native-${provider}`, provider });
+    const service = new LaunchService(f.config, f.provider, f.store, provider === "claude" ? native : undefined, [native]);
+    vi.mocked(native.create).mockImplementation(async receipt => {
       expect(f.store.get(receipt.id, "fixture")).toMatchObject({ workspaceKind: "project", cwd: fs.realpathSync(f.dir), projectRoot: fs.realpathSync(f.dir) });
     });
-    const receipt = await service.start("fixture", randomUUID(), "Inspect the fictional workflow", { provider: "codex", model: "default", permissionMode: "manual" });
-    expect(receipt).toMatchObject({ backend: "native-codex", workspaceKind: "project" });
-    expect(codex.create).toHaveBeenCalledTimes(1);
+    const receipt = await service.start("fixture", randomUUID(), "Inspect the fictional workflow", { provider, model: "default", permissionMode: "manual" });
+    expect(receipt).toMatchObject({ backend: `native-${provider}`, workspaceKind: "project" });
+    expect(native.create).toHaveBeenCalledTimes(1);
     expect(f.provider.start).not.toHaveBeenCalled();
   });
 

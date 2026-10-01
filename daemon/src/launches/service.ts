@@ -135,7 +135,7 @@ export class LaunchService {
       ...(resolved ? { effectiveModel: resolved.model, effectiveReasoningEffort: resolved.reasoningEffort } : {}),
       ...(backend ? {
         backend: backend.id, projectRoot: cwd, projectName: project.name, promptHash: promptHash(prompt),
-        ...(backend.id === "native-codex" ? { workspaceKind: "project" as const } : {}),
+        ...(["native-claude", "native-codex", "native-cursor"].includes(backend.id) ? { workspaceKind: "project" as const } : {}),
         launchState: "starting" as const, activity: "unknown" as const,
         requestedRemoteControl: options.remoteControl !== false,
       } : {}),
