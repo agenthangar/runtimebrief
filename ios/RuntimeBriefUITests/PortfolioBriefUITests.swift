@@ -88,7 +88,7 @@ final class PortfolioBriefUITests: XCTestCase {
     }
 
     @MainActor
-    func testPortfolioBriefEvidenceAndOptInAnalyst() throws {
+    func testPortfolioBriefEvidenceAndOptInAnalyst() async throws {
         let environment = ProcessInfo.processInfo.environment
         let testBundle = Bundle(for: Self.self)
         let serverURL = environment["RUNTIMEBRIEF_E2E_SERVER_URL"]
@@ -129,6 +129,16 @@ final class PortfolioBriefUITests: XCTestCase {
             .matching(NSPredicate(format: "identifier BEGINSWITH 'project-link-'"))
             .firstMatch
         XCTAssertTrue(projectLink.waitForExistence(timeout: 5))
+        let selectedProjectID = String(projectLink.identifier.dropFirst("project-link-".count))
+        var request = URLRequest(url: try XCTUnwrap(URL(string: "\(serverURL)/v1/projects/\(selectedProjectID)")))
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let (data, response) = try await URLSession.shared.data(for: request)
+        XCTAssertEqual((response as? HTTPURLResponse)?.statusCode, 200)
+        let projectData = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        let releaseData = try XCTUnwrap(projectData["iosRelease"] as? [String: Any])
+        let storeData = try XCTUnwrap(releaseData["appStoreConnect"] as? [String: Any])
+        let hasTestFlightBuild = storeData["latestTestFlightBuild"] as? [String: Any] != nil
+        let hasAppStoreVersion = storeData["appStoreVersion"] as? [String: Any] != nil
         projectLink.tap()
 
         let briefToggle = app.buttons["brief-section-toggle"]
@@ -176,7 +186,7 @@ final class PortfolioBriefUITests: XCTestCase {
         )
 
         let releaseToggle = app.buttons["ios-release-section-toggle"]
-        for _ in 0..<4 where !releaseToggle.exists {
+        for _ in 0..<30 where !releaseToggle.isHittable {
             app.swipeUp()
         }
         XCTAssertTrue(
@@ -189,19 +199,15 @@ final class PortfolioBriefUITests: XCTestCase {
         let testFlightLabel = app.staticTexts["TestFlight"]
         let appStoreLabel = app.staticTexts["App Store"]
         for _ in 0..<4 {
-            if testFlightLabel.exists, appStoreLabel.exists {
+            if (!hasTestFlightBuild || testFlightLabel.exists), (!hasAppStoreVersion || appStoreLabel.exists) {
                 break
             }
             app.swipeUp()
         }
-        XCTAssertTrue(
-            testFlightLabel.waitForExistence(timeout: 5),
-            "The expanded iOS release section should show its TestFlight build."
-        )
-        XCTAssertTrue(
-            appStoreLabel.waitForExistence(timeout: 5),
-            "The expanded iOS release section should show its App Store version."
-        )
+        if hasTestFlightBuild { XCTAssertTrue(testFlightLabel.waitForExistence(timeout: 5)) }
+        else { XCTAssertFalse(testFlightLabel.exists, "A project without a TestFlight build must not fabricate one.") }
+        if hasAppStoreVersion { XCTAssertTrue(appStoreLabel.waitForExistence(timeout: 5)) }
+        else { XCTAssertFalse(appStoreLabel.exists, "A project without an App Store version must not fabricate one.") }
 
         XCTAssertEqual(releaseToggle.value as? String, "Expanded")
         releaseToggle.tap()
@@ -215,7 +221,7 @@ final class PortfolioBriefUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Xcode"].waitForExistence(timeout: 5))
 
         let sessionsToggle = app.buttons["sessions-section-toggle"]
-        for _ in 0..<6 where !sessionsToggle.exists {
+        for _ in 0..<30 where !sessionsToggle.isHittable {
             app.swipeUp()
         }
         XCTAssertTrue(

@@ -7,6 +7,8 @@ import { isSensitivePath } from "../secretFilter.js";
 import type { ParsedSession } from "./claudeCodeSessions.js";
 import { cwdMatchesProject } from "./codexSessions.js";
 import { sharesGitRepository } from "./gitWorkspace.js";
+import { configDir } from "../config.js";
+import { isNativeCursorSnapshot, nativeCursorRefs, parseNativeCursorSnapshot } from "./nativeCursorSessions.js";
 import type {
   ActivityEvent,
   ProjectConfig,
@@ -89,6 +91,7 @@ export class CursorSessionsAdapter implements RuntimeAdapter {
     private readonly defaultRoot: string = DEFAULT_CURSOR_ROOT,
     private readonly defaultIdeDbPath: string | null =
       defaultRoot === DEFAULT_CURSOR_ROOT ? defaultCursorIdeDbPath() : null,
+    private readonly managedRoot: string | null = defaultRoot === DEFAULT_CURSOR_ROOT ? configDir() : null,
   ) {}
 
   private root(project: ProjectConfig): string {
@@ -145,7 +148,9 @@ export class CursorSessionsAdapter implements RuntimeAdapter {
       }
     }
 
-    return deduplicateCursorRefs(refs)
+    const native = this.managedRoot ? await nativeCursorRefs(project, this.managedRoot, limit) : [];
+    const nativeIDs = new Set(native.map(ref => ref.id));
+    return deduplicateCursorRefs([...native, ...refs.filter(ref => !nativeIDs.has(ref.id))])
       .sort((a, b) => transcriptTime(b) - transcriptTime(a))
       .slice(0, limit);
   }
@@ -1135,6 +1140,7 @@ function readMetaJson(metaPath: string): SessionMeta | null {
 }
 
 export async function parseCursorSessionDir(sessionDir: string): Promise<ParsedSession> {
+  if (isNativeCursorSnapshot(sessionDir)) return parseNativeCursorSnapshot(sessionDir);
   const ide = decodeCursorIdeTranscriptPath(sessionDir);
   if (ide) return parseCursorIdeSession(ide.dbPath, ide.composerId);
   const session = emptyCursorSession(path.basename(sessionDir));

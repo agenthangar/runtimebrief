@@ -32,13 +32,19 @@ final class AgentSessionUITests: XCTestCase {
             let before = Set(cards.allElementsBoundByIndex.map(\.identifier))
             newTask.tap()
             app.buttons["session-provider-picker"].tap(); app.buttons[provider].tap()
+            let modelPicker = app.buttons["session-model-picker"]
+            XCTAssertTrue(modelPicker.waitForExistence(timeout: 5))
+            XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == true"), object: modelPicker)], timeout: 30), .completed)
             let permissions = app.buttons["session-permissions-picker"]
             for _ in 0..<4 where !permissions.isHittable { app.swipeUp() }
             permissions.tap(); app.buttons[provider == "Codex" ? "Plan" : "Ask"].tap()
             let prompt = app.textFields["claude-task-prompt"]
             for _ in 0..<4 where !prompt.isHittable { app.swipeDown() }
-            prompt.tap(); prompt.typeText("Do not run tools or change files. Reply IOS_NATIVE_BEGIN only.")
-            app.buttons["start-claude-task"].tap()
+            prompt.tap(); prompt.typeText("Do not run tools or change files. Reply IOS_NATIVE_BEGIN only. Fixture run \(UUID().uuidString).")
+            let start = app.buttons["start-claude-task"]
+            XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == true"), object: start)], timeout: 30), .completed)
+            start.tap()
+            XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: prompt)], timeout: 90), .completed)
             XCTAssertTrue(newTask.waitForExistence(timeout: 90))
             let card = cards.matching(NSPredicate(format: "NOT (identifier IN %@)", Array(before))).firstMatch
             XCTAssertTrue(card.waitForExistence(timeout: 20))

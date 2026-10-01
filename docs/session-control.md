@@ -13,6 +13,12 @@ are retained privately but omitted from the new task list; they are not replayed
 | Codex | A persistent local App Server connection creates a non-ephemeral thread and starts turns. Native notifications drive messages, completion, and approval requests. |
 | Cursor | A persistent local ACP connection uses the existing Cursor login, creates a session, and handles prompts, updates, questions, plans, and permission requests. |
 
+Cursor ACP conversations also feed portfolio evidence and analyst context from
+their private native snapshots when no desktop transcript exists. The reader
+checks the exact worktree and native session identity, deduplicates matching
+desktop history, and verifies the owner before showing an active or waiting
+state. A stopped owner cannot leave an actionable approval in the portfolio.
+
 Every task gets a Git worktree under private RuntimeBrief storage, based on
 local HEAD. This does not copy uncommitted changes or fetch from the network.
 The selected provider runs in that exact worktree. The detached owner survives

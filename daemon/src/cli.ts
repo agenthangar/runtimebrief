@@ -96,7 +96,7 @@ Usage:
   runtimebriefd add-project-root <path> Trust a directory and auto-discover its
                                        direct child Git repositories
   runtimebriefd install-service        Install a launchd service (macOS)
-  runtimebriefd enable-claude <id>      Restore native Claude launches for a project
+  runtimebriefd enable-claude <id>      Restore coding agent tasks for a project
   runtimebriefd disable-claude <id>     Revoke launch access for a project
   runtimebriefd mcp                    Serve RuntimeBrief tools over MCP stdio
 
@@ -441,7 +441,7 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<void
       explicit.allowed_actions = explicit.allowed_actions.filter(action => action !== CLAUDE_LAUNCH_ACTION);
       explicit.claude_launch_enabled = command === "enable-claude";
       saveConfig(config);
-      console.log(`Claude launches ${command === "enable-claude" ? "enabled" : "disabled"} for ${project.id}. Restart the daemon to apply.`);
+      console.log(`Coding agent tasks ${command === "enable-claude" ? "enabled" : "disabled"} for ${project.id}. Restart the daemon to apply.`);
       return;
     }
     case "mcp":

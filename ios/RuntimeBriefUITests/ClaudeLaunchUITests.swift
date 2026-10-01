@@ -32,8 +32,14 @@ final class ClaudeLaunchUITests: XCTestCase {
         let prompt = app.textFields["claude-task-prompt"]
         XCTAssertTrue(prompt.waitForExistence(timeout: 5))
         prompt.tap()
-        prompt.typeText("Read README.md and reply IOS-NATIVE-HANDOFF-READY. Do not modify files or run commands.")
-        app.buttons["start-claude-task"].tap()
+        prompt.typeText("Read README.md and reply IOS-NATIVE-HANDOFF-READY. Do not modify files or run commands. Fixture run \(UUID().uuidString).")
+        let start = app.buttons["start-claude-task"]
+        XCTAssertTrue(start.waitForExistence(timeout: 5))
+        let ready = NSPredicate(format: "enabled == 1")
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: ready, object: start)], timeout: 30), .completed)
+        start.tap()
+        let dismissed = NSPredicate(format: "exists == 0")
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: dismissed, object: prompt)], timeout: 50), .completed)
         XCTAssertTrue(newTask.waitForExistence(timeout: 50))
         let newCard = cards.matching(NSPredicate(format: "NOT (identifier IN %@)", Array(existingIDs))).firstMatch
         XCTAssertTrue(newCard.waitForExistence(timeout: 30))
