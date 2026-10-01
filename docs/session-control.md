@@ -10,7 +10,7 @@ are retained privately but omitted from the new task list; they are not replayed
 | Provider | Execution and continuation |
 | --- | --- |
 | Claude Code | Detached PTY owner starts the native CLI with a fixed session UUID and Remote Control. Native history confirms prompt acceptance and the exact connection URL. Claude owns setup, trust, tools, and permission prompts. |
-| Codex | A persistent local App Server connection creates a non-ephemeral thread and starts turns. Native notifications drive messages, completion, and approval requests. |
+| Codex | App Server resolves the repository's native project before creating a durable thread in the isolated worktree. Native notifications drive messages and approvals. Its process closes after each turn to release ownership to native Codex. A RuntimeBrief follow-up verifies and resumes the same thread. |
 | Cursor | A persistent local ACP connection uses the existing Cursor login, creates a session, and handles prompts, updates, questions, plans, and permission requests. |
 
 Cursor ACP conversations also feed portfolio evidence and analyst context from
@@ -26,10 +26,22 @@ HTTP disconnects and daemon restarts. If it exits, RuntimeBrief reports Stopped
 or Failed; it does not redispatch an uncertain task.
 
 Native CLI/protocol identities do not by themselves prove desktop sidebar
-visibility. Claude continuation uses a verified Remote Control link. Codex and
-Cursor continuation is offered within RuntimeBrief for the live owned session.
-Restarting an exited owner or transferring a live session to another native UI
-is not performed automatically.
+visibility. Claude continuation uses a verified Remote Control link. Codex is
+assigned to its existing repository project, or one stable named project is
+created using the repository root. The UUID worktree remains the execution
+directory, not the project identity. Cursor continuation is offered within
+RuntimeBrief for the live owned session.
+
+Codex owns a task exclusively while a turn or approval is pending. On turn
+completion RuntimeBrief closes its App Server process; unsubscribing alone is
+insufficient because idle threads can remain loaded. The detached RuntimeBrief
+runner remains available without a loaded Codex thread. Follow-ups reconnect,
+read and verify the saved thread's identity, project, and exact workspace, then
+resume without changing its workspace or replaying the initial prompt. If
+native Codex already owns the task, the follow-up fails without creating a new
+thread or sending a turn. Close that native task before replying here, or
+continue in the native app. An exited RuntimeBrief runner is not restarted
+automatically, and active work is never interrupted for an implicit handoff.
 
 ## Loading and cache scope
 

@@ -16,12 +16,13 @@ import { resolveClaudeSettings, resolveCodexSettings, resolveCursorSettings } fr
 import { parseClaudeSessionFile } from "../adapters/claudeCodeSessions.js";
 import { nativeRemoteURL, promptHash } from "./identity.js";
 import { NativeProviderHealth } from "./providerHealth.js";
+import { withCodexApi } from "./codexApi.js";
 import { LaunchError, permissionModes, type ClaudeSessionBackend, type ClaudeLaunch, type LaunchCapability, type ClaudeLaunchOptions, type ConversationSnapshot, type SessionReply } from "./types.js";
 
 const exec = promisify(execFile);
 const uuid = /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/;
 const runnerScript = fileURLToPath(new URL("../../scripts/native-session.mjs", import.meta.url));
-interface State extends ConversationSnapshot { cwd: string; provider: string; sessionId: string | null; accepted: boolean; updatedAt: string }
+interface State extends ConversationSnapshot { cwd: string; provider: string; sessionId: string | null; nativeProjectId?: string; accepted: boolean; updatedAt: string }
 
 /** Direct provider adapter; a detached owner outlives daemon/UI connections. */
 export class NativeSessionBackend implements ClaudeSessionBackend {
@@ -45,6 +46,8 @@ export class NativeSessionBackend implements ClaudeSessionBackend {
       } else if (this.provider === "codex") {
         const [, { stdout: help }] = await Promise.all([exec(this.binary, ["login", "status"], { timeout: 10000 }), exec(this.binary, ["--help"], { timeout: 10000 })]);
         if (!help.includes("app-server")) throw Error();
+        try { await withCodexApi(this.binary, request => request("project/list", { limit: 1 })); }
+        catch { return { available: false, message: "Update Codex on your Mac to enable native project assignment." }; }
       } else {
         const [{ stdout }, { stdout: help }] = await Promise.all([exec(this.binary, ["status"], { timeout: 10000, env: { ...process.env, NO_COLOR: "1" } }), exec(this.binary, ["acp", "--help"], { timeout: 10000 })]);
         if (!help.includes("Agent Client Protocol")) throw Error();
@@ -81,7 +84,7 @@ export class NativeSessionBackend implements ClaudeSessionBackend {
     const directory = this.directory(launch);
     ensurePrivateDirectory(path.dirname(directory)); ensurePrivateDirectory(path.dirname(this.workspace(launch)));
     fs.mkdirSync(directory, { mode: 0o700 });
-    fs.writeFileSync(path.join(directory, "payload.json"), JSON.stringify({ id: launch.id, token: randomUUID(), provider: this.provider, binary: this.binary, projectRoot: launch.projectRoot ?? launch.cwd, cwd: this.workspace(launch), name: launch.name, prompt, model: launch.effectiveModel ?? launch.model ?? "default", mode: launch.permissionMode ?? "manual", effort: launch.effectiveReasoningEffort ?? launch.reasoningEffort ?? "default", remoteControl: launch.requestedRemoteControl !== false }), { flag: "wx", mode: 0o600 });
+    fs.writeFileSync(path.join(directory, "payload.json"), JSON.stringify({ id: launch.id, token: randomUUID(), provider: this.provider, binary: this.binary, projectRoot: launch.projectRoot ?? launch.cwd, projectName: launch.projectName, cwd: this.workspace(launch), name: launch.name, prompt, model: launch.effectiveModel ?? launch.model ?? "default", mode: launch.permissionMode ?? "manual", effort: launch.effectiveReasoningEffort ?? launch.reasoningEffort ?? "default", remoteControl: launch.requestedRemoteControl !== false }), { flag: "wx", mode: 0o600 });
     const child = spawn(process.execPath, [runnerScript, directory], { detached: true, stdio: "ignore" });
     await new Promise<void>((resolve, reject) => { child.once("spawn", resolve); child.once("error", reject); }); child.unref();
   }
@@ -94,7 +97,7 @@ export class NativeSessionBackend implements ClaudeSessionBackend {
     const owner = this.owner(launch);
     return new Promise<any>((resolve, reject) => {
       const connection = net.createConnection(owner.socket); let output = "";
-      connection.setTimeout(1500, () => connection.destroy(Error("Owner unavailable")));
+      connection.setTimeout(body.op === "reply" ? 35000 : 1500, () => connection.destroy(Error("Owner unavailable")));
       connection.once("connect", () => connection.end(JSON.stringify({ ...body, token: owner.token }) + "\n"));
       connection.on("data", data => { output += data; if (output.length > 300000) connection.destroy(Error("Oversized response")); });
       connection.once("error", reject); connection.once("end", () => { try { const response = JSON.parse(output); if (response.error) reject(new LaunchError(409, "not_ready", "The agent is busy or this request is no longer pending. Refresh the conversation.")); else resolve(response); } catch { reject(Error("Invalid owner response")); } });
@@ -115,6 +118,7 @@ export class NativeSessionBackend implements ClaudeSessionBackend {
     }
     let live = false; try { live = (await this.bridge(launch, { op: "status" })).live === true; } catch {}
     launch.cwd = state.cwd; launch.sessionId = launch.nativeId = state.sessionId;
+    if (state.nativeProjectId) launch.nativeProjectId = state.nativeProjectId;
     launch.state = state.state as ClaudeLaunch["state"]; launch.message = state.message;
     launch.launchState = state.accepted ? "started" : state.state === "failed" ? "failed" : "starting";
     launch.activity = live ? state.state === "needs_input" ? "needs_input" : state.state === "running" ? "working" : state.state === "completed" ? "idle" : "unknown" : "stopped";

@@ -6,6 +6,7 @@ import readline from 'node:readline';
 import { spawn, execFileSync } from 'node:child_process';
 import { randomUUID, createHash } from 'node:crypto';
 import * as pty from 'node-pty';
+import { NativeCodexSession } from '../dist/launches/nativeCodex.js';
 
 const directory = process.argv[2];
 const payloadFile = path.join(directory, 'payload.json');
@@ -15,7 +16,7 @@ fs.unlinkSync(payloadFile);
 const state = { cwd: payload.cwd, provider: payload.provider, sessionId: null, state: 'starting', message: 'Starting the native agent…', accepted: false, messages: [], requests: [], remoteURL: null, updatedAt: new Date().toISOString() };
 const stateFile = path.join(directory, 'state.json');
 const owner = { token: payload.token, socket: `/tmp/rb-native-${payload.id}.sock`, pid: process.pid, cwd: payload.cwd };
-let child, terminal, server, busy = false, sequence = 0, screen = '', ending = false;
+let child, codex, terminal, server, busy = false, sequence = 0, screen = '', ending = false;
 const pending = new Map(), nativeRequests = new Map();
 function canonical(value) {
   if (Array.isArray(value)) return value.map(canonical);
@@ -49,7 +50,7 @@ function finish(code) {
   try { fs.unlinkSync(owner.socket); } catch {}
   process.exit(code === 0 ? 0 : 1);
 }
-function send(value) { child.stdin.write(JSON.stringify(value) + '\n'); }
+function send(value) { if (codex) codex.send(value); else child.stdin.write(JSON.stringify(value) + '\n'); }
 function request(method, params, timeout = 30000) {
   return new Promise((resolve, reject) => {
     const id = ++sequence;
@@ -104,7 +105,7 @@ function event(msg) {
     if (msg.method === 'item/completed' && p.item?.type === 'agentMessage' && !state.messages.some(m => m.id === p.item.id)) add('assistant', p.item.text ?? '', p.item.id);
     if (msg.method === 'turn/completed') {
       busy = false; state.requests = []; nativeRequests.clear(); state.state = p.turn?.status === 'failed' ? 'failed' : p.turn?.status === 'interrupted' ? 'stopped' : 'completed';
-      state.message = state.state === 'completed' ? 'Ready to review. Continue this conversation here.' : 'This turn stopped. Review the conversation before continuing.'; save();
+      state.message = state.state === 'completed' ? 'Ready to review. Continue in Codex or here.' : 'This turn stopped. Review the conversation before continuing.'; save();
     }
     if (msg.method === 'serverRequest/resolved') { nativeRequests.delete(String(p.requestId)); state.requests = state.requests.filter(r => r.id !== String(p.requestId)); save(); }
   } else if (msg.method === 'session/update' && p.sessionId === state.sessionId) {
@@ -119,7 +120,7 @@ async function turn(text) {
   busy = true; state.state = 'running'; state.message = 'The agent is working.'; add('user', text);
   try {
     if (payload.provider === 'codex') {
-      await request('turn/start', { threadId: state.sessionId, input: [{ type: 'text', text, text_elements: [] }], ...(payload.effort !== 'default' ? { effort: payload.effort } : {}) });
+      await codex.turn(text, payload.effort);
       state.accepted = true; save();
     } else {
       // ACP prompt responses arrive when the turn finishes; keep reading permission requests.
@@ -128,7 +129,8 @@ async function turn(text) {
       state.message = state.state === 'completed' ? 'Ready to review. Continue this conversation here.' : 'This turn stopped.'; save();
     }
   } catch {
-    busy = false; failed('The native agent could not complete this turn. Check its sign-in and project setup on your Mac.');
+    busy = false; failed(payload.provider === 'codex' ? 'Codex could not accept this turn. If this task is open in Codex, continue it there or close it before replying here.' : 'The native agent could not complete this turn. Check its sign-in and project setup on your Mac.');
+    if (payload.provider === 'codex') throw Error('Codex did not confirm the turn');
   }
 }
 function approve(body) {
@@ -169,7 +171,10 @@ async function control(body) {
   }
   fs.writeFileSync(journal, JSON.stringify({ fingerprint, accepted: false }), { flag: 'wx', mode: 0o600 });
   if (body.approvalId) approve(body);
-  else if (typeof body.text === 'string' && body.text.trim()) void turn(body.text);
+  else if (typeof body.text === 'string' && body.text.trim()) {
+    if (payload.provider === 'codex') await turn(body.text);
+    else void turn(body.text);
+  }
   else throw Error('Missing response');
   fs.writeFileSync(journal, JSON.stringify({ fingerprint, accepted: true }), { mode: 0o600 });
   return { accepted: true };
@@ -192,32 +197,28 @@ try {
     terminal.onData(data => { screen = (screen + data).slice(-64000); fs.writeFileSync(path.join(directory,'screen.txt'), screen,{mode:0o600}); });
     terminal.onExit(({exitCode}) => finish(exitCode));
     state.message = 'Claude is starting. Waiting for its native conversation.'; save();
+  } else if (payload.provider === 'codex') {
+    codex = new NativeCodexSession({ ...payload, cwd: state.cwd }, event, () => { failed('Codex disconnected. Its conversation is saved on your Mac.'); finish(1); });
+    const identity = await codex.start();
+    state.sessionId = identity.sessionId; state.nativeProjectId = identity.projectId;
+    save(); void turn(payload.prompt).catch(() => {});
   } else {
-    const args = payload.provider === 'codex' ? ['app-server','--stdio'] : [...(payload.model !== 'default' ? ['--model',payload.model] : []), ...(payload.mode === 'bypassPermissions' ? ['--yolo','--sandbox','disabled'] : payload.mode === 'auto' ? ['--auto-review'] : []), 'acp'];
+    const args = [...(payload.model !== 'default' ? ['--model',payload.model] : []), ...(payload.mode === 'bypassPermissions' ? ['--yolo','--sandbox','disabled'] : payload.mode === 'auto' ? ['--auto-review'] : []), 'acp'];
     child = spawn(payload.binary, args, { cwd: state.cwd, stdio: ['pipe','pipe','pipe'], env: { ...process.env, NO_COLOR: '1' } });
     child.on('error', () => { failed('The native agent could not start. Check its installation on your Mac.'); finish(1); });
     child.on('exit', finish); child.stdin.on('error', () => finish(1));
     child.stderr.on('data', () => {}); // Vendor diagnostics may contain secrets; never expose them through API errors.
     readline.createInterface({ input: child.stdout }).on('line', line => { try { event(JSON.parse(line)); } catch {} });
-    if (payload.provider === 'codex') {
-      await request('initialize', { clientInfo: { name: 'runtimebrief', version: '1.0.0' } }); send({ jsonrpc:'2.0',method:'initialized',params:{} });
-      const policies = { manual: 'on-request', auto: 'on-request', plan: 'on-request', bypassPermissions: 'never', dontAsk: 'never' };
-      const response = await request('thread/start', { cwd: state.cwd, ephemeral: false, approvalPolicy: policies[payload.mode] ?? 'on-request', ...(payload.mode === 'auto' ? { approvalsReviewer: 'auto_review' } : {}), sandbox: payload.mode === 'bypassPermissions' ? 'danger-full-access' : payload.mode === 'plan' ? 'read-only' : 'workspace-write', ...(payload.model !== 'default' ? { model: payload.model } : {}) });
-      if (fs.realpathSync(response.thread.cwd) !== state.cwd) throw Error('Native workspace mismatch');
-      state.sessionId = response.thread.id;
-      void request('thread/name/set', { threadId: state.sessionId, name: payload.name }).catch(() => {});
-    } else {
-      const init = await request('initialize', { protocolVersion: 1, clientCapabilities: { fs: { readTextFile: false, writeTextFile: false }, terminal: false }, clientInfo: { name: 'runtimebrief', version: '1.0.0' } });
-      await request('authenticate', { methodId: 'cursor_login' });
-      const response = await request('session/new', { cwd: state.cwd, mcpServers: [] }); state.sessionId = response.sessionId;
-      const mode = payload.mode === 'plan' || payload.mode === 'ask' ? payload.mode : 'agent';
-      if (response.modes?.availableModes?.some(m => m.id === mode)) await request('session/set_mode', { sessionId: state.sessionId, modeId: mode });
-      else if (mode !== 'agent') throw Error('Requested mode unavailable');
-    }
+    await request('initialize', { protocolVersion: 1, clientCapabilities: { fs: { readTextFile: false, writeTextFile: false }, terminal: false }, clientInfo: { name: 'runtimebrief', version: '1.0.0' } });
+    await request('authenticate', { methodId: 'cursor_login' });
+    const response = await request('session/new', { cwd: state.cwd, mcpServers: [] }); state.sessionId = response.sessionId;
+    const mode = payload.mode === 'plan' || payload.mode === 'ask' ? payload.mode : 'agent';
+    if (response.modes?.availableModes?.some(m => m.id === mode)) await request('session/set_mode', { sessionId: state.sessionId, modeId: mode });
+    else if (mode !== 'agent') throw Error('Requested mode unavailable');
     save(); void turn(payload.prompt);
   }
 } catch {
   failed('The native session could not start. Check agent sign-in, workspace trust, and Git setup on your Mac.');
-  try { child?.kill(); terminal?.kill(); } catch {} finish(1);
+  try { codex?.stop(); child?.kill(); terminal?.kill(); } catch {} finish(1);
 }
-process.on('SIGTERM', () => { try { child?.kill(); terminal?.kill(); } catch {} finish(null); });
+process.on('SIGTERM', () => { try { codex?.stop(); child?.kill(); terminal?.kill(); } catch {} finish(null); });

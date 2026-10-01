@@ -170,9 +170,13 @@ the selected provider in the composer.
 
 Continuation is on by default. Claude uses its verified Remote Control link;
 Codex and Cursor offer **Open conversation** in RuntimeBrief, including explicit
-approval and question controls. A native protocol identity does not guarantee
-that a task appears in a desktop app's sidebar. The Mac and session owner must
-stay running. Stopped sessions keep their saved conversation and are not replayed.
+approval and question controls. Codex tasks belong to the repository's native
+project while executing in their isolated worktree. RuntimeBrief releases its
+Codex connection after each turn, so the saved task can be opened in Codex.
+A reply here resumes the same conversation; if another Codex app owns it,
+continue there or close it first. The Mac and RuntimeBrief owner must stay
+running for replies here. Cursor desktop sidebar visibility is not guaranteed.
+Stopped sessions keep their saved conversation and are not replayed.
 
 Paired clients can start tasks in registered projects. To revoke new launches
 and continuation, run `runtimebriefd disable-claude <project-id>` and reinstall
