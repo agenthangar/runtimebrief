@@ -92,6 +92,12 @@ appear only after native Remote Control readiness is confirmed. Codex and
 Cursor expose conversations and approval requests through authenticated,
 project-scoped endpoints. Existing config values for `claude_session_backend`
 are accepted for upgrade compatibility; new launches always use native adapters.
+Codex project APIs require the current bundled Codex CLI (0.159.0 or newer),
+independently of the analyst's pinned CLI. The native project is resolved by its
+canonical repository root before thread creation. Codex's owning process closes
+after each completed turn; a RuntimeBrief follow-up verifies and resumes the
+same saved thread. A thread open in another Codex app cannot be taken over or
+recreated implicitly. Running turns and pending approvals retain their owner.
 See [session control](../docs/session-control.md).
 
 ## Brief freshness
