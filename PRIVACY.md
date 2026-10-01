@@ -27,35 +27,45 @@ app preferences. That snapshot can include project identifiers and names,
 branches, briefs, attention state, and evidence labels. It stores the daemon
 bearer token in the iOS Keychain. Siri and App Shortcuts may receive project
 names needed to resolve RuntimeBrief requests under Apple's platform behavior.
-For Claude launches, app preferences also keep an opaque request ID indexed by
+For coding-agent launches, app preferences also keep an opaque request ID indexed by
 a fingerprint of the server, project, and task, so a retry can avoid duplicate
 dispatch. The app does not persist the task text in this retry record.
 
-## Native Claude tasks
+## Native coding-agent tasks
 
-A paired iOS client can send a task description to the Mac daemon for any
-registered project, including discovered projects, unless launches are explicitly
-disabled for that project. RuntimeBrief passes it to the local
-Claude Code process using the user's existing Claude login and normal project
-configuration. Claude can process the prompt and project contents through its
-own services and tools, subject to Claude's account policies and tool
-permissions. The client chooses the model and permission mode, with Manual as
-the default. Bypass skips tool permission checks when selected. This coding
-session is separate from RuntimeBrief's isolated evidence analyst.
+A paired client sends confirmed task descriptions to the Mac daemon for a
+registered project unless launches are explicitly disabled. RuntimeBrief starts
+Claude Code, Codex App Server, or Cursor ACP with the provider's existing login
+and native workspace configuration. The provider processes prompts, project
+contents, and tool results under its own account policies and permission mode.
+Each task runs in an isolated Git worktree based on local HEAD. This execution
+path is separate from RuntimeBrief's restricted evidence analyst.
 
-RuntimeBrief stores a launch receipt, native session identifiers, working
-directory, requested model and permission mode, status, and a request fingerprint. It does not retain the prompt or
-subprocess output in its launch database or logs. Claude retains its own native
-conversation and authentication. RuntimeBrief checks only Claude's sign-in
-status and reads session metadata, including the Desktop catalog, to confirm
-identity. Takeover uses Claude's native CLI-to-Desktop handoff. Desktop may
-apply its own permission mode when the conversation is transferred.
+The launch database stores receipts, native identifiers, workspace paths,
+selected settings, status, and request fingerprints. Detached owners keep private
+local state, bounded conversation snapshots, Claude setup screens, and durable
+reply journals. Those records may contain task text, messages, and tool details.
+They are not copied into source repositories or daemon logs. Native providers
+also retain their own conversations and authentication. RuntimeBrief checks
+sign-in and connection metadata without copying provider credentials.
+
+Claude continuation uses a verified Remote Control link. Codex and Cursor use
+structured conversation messages and explicit approval/question responses in
+RuntimeBrief. A native identity does not imply desktop sidebar visibility.
+Stopped owners are not automatically restarted and uncertain input is not replayed.
+
+iOS saves task cards in a protected cache scoped to the connected Mac and token.
+Reply preferences contain opaque IDs keyed by payload fingerprints, not message
+text. Demo data stays fictional and separate from live caches and networking.
 
 ## Codex analyst requests
 
-No model request occurs when loading the deterministic portfolio or project
-card. When the user explicitly requests analysis on macOS, RuntimeBrief starts
-one separately installed, exact Codex CLI 0.144.1 `codex app-server --stdio
+The deterministic portfolio and project card do not invoke a model. The daemon
+prepares project analyses in the background and refreshes them at the configured
+interval (three hours by default), with at most two running at once. Siri and the
+app reuse these saved answers; missing or old results queue the same background
+refresh. Explicit questions also use the analyst. For each analysis, RuntimeBrief starts
+one separately installed, exact Codex CLI 0.156.1 `codex app-server --stdio
 --strict-config` process for that request. It uses the ChatGPT OAuth login
 created by `codex login`. RuntimeBrief has no direct OpenAI or Anthropic API
 integration and no model API-key input or storage path.
@@ -128,7 +138,10 @@ RuntimeBrief data remains until it is manually removed:
   actionable; it does not delete the row.
 - `~/.runtimebrief/launches.db` and sidecars contain native task receipts and
   request fingerprints. Removing these records also removes duplicate-request
-  protection; it does not stop or delete Claude's own sessions.
+  protection; it does not stop or delete native provider sessions.
+- `~/.runtimebrief/native-launches/` holds private owner state and reply journals;
+  `native-worktrees/` holds isolated task worktrees. Removing state can erase
+  continuation and duplicate-delivery evidence. Stop the owner before cleanup.
 - `~/.runtimebrief/logs/` contains launchd stdout and stderr.
 - Codex CLI owns its saved ChatGPT OAuth login outside the RuntimeBrief data
   directory. When `auth.json` storage is used, RuntimeBrief validates only the
@@ -162,8 +175,8 @@ may stop it at any time. Trusting a project root opts in every current and
 future non-hidden direct child Git repository under that root. Users also
 choose whether to install and sign in to Codex CLI, configure App Store Connect
 access, use an iOS client or Tailscale, or connect an MCP client.
-Claude launches are enabled by default for these registered projects. Setting
-`claude_launch_enabled: false` for a project blocks new launches and handoff
+Coding-agent launches are enabled by default for these registered projects. Setting
+`claude_launch_enabled: false` for a project blocks new launches and continuation writes
 requests after daemon restart; it does not stop
 existing native Claude tasks or delete their history.
 

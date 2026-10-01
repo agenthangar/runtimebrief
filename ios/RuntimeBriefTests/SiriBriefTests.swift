@@ -26,7 +26,7 @@ struct SiriBriefTests {
         #expect(!snapshot.isSaved)
         let text = SiriBrief.project(snapshot.projects[0], snapshot: snapshot)
         #expect(text.contains("Export validation is ready to review"))
-        #expect(text.contains("Evidence updated"))
+        #expect(text.contains("Last activity"))
         #expect(!text.contains("Your Mac is unreachable"))
     }
 
@@ -240,6 +240,8 @@ private func spotlightCount(title: String) async throws -> Int {
     let context = CSSearchQueryContext()
     context.fetchAttributes = ["title"]
     let query = CSSearchQuery(queryString: "title == \"\(title)\"", queryContext: context)
+    // Keep the query alive until its asynchronous completion handler fires.
+    defer { query.cancel() }
     return try await withCheckedThrowingContinuation { continuation in
         query.foundItemsHandler = { items in count.withLock { $0 += items.count } }
         query.completionHandler = { error in

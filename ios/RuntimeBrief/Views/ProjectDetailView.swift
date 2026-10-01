@@ -9,13 +9,17 @@ struct ProjectDetailView: View {
     @State private var statusText = ""
     @State private var statusAnswer: AnalystAnswer?
     @State private var requestingStatus = false
+    @State private var statusUpdatedAt: Date?
+    @State private var statusRefreshing = false
+    @State private var statusUnavailable = false
+    @State private var statusError: String?
     @State private var thread: [QAEntry] = []
     @State private var question = ""
     @State private var asking = false
     @State private var errorMessage: String?
     @State private var briefExpanded = false
     @State private var releaseExpanded = false
-    @State private var analystExpanded = false
+    @State private var analystExpanded = true
     @State private var askExpanded = false
     @State private var sessionsExpanded = false
     @State private var commitsExpanded = false
@@ -42,21 +46,21 @@ struct ProjectDetailView: View {
                     .foregroundStyle(.indigo)
                     .accessibilityIdentifier("demo-detail-banner")
                 }
+                analystSection
                 briefSection
-                ClaudeLaunchView(project: project)
                 if let error = errorMessage {
                     ErrorBanner(message: error)
                 }
-                if let release = card?.iosRelease {
-                    iosReleaseSection(release)
-                }
-                analystSection
                 askSection
                 if let card, !card.sessions.isEmpty {
                     sessionsSection(card.sessions)
                 }
+                ClaudeLaunchView(project: project)
                 if let git = card?.git {
                     commitsSection(git)
+                }
+                if let release = card?.iosRelease {
+                    iosReleaseSection(release)
                 }
             }
             .padding()
@@ -73,8 +77,20 @@ struct ProjectDetailView: View {
         }
         .task {
             let fromIntent = ProjectNavigation.shared.consumeIntentNavigation(for: project.id)
-            await loadCard()
+            async let cardLoad: Void = loadCard()
+            async let analysisLoad: Void = loadCachedStatus()
+            _ = await (cardLoad, analysisLoad)
             if !fromIntent { await ProjectDiscovery.donateOpen(project) }
+        }
+        .task(id: analystExpanded && statusRefreshing) {
+            guard analystExpanded && statusRefreshing else { return }
+            while !Task.isCancelled && statusRefreshing {
+                do { try await Task.sleep(for: .seconds(5)) } catch { return }
+                await loadCachedStatus()
+            }
+        }
+        .onChange(of: analystExpanded) { _, expanded in
+            if expanded { Task { await loadCachedStatus() } }
         }
     }
 
@@ -101,8 +117,7 @@ struct ProjectDetailView: View {
                 VStack(alignment: .leading, spacing: 14) {
                     ForEach(brief.claims) { claim in
                         VStack(alignment: .leading, spacing: 8) {
-                            ClaimLabel(claim: claim, showEvidence: false)
-                            EvidenceList(evidence: claim.evidence)
+                            ClaimLabel(claim: claim)
                         }
                         .padding(.top, 2)
                     }
@@ -240,7 +255,7 @@ struct ProjectDetailView: View {
         }
     }
 
-    // MARK: On-demand analyst
+    // MARK: Shared cached analysis
 
     private var analystSection: some View {
         CollapsibleProjectSection(
@@ -253,38 +268,40 @@ struct ProjectDetailView: View {
         } content: {
             VStack(alignment: .leading, spacing: 10) {
                 if statusText.isEmpty && !requestingStatus {
-                    Text("Generate an interpretation only when you want one. The portfolio brief above never spends an AI query.")
+                    Text(statusUnavailable ? "Analysis is unavailable right now." : "Preparing your project analysis in the background…")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
-                    Button {
-                        Task { await streamStatus() }
-                    } label: {
-                        Label("Generate analyst update", systemImage: "sparkles")
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .accessibilityIdentifier("generate-analyst-update")
+                        .accessibilityIdentifier("analyst-update-status")
                 } else if requestingStatus && statusText.isEmpty {
                     HStack {
                         ProgressView()
-                        Text("Asking the analyst…")
+                        Text("Loading latest analysis…")
                             .foregroundStyle(.secondary)
                     }
                 } else {
-                    Text(statusText)
+                    Text(EvidencePresentation.text(statusText, evidence: statusAnswer?.evidence ?? []))
                         .font(.subheadline)
                         .lineSpacing(4)
                         .textSelection(.enabled)
+                        .accessibilityIdentifier("analyst-update-text")
                     if let answer = statusAnswer {
                         analystMetadata(answer)
-                        if let evidence = answer.evidence, !evidence.isEmpty {
-                            Text("Evidence")
-                                .font(.subheadline.weight(.semibold))
-                            EvidenceList(evidence: evidence)
+                        if let statusUpdatedAt {
+                            HStack { Text("Analyzed"); RelativeTimeText(date: statusUpdatedAt) }
+                                .font(.caption).foregroundStyle(.secondary)
                         }
                     } else if requestingStatus {
                         ProgressView().controlSize(.small)
                     }
                 }
+                if statusRefreshing {
+                    Label("Refreshing in the background…", systemImage: "arrow.triangle.2.circlepath")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                if let statusError { Text(statusError).font(.caption).foregroundStyle(.orange) }
+                Button("Check for updates") { Task { await loadCachedStatus() } }
+                    .disabled(requestingStatus)
+                    .accessibilityIdentifier("check-analyst-update")
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -292,28 +309,25 @@ struct ProjectDetailView: View {
         .background(.blue.opacity(0.07), in: RoundedRectangle(cornerRadius: 14))
     }
 
-    private func streamStatus() async {
+    private func loadCachedStatus() async {
         guard !requestingStatus else { return }
         requestingStatus = true
-        statusText = ""
-        statusAnswer = nil
-        errorMessage = nil
+        statusError = nil
         defer { requestingStatus = false }
         do {
-            for try await event in RuntimeBriefDataSourceFactory.current()
-                .streamStatus(projectID: project.id) {
-                switch event {
-                case .chunk(let text):
-                    statusText += text
-                case .done(let answer):
-                    statusText = answer.answer
-                    statusAnswer = answer
-                case .failure:
-                    errorMessage = "The analyst hit an error."
-                }
+            let status = try await RuntimeBriefDataSourceFactory.current(timeout: 6).voiceStatus(projectID: project.id)
+            statusRefreshing = status.refreshing
+            statusUnavailable = status.unavailable
+            if let answer = status.answer, !answer.isEmpty {
+                statusText = answer
+                statusAnswer = AnalystAnswer(answer: answer, costUsd: 0, cached: true, truncated: false, evidence: status.evidence)
+                statusUpdatedAt = status.analyzedAt
             }
         } catch {
-            errorMessage = (error as? RuntimeBriefError)?.errorDescription ?? error.localizedDescription
+            guard !Task.isCancelled else { return }
+            statusError = (error as? RuntimeBriefError)?.errorDescription ?? error.localizedDescription
+            statusUnavailable = true
+            statusRefreshing = false
         }
     }
 
@@ -367,7 +381,7 @@ struct ProjectDetailView: View {
                     VStack(alignment: .leading, spacing: 6) {
                         Text(entry.question)
                             .font(.subheadline.weight(.semibold))
-                        Text(entry.answer.isEmpty ? "…" : entry.answer)
+                        Text(entry.answer.isEmpty ? "…" : EvidencePresentation.text(entry.answer, evidence: entry.evidence))
                             .font(.subheadline)
                             .lineSpacing(3)
                             .textSelection(.enabled)
@@ -386,11 +400,6 @@ struct ProjectDetailView: View {
                             }
                             .font(.caption)
                             .foregroundStyle(.secondary)
-                            if !entry.evidence.isEmpty {
-                                Text("Evidence")
-                                    .font(.caption.weight(.semibold))
-                                EvidenceList(evidence: entry.evidence)
-                            }
                         }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -519,7 +528,6 @@ struct ProjectDetailView: View {
                             .font(.subheadline)
                             .lineLimit(2)
                         HStack {
-                            MonoLabel(text: String(commit.hash.prefix(7)))
                             Text(commit.author)
                                 .font(.caption)
                                 .foregroundStyle(.secondary)

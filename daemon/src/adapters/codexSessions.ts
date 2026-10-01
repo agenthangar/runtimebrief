@@ -226,9 +226,8 @@ export function cwdMatchesProject(cwd: string | null, projectPath: string): bool
 /**
  * Codex desktop sessions can be launched from a workspace that contains many
  * repositories, so session_meta.cwd may be the parent of the actual project.
- * Accept that shape only when the rollout explicitly references a path at or
- * inside the project. This avoids assigning every workspace session to every
- * project registered beneath it.
+ * Prefer the task's concrete working directories over incidental file reads.
+ * Without a focused directory, use only references in the current user turn.
  */
 export async function sessionMatchesProject(
   filePath: string,
@@ -299,6 +298,18 @@ async function scanReferencedPaths(
     ? resolvedWorkspace
     : resolvedWorkspace + path.sep;
   const found = new Set<string>();
+  const turnWorkspaces = new Set<string>();
+  let focusedWorkspaces: string[] = [];
+  const focus = (candidates: Set<string>) => {
+    for (const candidate of candidates) {
+      if (candidate !== resolvedWorkspace && cwdMatchesProject(candidate, resolvedWorkspace)) {
+        turnWorkspaces.add(candidate);
+      }
+    }
+    // Keep established ownership through follow-up questions without tools.
+    // The first scoped operation in a new turn replaces the previous owner.
+    if (turnWorkspaces.size) focusedWorkspaces = [...turnWorkspaces];
+  };
   let stream: fs.ReadStream;
   try {
     stream = fs.createReadStream(filePath, { encoding: "utf8" });
@@ -315,10 +326,21 @@ async function scanReferencedPaths(
         continue;
       }
       const payload = (record.payload ?? {}) as Record<string, unknown>;
-      const kind = stringOrNull(payload.type);
+      let kind = stringOrNull(payload.type);
       if (record.type === "event_msg") {
+        const item = kind === "item_completed" && payload.item && typeof payload.item === "object"
+          ? payload.item as Record<string, unknown>
+          : null;
+        if (item?.type === "UserMessage") kind = "user_message";
+        else if (item?.type === "AgentMessage") kind = "agent_message";
+        const message = item ? completedMessageText(item) : stringOrNull(payload.message);
         if (kind === "user_message" || kind === "agent_message") {
-          addPathsFromText(found, stringOrNull(payload.message), prefix);
+          // A later unrelated task must not revive projects from earlier turns.
+          if (kind === "user_message" && normalizeUserText(message)) {
+            found.clear();
+            turnWorkspaces.clear();
+          }
+          addPathsFromText(found, kind === "user_message" ? normalizeUserText(message) : message, prefix);
         } else if (kind === "patch_apply_end") {
           const changes = payload.changes;
           if (changes && typeof changes === "object") {
@@ -342,13 +364,15 @@ async function scanReferencedPaths(
           resolvedWorkspace,
           toolName,
         );
-        addPathsFromToolValue(
-          found,
-          payload.input,
-          prefix,
-          resolvedWorkspace,
-          toolName,
-        );
+        addPathsFromToolValue(found, payload.input, prefix, resolvedWorkspace, toolName);
+        const workspaces = new Set<string>();
+        for (const value of [payload.arguments, payload.input]) {
+          addPathsFromToolValue(workspaces, value, prefix, resolvedWorkspace, toolName, true);
+        }
+        focus(workspaces);
+      } else if (record.type === "turn_context") {
+        const cwd = stringOrNull(payload.cwd);
+        if (cwd) focus(new Set([path.resolve(cwd)]));
       }
     }
   } catch {
@@ -358,7 +382,7 @@ async function scanReferencedPaths(
     stream.destroy();
   }
 
-  const paths = [...found];
+  const paths = focusedWorkspaces.length ? focusedWorkspaces : [...found];
   referencedPathsCache.set(filePath, {
     mtimeMs: stat.mtimeMs,
     size: stat.size,
@@ -402,6 +426,9 @@ const PATH_ARGUMENT_KEYS = new Set([
 ]);
 
 const COMMAND_ARGUMENT_KEYS = new Set(["cmd", "code", "command", "script"]);
+const WORKSPACE_ARGUMENT_KEYS = new Set([
+  "cwd", "workdir", "workingdirectory", "projectpath", "repopath", "rootpath",
+]);
 
 const COMMAND_TOOL_NAMES = new Set([
   "bash",
@@ -433,6 +460,7 @@ function addPathsFromToolValue(
   prefix: string,
   workspace: string,
   toolName: string | null,
+  workspaceOnly = false,
 ): void {
   if (value === undefined || value === null) return;
   let structured: unknown = value;
@@ -440,7 +468,7 @@ function addPathsFromToolValue(
     try {
       structured = JSON.parse(value) as unknown;
     } catch {
-      addPathsFromToolSource(found, value, prefix, workspace, toolName);
+      addPathsFromToolSource(found, value, prefix, workspace, toolName, workspaceOnly);
       return;
     }
   }
@@ -450,6 +478,7 @@ function addPathsFromToolValue(
     prefix,
     workspace,
     isCommandTool(toolName),
+    workspaceOnly,
   );
 }
 
@@ -459,11 +488,12 @@ function addPathsFromStructuredToolValue(
   prefix: string,
   workspace: string,
   allowCommands: boolean,
+  workspaceOnly = false,
 ): void {
   if (Array.isArray(value)) {
     for (const child of value) {
       if (child && typeof child === "object") {
-        addPathsFromStructuredToolValue(found, child, prefix, workspace, allowCommands);
+        addPathsFromStructuredToolValue(found, child, prefix, workspace, allowCommands, workspaceOnly);
       }
     }
     return;
@@ -472,12 +502,12 @@ function addPathsFromStructuredToolValue(
 
   for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
     const normalizedKey = normalizeToolToken(key);
-    if (PATH_ARGUMENT_KEYS.has(normalizedKey)) {
+    if ((workspaceOnly ? WORKSPACE_ARGUMENT_KEYS : PATH_ARGUMENT_KEYS).has(normalizedKey)) {
       addPathArgumentValues(found, child, prefix, workspace);
     } else if (allowCommands && COMMAND_ARGUMENT_KEYS.has(normalizedKey)) {
-      addCommandArgumentValues(found, child, prefix, workspace);
+      addCommandArgumentValues(found, child, prefix, workspace, workspaceOnly);
     } else if (child && typeof child === "object") {
-      addPathsFromStructuredToolValue(found, child, prefix, workspace, allowCommands);
+      addPathsFromStructuredToolValue(found, child, prefix, workspace, allowCommands, workspaceOnly);
     }
   }
 }
@@ -499,9 +529,10 @@ function addCommandArgumentValues(
   value: unknown,
   prefix: string,
   workspace: string,
+  workspaceOnly = false,
 ): void {
   forEachDirectString(value, (command) =>
-    addPathsFromCommandText(found, command, prefix, workspace),
+    addPathsFromCommandText(found, command, prefix, workspace, workspaceOnly),
   );
 }
 
@@ -551,8 +582,9 @@ function addPathsFromCommandText(
   command: string,
   prefix: string,
   workspace: string,
+  workspaceOnly = false,
 ): void {
-  addPathsFromText(found, command, prefix);
+  if (!workspaceOnly) addPathsFromText(found, command, prefix);
 
   // Relative paths only become evidence in explicit working-directory command
   // forms. General command arguments remain text and cannot attribute a child
@@ -577,13 +609,14 @@ function addPathsFromToolSource(
   prefix: string,
   workspace: string,
   toolName: string | null,
+  workspaceOnly = false,
 ): void {
   const allowCommands = isCommandTool(toolName);
   forEachToolSourceProperty(source, (rawKey, start) => {
     const key = normalizeToolToken(rawKey);
     const literal = readToolSourceValue(source, start);
     if (!literal) return;
-    if (PATH_ARGUMENT_KEYS.has(key)) {
+    if ((workspaceOnly ? WORKSPACE_ARGUMENT_KEYS : PATH_ARGUMENT_KEYS).has(key)) {
       if (literal.quoted) {
         addPathsFromText(found, literal.text, prefix);
         addExactPathArgument(found, literal.text, workspace);
@@ -593,10 +626,10 @@ function addPathsFromToolSource(
       }
     } else if (allowCommands && COMMAND_ARGUMENT_KEYS.has(key)) {
       if (literal.quoted) {
-        addPathsFromCommandText(found, literal.text, prefix, workspace);
+        addPathsFromCommandText(found, literal.text, prefix, workspace, workspaceOnly);
       } else {
         const value = parseToolSourceCollection(literal.text);
-        if (value !== null) addCommandArgumentValues(found, value, prefix, workspace);
+        if (value !== null) addCommandArgumentValues(found, value, prefix, workspace, workspaceOnly);
       }
     }
   });

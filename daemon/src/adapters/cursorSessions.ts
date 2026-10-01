@@ -7,6 +7,8 @@ import { isSensitivePath } from "../secretFilter.js";
 import type { ParsedSession } from "./claudeCodeSessions.js";
 import { cwdMatchesProject } from "./codexSessions.js";
 import { sharesGitRepository } from "./gitWorkspace.js";
+import { configDir } from "../config.js";
+import { isNativeCursorSnapshot, nativeCursorRefs, parseNativeCursorSnapshot } from "./nativeCursorSessions.js";
 import type {
   ActivityEvent,
   ProjectConfig,
@@ -89,6 +91,7 @@ export class CursorSessionsAdapter implements RuntimeAdapter {
     private readonly defaultRoot: string = DEFAULT_CURSOR_ROOT,
     private readonly defaultIdeDbPath: string | null =
       defaultRoot === DEFAULT_CURSOR_ROOT ? defaultCursorIdeDbPath() : null,
+    private readonly managedRoot: string | null = defaultRoot === DEFAULT_CURSOR_ROOT ? configDir() : null,
   ) {}
 
   private root(project: ProjectConfig): string {
@@ -145,7 +148,9 @@ export class CursorSessionsAdapter implements RuntimeAdapter {
       }
     }
 
-    return deduplicateCursorRefs(refs)
+    const native = this.managedRoot ? await nativeCursorRefs(project, this.managedRoot, limit) : [];
+    const nativeIDs = new Set(native.map(ref => ref.id));
+    return deduplicateCursorRefs([...native, ...refs.filter(ref => !nativeIDs.has(ref.id))])
       .sort((a, b) => transcriptTime(b) - transcriptTime(a))
       .slice(0, limit);
   }
@@ -389,7 +394,7 @@ function cursorSessionMatchesProject(
   if (cwdMatchesProject(workspacePath, projectPath)) return true;
   if (sharesGitRepository(workspacePath, projectPath)) return true;
   if (!workspacePath || !cwdMatchesProject(projectPath, workspacePath)) return false;
-  return session.filesTouched.some((candidate) => {
+  return (session.latestTurnFiles ?? session.filesTouched).some((candidate) => {
     const resolved = resolvedObservedPath(candidate, workspacePath);
     return resolved ? cwdMatchesProject(resolved, projectPath) : false;
   });
@@ -471,7 +476,7 @@ function cursorProjectTranscriptMatchesProject(
   existingWorkspacePaths: string[],
 ): boolean {
   const resolvedProject = path.resolve(projectPath);
-  const absoluteObservedPaths = session.filesTouched.flatMap((candidate) => {
+  const absoluteObservedPaths = (session.latestTurnFiles ?? session.filesTouched).flatMap((candidate) => {
     const value = filePathFromValue(candidate);
     return value && path.isAbsolute(value) ? [path.resolve(value)] : [];
   });
@@ -600,6 +605,7 @@ export async function parseCursorProjectTranscript(filePath: string): Promise<Pa
         const prompt = extractUserQuery(contentText(content));
         if (prompt) {
           session.userPrompts.push(prompt);
+          session.latestTurnFiles = [];
           session.state = "active";
           session.stateReason = "The latest observed lifecycle event is a user request.";
         }
@@ -619,7 +625,10 @@ export async function parseCursorProjectTranscript(filePath: string): Promise<Pa
         if (parsed.model && !session.model) session.model = parsed.model;
         session.toolUseCount += parsed.toolUses;
         for (const file of parsed.files) {
-          if (!isSensitivePath(file)) filesTouched.add(file);
+          if (!isSensitivePath(file)) {
+            filesTouched.add(file);
+            session.latestTurnFiles?.push(file);
+          }
         }
       } else if (stringValue(record.type) === "turn_ended") {
         const status = stringValue(record.status)?.toLowerCase();
@@ -829,6 +838,9 @@ function readCursorIdeSession(
       );
       if (prompt) {
         session.userPrompts.push(prompt);
+        // IDE file-state metadata supports a single-turn task. Once the
+        // conversation changes tasks, require paths from the new turn itself.
+        session.latestTurnFiles = session.userPrompts.length == 1 ? [...filesTouched] : [];
         session.state = "active";
         session.stateReason = "The latest observed lifecycle event is a user request.";
       }
@@ -855,6 +867,11 @@ function readCursorIdeSession(
       for (const value of [tool.rawArgs, tool.params]) {
         const parsed = jsonValue(value);
         collectPathValues(parsed, filesTouched);
+        if (session.latestTurnFiles) {
+          const current = new Set<string>();
+          collectPathValues(parsed, current);
+          session.latestTurnFiles.push(...current);
+        }
       }
     } else if (text) {
       session.state = "completed";
@@ -1135,6 +1152,7 @@ function readMetaJson(metaPath: string): SessionMeta | null {
 }
 
 export async function parseCursorSessionDir(sessionDir: string): Promise<ParsedSession> {
+  if (isNativeCursorSnapshot(sessionDir)) return parseNativeCursorSnapshot(sessionDir);
   const ide = decodeCursorIdeTranscriptPath(sessionDir);
   if (ide) return parseCursorIdeSession(ide.dbPath, ide.composerId);
   const session = emptyCursorSession(path.basename(sessionDir));
@@ -1206,6 +1224,7 @@ function readConversation(
       const text = extractUserQuery(contentText(message.content));
       if (text) {
         session.userPrompts.push(text);
+        session.latestTurnFiles = [];
         session.state = "active";
         session.stateReason = "The latest observed lifecycle event is a user request.";
       }
@@ -1226,7 +1245,7 @@ function readConversation(
       if (model && !session.model) session.model = model;
       session.toolUseCount += toolUses;
       for (const f of files) {
-        if (!isSensitivePath(f)) filesTouched.add(f);
+        if (!isSensitivePath(f)) { filesTouched.add(f); session.latestTurnFiles?.push(f); }
       }
     }
     // system / tool messages are context or tool output — skipped.

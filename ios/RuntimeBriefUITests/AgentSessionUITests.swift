@@ -1,57 +1,8 @@
 import XCTest
 
 final class AgentSessionUITests: XCTestCase {
-    /// Explicit live coverage uses an isolated daemon and already-running native fixtures.
     @MainActor
-    func testLiveCodexAndCursorTerminalContinuation() async throws {
-        let environment = ProcessInfo.processInfo.environment
-        guard environment["RUNTIMEBRIEF_E2E_NATIVE_LIVE"] == "1",
-              let server = environment["RUNTIMEBRIEF_E2E_SERVER_URL"],
-              let token = environment["RUNTIMEBRIEF_E2E_TOKEN"],
-              let projectID = environment["RUNTIMEBRIEF_E2E_PROJECT_ID"],
-              let url = URL(string: "\(server)/v1/projects/\(projectID)/sessions")
-        else { throw XCTSkip("Configure an isolated native-session fixture for live terminal coverage.") }
-        var request = URLRequest(url: url)
-        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        let (data, _) = try await URLSession.shared.data(for: request)
-        let body = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
-        let launches = try XCTUnwrap(body["launches"] as? [[String: Any]])
-        continueAfterFailure = false
-        for provider in ["codex", "cursor"] {
-            let receipt = try XCTUnwrap(launches.first { $0["provider"] as? String == provider && ($0["remoteControl"] as? [String: Any])?["state"] as? String == "ready" })
-            let id = try XCTUnwrap(receipt["id"] as? String)
-            let app = XCUIApplication()
-            app.launchEnvironment["RUNTIMEBRIEF_E2E_CLEAR_STATE"] = "1"
-            app.launchEnvironment["RUNTIMEBRIEF_E2E_SERVER_URL"] = server
-            app.launchEnvironment["RUNTIMEBRIEF_E2E_TOKEN"] = token
-            app.launch()
-            let project = app.buttons["project-link-\(projectID)"]
-            XCTAssertTrue(project.waitForExistence(timeout: 15)); project.tap()
-            let receiptView = app.descendants(matching: .any)["claude-launch-\(id)"]
-            let terminal = receiptView.buttons["open-session-terminal"]
-            for _ in 0..<10 where !terminal.isHittable { app.swipeUp() }
-            XCTAssertTrue(terminal.waitForExistence(timeout: 10)); terminal.tap()
-            let input = app.textFields["session-terminal-input"]
-            XCTAssertTrue(input.waitForExistence(timeout: 10))
-            let marker = "IOS-\(provider.uppercased())-\(UUID().uuidString.prefix(8))"
-            input.tap(); input.typeText("Reply exactly \(marker). Then recall the text you put in native-proof.txt earlier.")
-            app.buttons["session-terminal-send"].tap()
-            let screen = app.descendants(matching: .any)["session-terminal-screen"]
-            // Wait for the native reply as well as the single submitted prompt echo.
-            let replied = NSPredicate { value, _ in
-                guard let element = value as? XCUIElement else { return false }
-                return element.label.components(separatedBy: marker).count >= 3
-            }
-            let observed = expectation(for: replied, evaluatedWith: screen)
-            await fulfillment(of: [observed], timeout: 45)
-            let screenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
-            screenshot.name = "\(provider) live native terminal"; screenshot.lifetime = .keepAlways; add(screenshot)
-            app.buttons["Done"].tap(); app.terminate()
-        }
-    }
-
-    @MainActor
-    func testCodexAndCursorNativeTerminalFlowInDemo() {
+    func testCodexAndCursorNativeConversationFlowInDemo() {
         continueAfterFailure = false
         for provider in ["Codex", "Cursor"] {
             let app = XCUIApplication()
@@ -70,19 +21,17 @@ final class AgentSessionUITests: XCTestCase {
             XCTAssertEqual(remoteToggle.value as? String, "1")
             app.swipeDown()
             let modelPicker = app.buttons["session-model-picker"]
-            modelPicker.tap(); app.buttons["Demo model"].tap()
-            assertSelection(modelPicker, contains: "Demo model")
+            selectMenuOption("Demo model", picker: modelPicker, app: app)
             let reasoning = app.buttons["session-reasoning-picker"]
             assertSelection(reasoning, contains: "Default")
-            reasoning.tap(); app.buttons["High"].tap()
-            assertSelection(reasoning, contains: "High")
+            selectMenuOption("High", picker: reasoning, app: app)
             let permissions = app.buttons["session-permissions-picker"]
-            permissions.tap(); app.buttons["Bypass"].tap()
-            assertSelection(permissions, contains: "Bypass")
+            selectMenuOption("Bypass", picker: permissions, app: app)
             let options = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
             options.name = "\(provider) selected model and Bypass"; options.lifetime = .keepAlways; add(options)
             let prompt = app.textFields["claude-task-prompt"]
-            prompt.tap(); prompt.typeText("Inspect the fictional native terminal")
+            for _ in 0..<6 where prompt.frame.minY < 120 || !prompt.isHittable { app.swipeDown() }
+            prompt.tap(); prompt.typeText("Inspect the fictional native conversation")
             app.buttons["start-claude-task"].tap()
             XCTAssertTrue(newTask.waitForExistence(timeout: 10))
             let settings = app.staticTexts.matching(NSPredicate(
@@ -90,21 +39,42 @@ final class AgentSessionUITests: XCTestCase {
                 "Started with", "demo-model", "Bypass"
             )).firstMatch
             XCTAssertTrue(settings.waitForExistence(timeout: 10), "The receipt must preserve the chosen model and permissions.")
-            let terminal = app.buttons["open-session-terminal"].firstMatch
+            let terminal = app.buttons["open-session-conversation"].firstMatch
             for _ in 0..<4 where !terminal.isHittable { app.swipeUp() }
             XCTAssertTrue(terminal.waitForExistence(timeout: 10)); terminal.tap()
-            let input = app.textFields["session-terminal-input"]
+            let input = app.textFields["session-conversation-input"]
             XCTAssertTrue(input.waitForExistence(timeout: 10)); input.tap(); input.typeText("FOLLOW-UP-UI")
-            app.buttons["session-terminal-send"].tap()
-            let screen = app.descendants(matching: .any)["session-terminal-screen"]
-            let received = NSPredicate(format: "label CONTAINS %@", "Demo received input")
-            expectation(for: received, evaluatedWith: screen)
-            waitForExpectations(timeout: 15)
+            app.buttons["session-conversation-send"].tap()
+            let response = app.staticTexts.matching(identifier: "session-message-assistant")
+                .matching(NSPredicate(format: "label CONTAINS %@", "Demo received your response")).firstMatch
+            XCTAssertTrue(response.waitForExistence(timeout: 15))
             let screenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
-            screenshot.name = "\(provider) remote terminal demo"; screenshot.lifetime = .keepAlways; add(screenshot)
+            screenshot.name = "\(provider) native conversation demo"; screenshot.lifetime = .keepAlways; add(screenshot)
             app.buttons["Done"].tap()
             app.terminate()
         }
+    }
+
+    @MainActor
+    private func selectMenuOption(_ label: String, picker: XCUIElement, app: XCUIApplication,
+                                  file: StaticString = #filePath, line: UInt = #line) {
+        for _ in 0..<6 {
+            if picker.frame.minY < 120 { app.swipeDown() }
+            else if picker.frame.maxY > app.frame.maxY - 160 || !picker.isHittable { app.swipeUp() }
+            else { break }
+        }
+        let option = app.buttons[label]
+        picker.tap()
+        for _ in 0..<3 {
+            XCTAssertTrue(option.waitForExistence(timeout: 3), file: file, line: line)
+            option.tap()
+            let selected = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label CONTAINS %@", label), object: picker)
+            if XCTWaiter.wait(for: [selected], timeout: 2) == .completed { return }
+            // Simulator menu taps can be ignored while its layout is settling.
+            // Retry the same visible choice and still verify the saved receipt.
+            if !option.exists { picker.tap() }
+        }
+        assertSelection(picker, contains: label, file: file, line: line)
     }
 
     @MainActor

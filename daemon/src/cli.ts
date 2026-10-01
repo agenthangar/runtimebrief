@@ -24,9 +24,7 @@ import { runRuntimeBriefMcpStdio } from "./mcp/server.js";
 import { LaunchService, CLAUDE_LAUNCH_ACTION } from "./launches/service.js";
 import { LaunchStore } from "./launches/store.js";
 import { NativeClaudeProvider } from "./launches/claude.js";
-import { TNativeBackend } from "./launches/tNative.js";
-import { TLegacyBackend } from "./launches/tLegacy.js";
-import { installPinnedT } from "./launches/tDependency.js";
+import { NativeSessionBackend } from "./launches/native.js";
 
 const commandNames = [
   "init",
@@ -35,7 +33,6 @@ const commandNames = [
   "add-project",
   "add-project-root",
   "install-service",
-  "install-t",
   "enable-claude",
   "disable-claude",
   "mcp",
@@ -44,9 +41,8 @@ const commandNames = [
 type CommandName = (typeof commandNames)[number];
 
 const commandHelp: Record<CommandName, string> = {
-  "install-t": `Usage: runtimebriefd install-t\n\nInstall RuntimeBrief's pinned, checksum-verified t dependency privately.\nYour dotfiles and existing t installation are unchanged.`,
-  "enable-claude": `Usage: runtimebriefd enable-claude <project-id>\n\nRestore native Claude tasks for a project that was disabled. Launches are enabled by default.\nClaude handles tool permissions. Restart the daemon after changing this setting.`,
-  "disable-claude": `Usage: runtimebriefd disable-claude <project-id>\n\nRevoke new Claude launches and takeover requests for this project.\nExisting native Claude sessions keep running. Restart the daemon afterwards.`,
+  "enable-claude": `Usage: runtimebriefd enable-claude <project-id>\n\nRestore coding agent tasks for a project that was disabled. Launches are enabled by default.\nClaude handles tool permissions. Restart the daemon after changing this setting.`,
+  "disable-claude": `Usage: runtimebriefd disable-claude <project-id>\n\nRevoke new coding agent launches and continuation requests for this project.\nExisting native sessions keep running. Restart the daemon afterwards.`,
   init: `Usage:
   runtimebriefd init
 
@@ -100,8 +96,7 @@ Usage:
   runtimebriefd add-project-root <path> Trust a directory and auto-discover its
                                        direct child Git repositories
   runtimebriefd install-service        Install a launchd service (macOS)
-  runtimebriefd install-t              Install the pinned t session launcher
-  runtimebriefd enable-claude <id>      Restore native Claude launches for a project
+  runtimebriefd enable-claude <id>      Restore coding agent tasks for a project
   runtimebriefd disable-claude <id>     Revoke launch access for a project
   runtimebriefd mcp                    Serve RuntimeBrief tools over MCP stdio
 
@@ -244,12 +239,13 @@ async function cmdStart(allowAll: boolean): Promise<void> {
   const analyst = createAnalystService(config, adapters, { iosReleases });
   const decisions = new DecisionStore();
   const launches = new LaunchService(config, new NativeClaudeProvider(), new LaunchStore(),
-    config.claude_session_backend === "t" ? new TLegacyBackend() : undefined,
-    [new TNativeBackend("codex"), new TNativeBackend("cursor")]);
+    new NativeSessionBackend("claude"),
+    [new NativeSessionBackend("codex"), new NativeSessionBackend("cursor")]);
   const app = await startServer(
     { config, adapters, analyst, iosReleases, decisions, launches },
     { allowAllInterfaces: allowAll },
   );
+  launches.providers();
   analyst.startBackgroundRefresh();
   console.log(
     `runtimebriefd ${VERSION} listening on http://${config.server.host}:${config.server.port} ` +
@@ -347,7 +343,6 @@ async function cmdInstallService(): Promise<void> {
     process.exit(1);
   }
   const config = loadConfig(); // fail early if not initialized
-  if (config.claude_session_backend === "t") await installPinnedT();
   const here = path.dirname(fileURLToPath(import.meta.url));
   const templatePath = path.join(here, "..", "templates", "com.runtimebrief.daemon.plist");
   const template = fs.readFileSync(templatePath, "utf8");
@@ -432,11 +427,6 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<void
     case "install-service":
       rejectUnexpected(command, rest);
       return cmdInstallService();
-    case "install-t":
-      rejectUnexpected(command, rest);
-      await installPinnedT();
-      console.log("Installed the pinned t launcher. Refresh RuntimeBrief to check session availability.");
-      return;
     case "enable-claude":
     case "disable-claude": {
       if (rest.length !== 1) throw new Error(commandHelp[command]);
@@ -451,7 +441,7 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<void
       explicit.allowed_actions = explicit.allowed_actions.filter(action => action !== CLAUDE_LAUNCH_ACTION);
       explicit.claude_launch_enabled = command === "enable-claude";
       saveConfig(config);
-      console.log(`Claude launches ${command === "enable-claude" ? "enabled" : "disabled"} for ${project.id}. Restart the daemon to apply.`);
+      console.log(`Coding agent tasks ${command === "enable-claude" ? "enabled" : "disabled"} for ${project.id}. Restart the daemon to apply.`);
       return;
     }
     case "mcp":

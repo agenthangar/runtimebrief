@@ -166,10 +166,9 @@ private final class SessionTransport: HTTPTransport, @unchecked Sendable {
             body = try encoder.encode(projects)
         } else {
             body = Data("""
-                {"capability":{"available":true,"message":"Ready"},"launches":[],
-                 "providers":[{"id":"\(provider.rawValue)","available":\(available),"message":"Needs setup",
+                {"id":"\(provider.rawValue)","available":\(available),"message":"Needs setup",
                  "models":[{"id":"demo-model","label":"Demo model","reasoningEfforts":["high"]}],
-                 "defaultModelLabel":"demo-model","permissionModes":["manual","plan"]}]}
+                 "defaultModelLabel":"demo-model","permissionModes":["manual","plan"]}
                 """.utf8)
         }
         return (body, HTTPURLResponse(url: request.url!, statusCode: status, httpVersion: nil, headerFields: nil)!)

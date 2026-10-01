@@ -171,16 +171,7 @@ struct AnalystAnswer: Codable, Sendable, Equatable {
     let evidence: [EvidenceRef]?
 
     var spokenAnswer: String {
-        let withoutCitations = answer
-            .replacingOccurrences(
-                of: #"\[[^\[\]]+\]"#,
-                with: "",
-                options: .regularExpression
-            )
-            .replacingOccurrences(of: "  ", with: " ")
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        guard evidence?.isEmpty == false else { return withoutCitations }
-        return withoutCitations + " Evidence is available in RuntimeBrief."
+        EvidencePresentation.text(answer, evidence: evidence ?? [])
     }
 }
 

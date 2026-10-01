@@ -287,6 +287,14 @@ struct DemoRuntimeBriefDataSource: RuntimeBriefDataSource {
         return await DemoClaudeTasks.shared.start(projectID: projectID, requestID: request.requestId, model: request.model, permissionMode: request.permissionMode, remoteControl: request.remoteControl)
     }
 
+    func agentProviders() async throws -> AgentProviderList { AgentProviderList(providers: await DemoClaudeTasks.shared.list(projectID: "demo").providers ?? []) }
+    func agentModels(projectID: String, provider: AgentProvider) async throws -> AgentCapability {
+        _ = try DemoData.card(id: projectID)
+        guard let capability = await DemoClaudeTasks.shared.list(projectID: projectID).providers?.first(where: { $0.id == provider }) else { throw RuntimeBriefError.notFound }
+        return capability
+    }
+    func conversation(projectID: String, launchID: String) async throws -> ConversationSnapshot { try await DemoClaudeTasks.shared.conversation(projectID: projectID, launchID: launchID) }
+    func reply(projectID: String, launchID: String, reply: SessionReply) async throws -> SessionReplyResult { try await DemoClaudeTasks.shared.reply(projectID: projectID, launchID: launchID, reply: reply) }
     func sessions(projectID: String) async throws -> ClaudeLaunchList { try await claudeLaunches(projectID: projectID) }
     func startSession(projectID: String, request: SessionLaunchRequest) async throws -> ClaudeLaunch {
         _ = try DemoData.card(id: projectID)

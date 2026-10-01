@@ -822,6 +822,8 @@ export interface ParsedSession {
   /** Last assistant text output in the main thread (what the agent concluded). */
   finalAssistantText: string | null;
   filesTouched: string[];
+  /** Current-turn paths for parent-workspace attribution; history stays separate. */
+  latestTurnFiles?: string[];
   toolUseCount: number;
   malformedLines: number;
   state: SessionState;

@@ -21,7 +21,7 @@ struct StatusSnippetView: View {
                         .lineLimit(1)
                 }
             }
-            Text(answer)
+            Text(EvidencePresentation.text(answer))
                 .font(.subheadline)
                 .lineSpacing(3)
                 .lineLimit(6)

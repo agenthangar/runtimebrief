@@ -108,6 +108,7 @@ struct ProjectsListView: View {
     }
 
     private func refresh() async {
+        Task { await AgentSessionsStore.shared.warm() }
         guard !isLoading else { return }
         isLoading = true
         defer { isLoading = false }
@@ -115,6 +116,7 @@ struct ProjectsListView: View {
             // A user refresh always asks the daemon for current deterministic
             // briefs. The store persists them for offline launch and Siri.
             projects = try await ProjectsStore.shared.refresh()
+            Task { await AgentSessionsStore.shared.prefetch(projects) }
             errorMessage = nil
             showingSavedBrief = false
             lastSavedAt = Date()
@@ -128,7 +130,9 @@ struct ProjectsListView: View {
     }
 
     private func loadSavedThenRefresh() async {
+        Task { await AgentSessionsStore.shared.warm() }
         let snapshot = await ProjectsStore.shared.cachedSnapshot()
+        Task { await AgentSessionsStore.shared.prefetch(snapshot.projects) }
         // Honor a disabled preference or demo mode even when the Mac is offline.
         await ProjectDiscovery.shared.synchronize(projects: snapshot.projects)
         if projects.isEmpty {
@@ -171,6 +175,16 @@ struct ProjectsListView: View {
 private struct ProjectRow: View {
     let project: ProjectSummary
     @AppStorage(ProjectDiscoverySettings.key) private var discoveryEnabled = true
+    private var activityTime: some View {
+        HStack(spacing: 4) {
+            Text("Last activity")
+            RelativeTimeText(date: project.lastActivityAt)
+        }
+        .font(.caption)
+        .foregroundStyle(.secondary)
+        .accessibilityIdentifier("project-activity-\(project.id)")
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 7) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
@@ -193,7 +207,7 @@ private struct ProjectRow: View {
                         MonoLabel(text: branch)
                     }
                     Spacer()
-                    RelativeTimeText(date: brief.updatedAt ?? project.lastActivityAt)
+                    activityTime
                 }
             } else {
                 HStack(spacing: 8) {
@@ -202,7 +216,7 @@ private struct ProjectRow: View {
                         MonoLabel(text: branch)
                     }
                     Spacer()
-                    RelativeTimeText(date: project.lastActivityAt)
+                    activityTime
                 }
             }
         }

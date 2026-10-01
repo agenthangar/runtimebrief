@@ -18,10 +18,11 @@ from source; maintainers distribute internal TestFlight builds. See the
 
 - A deterministic, zero-model-cost portfolio brief with evidence for every
   claim.
-- Optional on-demand analysis of a single project's locally collected evidence.
+- Saved project analysis shared by the app and Siri, refreshed in the background,
+  plus on-demand questions about locally collected evidence.
 - Read-only summaries of Git, Claude Code, Codex, and Cursor activity.
 - Native Claude Code, Codex, and Cursor tasks, with model and permission
-  choices, isolated `t` worktrees, and phone continuation.
+  choices, isolated native worktrees, and phone continuation.
 - Local Xcode metadata plus optional read-only App Store Connect status.
 - Siri access through the iOS app and local MCP tools for ChatGPT and Codex.
 - No RuntimeBrief account, hosted relay, or analytics SDK.
@@ -151,46 +152,33 @@ Then try:
 
 ### 3. Start coding-agent tasks (optional)
 
-Install Claude Code and tmux on your Mac, sign in to Claude, and complete its
-native workspace-trust setup. RuntimeBrief installs a pinned, unchanged copy
-of `t` privately when you install the service. Your dotfiles and installed
-`t` stay as they are. Projects need an `origin/main` ref for the current `t`
-worktree flow. Registered and discovered projects allow launches by default:
+Install and sign in to the provider CLIs you want to use: Claude Code, Codex,
+and Cursor. Update the daemon and run `runtimebriefd install-service`.
+Registered and discovered projects allow tasks by default. Each task uses an
+isolated worktree based on the project's local Git HEAD; the repository needs
+an initial commit. Uncommitted checkout changes are not copied.
 
-```sh
-claude auth login
-runtimebriefd install-service
-```
+In a project, tap **New task**, select the provider, model, permissions, and
+optional reasoning level, then describe the work. Native default uses the Mac's
+workspace settings. Manual is the default permission mode. The provider owns
+workspace trust, tools, and permission enforcement.
 
-Clients paired with your daemon token can launch tasks in any registered
-project. In the iOS project screen, tap **New task**, choose Claude Code, Codex,
-or Cursor, select the model and permissions, describe the work, and start it.
-Install and sign in to each provider's CLI on your Mac. Models include your Claude
-default, Fable, Opus, Sonnet, and Haiku. Permissions include Manual (the default),
-Auto, Accept Edits, Plan, Bypass, and Pre-approved Only. Availability depends on
-your Claude version, account, and model. Bypass skips tool permission checks;
-choose it only for trusted work. Each task starts in a separate `t` worktree
-from `origin/main`; uncommitted changes in your checkout are not copied. Claude
-handles workspace trust and any tool requests on your Mac.
+Provider installation and sign-in checks start when the app opens and are
+shared across projects. Saved task cards remain visible during refresh;
+project task lists are prefetched. Models and workspace defaults load only for
+the selected provider in the composer.
 
-**Remote Control is on by default**, including API requests that omit the
-option. Tap **Open Remote Control** once Claude confirms the connection, or
-use **Open Codex terminal** or **Open Cursor terminal** to continue those live
-CLIs through RuntimeBrief. You can also attach to the terminal shown on the
-receipt. The Mac must stay awake. Claude
-handles account eligibility and trusted-device verification. An explicit
-opt-out starts a local-only session. Existing background receipts keep their
-original Claude Desktop handoff; see [session control](docs/session-control.md).
+Continuation is on by default. Claude uses its verified Remote Control link;
+Codex and Cursor offer **Open conversation** in RuntimeBrief, including explicit
+approval and question controls. A native protocol identity does not guarantee
+that a task appears in a desktop app's sidebar. The Mac and session owner must
+stay running. Stopped sessions keep their saved conversation and are not replayed.
 
-To revoke launches and handoff requests, run `runtimebriefd disable-claude
-<project-id>` and reinstall the service. This sets `claude_launch_enabled:
-false` in the local project config. Use `enable-claude` to restore launches.
-This existing config flag applies to all three session providers. Existing
-tasks keep running. Linked worktrees belong to their original repository in
-RuntimeBrief; supported Codex versions also receive its native project identity.
-Launch prompts go directly to the local native process; RuntimeBrief stores
-delivery receipts and a request fingerprint, not another copy of the prompt.
-See [session control](docs/session-control.md) for recovery and takeover details.
+Paired clients can start tasks in registered projects. To revoke new launches
+and continuation, run `runtimebriefd disable-claude <project-id>` and reinstall
+the service; `enable-claude` restores access. This existing setting applies to
+all three providers. Existing tasks keep running. Old t receipts are retained
+privately and omitted from the new task list. See [session control](docs/session-control.md).
 
 ### 4. Run in the foreground for development (optional)
 
@@ -224,7 +212,7 @@ Start a new ChatGPT desktop or Codex thread after installation. Example asks:
 The MCP tools are `list_attention`, `get_project_evidence`,
 `list_pending_decisions`, and `resolve_decision`. Resolution records the user's
 choice but never executes it. Another authenticated local client must
-explicitly propose an allowlisted action through REST. Native Claude launches
+explicitly propose an allowlisted action through REST. Native coding-agent launches
 use separate authenticated REST routes; MCP decision resolution does not
 launch tasks.
 
@@ -247,12 +235,16 @@ All endpoints require `Authorization: Bearer <token>` and are rate-limited to
 | `GET /v1/projects/:id/claude-launches` | Claude capability and recent delivery receipts |
 | `POST /v1/projects/:id/claude-launches` | Start a native task with `{ requestId, prompt, model?, permissionMode?, remoteControl? }` (Remote Control defaults to `true`) |
 | `POST /v1/projects/:id/claude-launches/:launchId/open` | Claude Desktop handoff for legacy background receipts |
-| `GET /v1/projects/:id/sessions` | Provider capabilities and recent session receipts |
+| `GET /v1/providers` | Shared account health without model discovery |
+| `GET /v1/projects/:id/providers/:provider` | Selected native model catalog and workspace defaults |
+| `GET /v1/projects/:id/sessions` | Cached task receipts; status refreshes in the background |
 | `POST /v1/projects/:id/sessions` | Start a task with `provider` (`claude`, `codex`, or `cursor`); Remote Control defaults to `true` |
-| `GET /v1/projects/:id/sessions/:launchId/terminal` | Verified live Codex/Cursor terminal snapshot |
+| `GET /v1/projects/:id/sessions/:launchId/conversation` | Structured native messages and pending requests |
+| `POST /v1/projects/:id/sessions/:launchId/reply` | Durable follow-up or explicit native decision |
+| `GET /v1/projects/:id/sessions/:launchId/terminal` | Verified Claude setup screen |
 | `POST /v1/projects/:id/sessions/:launchId/input` | Idempotent native terminal input with `{ requestId, data }` |
 
-See the [Claude launch API](docs/session-control.md#claude-launch-api) for
+See the [native session API](docs/session-control.md#authenticated-endpoints) for
 model and permission values, defaults, receipts, and retry behavior.
 
 `/status` and `/ask` can return buffered Server-Sent Events (`chunk`, `done`,
@@ -276,7 +268,7 @@ server:
   port: 8484
 auth:
   token_hash: scrypt:…
-# claude_session_backend: t  # default; native retains the old background launcher
+# New tasks use direct native Claude Code, Codex App Server, and Cursor ACP.
 project_roots:
   - /Users/developer/dev
 projects:
@@ -284,7 +276,7 @@ projects:
     name: "Sample Tracker App"
     path: /Users/developer/projects/sample-tracker
     allowed_actions: ["run-tests"]
-    # claude_launch_enabled: false  # optional: disable native Claude tasks
+    # claude_launch_enabled: false  # optional: disable coding-agent tasks
     # transcript_sources:       # optional and exhaustive when present
     #   - type: codex
     #     root: /custom/codex/home
@@ -308,10 +300,10 @@ which does not report a per-request dollar cost.
 Trusted roots are shallow. RuntimeBrief discovers only non-hidden direct child
 directories containing a `.git` directory or file. Explicit `projects` entries
 take precedence. A newly created repository under a trusted root appears on the
-next refresh and allows Claude launches by default. Explicitly set
-`claude_launch_enabled: false` to disable launches and handoff for a project;
+next refresh and allows coding-agent launches by default. Explicitly set
+`claude_launch_enabled: false` to disable launches and continuation for a project;
 the project remains visible for observation. `allowed_actions` controls the
-decision inbox, not native Claude launch access. All clients paired with the
+decision inbox, not native coding-agent launch access. All clients paired with the
 daemon token share the same project scope.
 
 ## Security and privacy

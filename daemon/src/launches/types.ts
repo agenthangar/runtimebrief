@@ -58,7 +58,7 @@ export interface ClaudeLaunch {
   };
 }
 
-/** RuntimeBrief's internal seam. A future t API backend replaces this implementation. */
+/** Provider execution and continuation boundary. */
 export interface ClaudeSessionBackend {
   readonly id: string;
   readonly provider?: SessionProvider;
@@ -67,6 +67,8 @@ export interface ClaudeSessionBackend {
   create(launch: ClaudeLaunch, prompt: string): Promise<void>;
   get(launch: ClaudeLaunch): Promise<ClaudeLaunch>;
   open(launch: ClaudeLaunch): Promise<void>;
+  conversation?(launch: ClaudeLaunch): Promise<ConversationSnapshot>;
+  reply?(launch: ClaudeLaunch, body: SessionReply): Promise<{ accepted: boolean; unknown?: boolean }>;
   terminal?(launch: ClaudeLaunch): Promise<TerminalSnapshot>;
   input?(launch: ClaudeLaunch, data: string): Promise<void>;
 }
@@ -113,4 +115,11 @@ export class LaunchError extends Error {
   constructor(public readonly statusCode: number, public readonly code: string, message: string) {
     super(message);
   }
+}
+
+export interface SessionReply { requestId: string; text?: string | undefined; approvalId?: string | undefined; optionId?: string | undefined; answers?: Record<string, string[]> | undefined }
+export interface ConversationSnapshot {
+  state: string; message: string; writable?: boolean;
+  messages: { id: string; role: string; text: string }[];
+  requests: { id: string; title: string; body: string; options: { id: string; label: string }[]; questions: { id: string; prompt: string; options: { id: string; label: string }[] }[] }[];
 }

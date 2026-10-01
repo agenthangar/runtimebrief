@@ -4,9 +4,9 @@
 authenticated REST, buffered SSE, and MCP interfaces used by the RuntimeBrief
 iOS app and Codex plugin.
 
-The daemon reads explicitly configured local project evidence. Optional
-on-demand analysis is macOS-only and starts the separately installed, exact
-Codex CLI 0.144.1 as a new `codex app-server --stdio --strict-config` process
+The daemon reads explicitly configured local project evidence. Background
+project analysis and on-demand questions are macOS-only and start the
+separately installed, exact Codex CLI 0.156.1 as a new `codex app-server --stdio --strict-config` process
 for each request. It uses the ChatGPT OAuth login created by `codex login`;
 RuntimeBrief never calls the OpenAI or Anthropic API directly and has no model
 API-key input or storage path.
@@ -53,12 +53,12 @@ ChatGPT workspace selected during sign-in.
 
 ## Native Claude tasks
 
-Claude tasks use a separate execution path from the isolated analyst. Install
-Claude Code and tmux on the Mac, sign in to Claude, and complete its native
-workspace-trust setup. `install-service` installs RuntimeBrief's private,
-checksum-verified copy of current `t`; `runtimebriefd install-t` can install it
-separately. Neither command changes your dotfiles or installed `t`. Projects
-need `origin/main`; each task starts in a separate worktree from that ref.
+Coding tasks use direct native adapters: Claude Code with Remote Control,
+Codex App Server over local stdio, and Cursor ACP. Install and sign in to the
+providers you want on your Mac. New tasks do not require `t` or tmux.
+Each task gets an isolated worktree based on local `HEAD`; no fetch or
+`origin/main` is required. A detached local runner survives daemon restarts.
+Claude may require workspace trust or Remote Control setup in its native UI.
 
 Registered projects, including new repositories discovered under trusted
 roots, allow launches by default. Every authenticated client paired with the
@@ -75,9 +75,9 @@ runtimebriefd install-service
 
 Run the disable and restore commands as alternatives, not both at once.
 These commands write the optional `claude_launch_enabled` project setting.
-Only `false` disables launches and Desktop handoff; observation and existing
-Claude sessions remain available. The decision inbox's `allowed_actions`
-setting does not control Claude launches.
+Only `false` disables launches and continuation writes; observation and existing
+native sessions remain available. The decision inbox's `allowed_actions`
+setting does not control coding-agent launches.
 
 The authenticated launch API accepts a task, stable request UUID, optional
 model alias, permission mode, and `remoteControl` boolean. Defaults are the
@@ -87,13 +87,12 @@ The iOS composer offers Fable, Opus,
 Sonnet, Haiku, Auto, Bypass, and the other supported choices. Claude controls
 model availability, tools, account policy, and workspace trust.
 
-Delivery receipts record launch settings, backend identity, terminal target,
-and independently observed Remote Control state without storing the prompt.
-A link appears only after Claude reports a native connection. Existing native
-background receipts retain Desktop takeover; the explicit
-`claude_session_backend: native` setting retains that older launcher, which
-cannot accept requests requiring Remote Control. See the
-[request contract and handoff limits](../docs/session-control.md#claude-launch-api).
+Delivery receipts record settings and confirmed native identities. Claude links
+appear only after native Remote Control readiness is confirmed. Codex and
+Cursor expose conversations and approval requests through authenticated,
+project-scoped endpoints. Existing config values for `claude_session_backend`
+are accepted for upgrade compatibility; new launches always use native adapters.
+See [session control](../docs/session-control.md).
 
 ## Brief freshness
 

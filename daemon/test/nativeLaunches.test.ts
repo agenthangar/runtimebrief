@@ -10,14 +10,14 @@ import { authHeaders, testConfig, tmpdir } from "./helpers.js";
 
 const cleanup: (() => Promise<unknown> | void)[] = [];
 afterEach(async () => { for (const fn of cleanup.splice(0).reverse()) await fn(); });
-function setup() {
+function setup(projectCount = 1) {
   const root = tmpdir("native-launch");
   cleanup.push(() => fs.rmSync(root, { recursive: true, force: true }));
-  const config = testConfig({ projects: [{ id: "fixture", name: "Fixture", path: root, allowed_actions: [] }] });
+  const config = testConfig({ projects: Array.from({ length: projectCount }, (_, index) => ({ id: index === 0 ? "fixture" : `fixture-${index}`, name: `Fixture ${index}`, path: root, allowed_actions: [] })) });
   const provider: ClaudeProvider = { capability: async () => ({ available: true, message: "Ready" }), start: vi.fn(), sessions: async () => [], desktopHas: () => false, open: vi.fn() };
   const store = new LaunchStore(path.join(root, "receipts.db"));
   const backends: ClaudeSessionBackend[] = (["codex", "cursor"] as const).map(provider => ({
-    id: `t-${provider}`, provider, capability: async () => ({ available: true, message: "Ready" }),
+    id: `native-${provider}`, provider, capability: async () => ({ available: true, message: "Ready" }),
     create: vi.fn(async () => {}), get: vi.fn(async receipt => ({ ...receipt, state: "running", remoteControl: { state: receipt.requestedRemoteControl === false ? "disabled" : "ready", url: null, observedAt: new Date().toISOString() } })),
     open: vi.fn(), terminal: vi.fn(async () => ({ screen: "Fictional", cols: 80, rows: 24, writable: true, message: "Ready" })), input: vi.fn(async () => {}),
   }));
@@ -30,12 +30,82 @@ const task = (provider: string, extra = {}) => ({ provider, requestId: randomUUI
 const sessions = "/v1/projects/fixture/sessions";
 
 describe("native provider sessions and remote terminal", () => {
+  it("serves cached cards while provider health and reconciliation are pending", async () => {
+    const f = setup();
+    const receipt = await f.service.start("fixture", randomUUID(), "Inspect the fictional workflow", { provider: "codex", model: "default", permissionMode: "manual" });
+    let finish!: (value: any) => void;
+    const pending = new Promise<any>(resolve => { finish = resolve; });
+    (f.backends[0]!.get as ReturnType<typeof vi.fn>).mockReturnValue(pending);
+    const list = await f.app.inject({ url: sessions, headers: authHeaders() });
+    expect(list.statusCode).toBe(200);
+    expect(list.json().launches[0].id).toBe(receipt.id);
+    expect(list.headers["cache-control"]).toBe("no-store");
+    finish(receipt);
+  });
+
+  it("keeps project opt-out separate from shared account health and scopes catalogs", async () => {
+    const f = setup();
+    f.service.providers();
+    await vi.waitFor(() => expect(f.service.providers().providers.every(p => !p.checking)).toBe(true));
+    f.config.projects[0]!.claude_launch_enabled = false;
+    expect((await f.service.list("fixture")).providers.every(p => !p.available)).toBe(true);
+    expect(f.service.providers().providers.every(p => p.available)).toBe(true);
+    await expect(f.service.models("fixture", "codex")).rejects.toMatchObject({ statusCode: 403 });
+    f.config.projects[0]!.claude_launch_enabled = true;
+    const capability = vi.spyOn(f.backends[0]!, "capability");
+    await f.service.models("fixture", "codex");
+    expect(capability).toHaveBeenLastCalledWith(fs.realpathSync(f.root));
+  });
+
+  it("retires t cards without replaying or deleting their durable receipts", async () => {
+    const f = setup();
+    const receipt = await f.service.start("fixture", randomUUID(), "Inspect the fictional workflow", { provider: "codex", model: "default", permissionMode: "manual" });
+    f.store.save({ ...receipt, backend: "t-codex" });
+    expect((await f.service.list("fixture")).launches).toEqual([]);
+    expect(f.store.get(receipt.id, "fixture")?.backend).toBe("t-codex");
+    expect(f.backends[0]!.create).toHaveBeenCalledTimes(1);
+  });
+
+  it("authenticates and scopes conversations and explicit native replies", async () => {
+    const f = setup();
+    f.backends[0]!.conversation = vi.fn(async () => ({ state: "completed", message: "Ready", writable: true, messages: [], requests: [] }));
+    f.backends[0]!.reply = vi.fn(async () => ({ accepted: true }));
+    const receipt = await f.service.start("fixture", randomUUID(), "Inspect the fictional workflow", { provider: "codex", model: "default", permissionMode: "manual" });
+    const url = `${sessions}/${receipt.id}`;
+    expect((await f.app.inject({ url: `${url}/conversation` })).statusCode).toBe(401);
+    expect((await f.app.inject({ url: `${url}/conversation`, headers: authHeaders() })).headers["cache-control"]).toBe("no-store");
+    const body = { requestId: randomUUID(), text: "A follow-up" };
+    expect((await f.app.inject({ method: "POST", url: `${url}/reply`, headers: authHeaders(), payload: { ...body, approvalId: "native-request" } })).statusCode).toBe(400);
+    expect((await f.app.inject({ method: "POST", url: `${url}/reply`, headers: authHeaders(), payload: body })).statusCode).toBe(202);
+    f.config.projects[0]!.claude_launch_enabled = false;
+    expect((await f.app.inject({ method: "POST", url: `${url}/reply`, headers: authHeaders(), payload: body })).statusCode).toBe(403);
+    expect((await f.app.inject({ url: `/v1/projects/other/sessions/${receipt.id}/conversation`, headers: authHeaders() })).statusCode).toBe(404);
+    expect(f.backends[0]!.reply).toHaveBeenCalledTimes(1);
+  });
+
+  it("bounds polling attempts while keeping authentication enforced", async () => {
+    const f = setup();
+    for (let count = 0; count < 600; count++) expect((await f.app.inject({ url: "/v1/providers" })).statusCode).toBe(401);
+    expect((await f.app.inject({ url: "/v1/providers" })).statusCode).toBe(429);
+  });
+  it("loads a 28-project portfolio repeatedly without starving the visible card or mutations", async () => {
+    const f = setup(28);
+    for (let pass = 0; pass < 6; pass++) {
+      for (const project of f.config.projects) {
+        expect((await f.app.inject({ url: `/v1/projects/${project.id}/sessions`, headers: authHeaders() })).statusCode).toBe(200);
+      }
+    }
+    for (let count = 0; count < 20; count++) expect((await f.app.inject({ url: sessions, headers: authHeaders() })).statusCode).toBe(200);
+    for (let count = 0; count < 30; count++) expect((await f.app.inject({ method: "POST", url: sessions, headers: authHeaders(), payload: {} })).statusCode).toBe(400);
+    expect((await f.app.inject({ method: "POST", url: sessions, headers: authHeaders(), payload: {} })).statusCode).toBe(429);
+    expect((await f.app.inject({ url: sessions, headers: authHeaders() })).statusCode).toBe(200);
+  });
   it.each(["codex", "cursor"])("defaults remote control on and dispatches %s once across retries", async provider => {
     const f = setup(); const body = task(provider);
     const first = await f.app.inject({ method: "POST", url: sessions, headers: authHeaders(), payload: body });
     expect(first.statusCode).toBe(202);
     const receipt = first.json();
-    expect(receipt).toMatchObject({ provider, backend: `t-${provider}`, requestedRemoteControl: true });
+    expect(receipt).toMatchObject({ provider, backend: `native-${provider}`, requestedRemoteControl: true });
     const retry = await f.app.inject({ method: "POST", url: sessions, headers: authHeaders(), payload: { ...body, remoteControl: true } });
     expect(retry.json().id).toBe(receipt.id);
     expect(f.backends.find(b => b.provider === provider)!.create).toHaveBeenCalledTimes(1);

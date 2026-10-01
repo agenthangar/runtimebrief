@@ -319,6 +319,21 @@ describe("Cursor project transcript sessions", () => {
     });
   });
 
+  it("does not revive an old project when a parent conversation moves to Mac maintenance", async () => {
+    const root = fixtureRoot("cursor-project-current-turn");
+    writeProjectTranscript(root, PARENT_WORKSPACE, PARENT_PROJECT_ID, [
+      userMessage("Inspect the selected project"),
+      assistantMessage([{ type: "tool_use", name: "Read", input: { path: `${PROJECT}/src/note.ts` } }]),
+      turnEnded("success"),
+      userMessage("Check disk space on the computer"),
+      assistantMessage([{ type: "tool_use", name: "Read", input: { path: `${PARENT_WORKSPACE}/terminal-output.txt` } }]),
+      turnEnded("success"),
+    ], new Date("2026-09-30T12:00:00Z"));
+    expect(await new CursorSessionsAdapter(root, null).transcriptPaths(project(), 10)).toEqual([]);
+    writeProjectTranscript(root, PROJECT, EXACT_ID, [userMessage("Continue the work"), turnEnded("success")], new Date("2026-09-30T12:00:01Z"));
+    expect((await new CursorSessionsAdapter(root, null).transcriptPaths(project(), 10)).map(r => r.id)).toEqual([EXACT_ID]);
+  });
+
   it("attributes parent-workspace transcripts only through concrete project paths", async () => {
     const root = fixtureRoot("cursor-project-attribution");
     const base = Date.parse("2026-08-20T12:00:00.000Z");

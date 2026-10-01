@@ -32,8 +32,8 @@ struct SessionModelOptions: DynamicOptionsProvider {
 
     func results() async throws -> [String] {
         guard let project = intent?.project, let provider = intent?.provider else { return ["default"] }
-        let list = try await RuntimeBriefDataSourceFactory.current().sessions(projectID: project.id)
-        return ["default"] + (list.providers?.first { $0.id == provider }?.models ?? [])
+        let capability = try await RuntimeBriefDataSourceFactory.current().agentModels(projectID: project.id, provider: provider)
+        return ["default"] + (capability.models ?? [])
             .map(\.id).filter { $0 != "default" }
     }
 }
@@ -124,12 +124,7 @@ enum SiriSessionLauncher {
                 throw RuntimeBriefError.notFound
             }
             current = match
-            let list = try await source.sessions(projectID: project.id)
-            guard let selected = list.providers?.first(where: { $0.id == provider }) ??
-                    (provider == .claude ? AgentCapability(id: .claude, available: list.capability.available, message: list.capability.message) : nil) else {
-                throw SiriIntentFailure(message: "Update the daemon on your Mac to enable \(provider.label) sessions.")
-            }
-            capability = selected
+            capability = try await source.agentModels(projectID: project.id, provider: provider)
         } catch let error as SiriIntentFailure { throw error }
         catch { throw SiriIntentFailure(message: unreachableMessage(for: error)) }
         guard capability.available else { throw SiriIntentFailure(message: capability.message) }

@@ -4,6 +4,7 @@ import Foundation
 actor DemoClaudeTasks {
     static let shared = DemoClaudeTasks()
     private var tasks: [ClaudeLaunch] = []
+    private var conversations: [String: [ConversationMessage]] = [:]
     private var screens: [String: String] = [:]
     private var inputs: Set<String> = []
 
@@ -22,7 +23,7 @@ actor DemoClaudeTasks {
             state: "completed", message: "Demo task ready to review. No work was sent to a Mac.",
             nativeId: "demo-task", sessionId: nil, cwd: "/demo/sample-tracker", openedAt: nil,
             model: model.rawValue, permissionMode: permissionMode.rawValue,
-            backend: "t-legacy", requestedRemoteControl: remoteControl,
+            backend: "native-claude", requestedRemoteControl: remoteControl,
             remoteControl: ClaudeRemoteControl(state: remoteControl ? "ready" : "disabled", url: nil)
         )
         tasks.insert(launch, at: 0)
@@ -36,10 +37,24 @@ actor DemoClaudeTasks {
         launch.model = request.model
         launch.permissionMode = request.permissionMode
         launch.reasoningEffort = request.reasoningEffort
-        launch.backend = request.provider == .claude ? "t-legacy" : "t-\(request.provider.rawValue)"
+        launch.backend = "native-\(request.provider.rawValue)"
         tasks[0] = launch
-        screens[launch.id] = "Demo \(request.provider.label) terminal\r\n\r\nFictional conversation. No Mac is connected.\r\n\r\n> "
+        screens[launch.id] = "Your sample project summary is ready to review. This is a fictional \(request.provider.label) response; no Mac is connected."
+        conversations[launch.id] = [ConversationMessage(id: "demo-reply", role: "assistant", text: screens[launch.id]!)]
         return launch
+    }
+
+    func conversation(projectID: String, launchID: String) throws -> ConversationSnapshot {
+        guard let launch = tasks.first(where: { $0.id == launchID && $0.projectId == projectID }) else { throw RuntimeBriefError.notFound }
+        return ConversationSnapshot(state: "completed", message: "Fictional conversation. No Mac is connected.", writable: launch.requestedRemoteControl != false, messages: conversations[launchID] ?? [ConversationMessage(id: "demo-reply", role: "assistant", text: "Your demo task is ready to review.")], requests: [])
+    }
+    func reply(projectID: String, launchID: String, reply: SessionReply) throws -> SessionReplyResult {
+        guard try conversation(projectID: projectID, launchID: launchID).writable == true else { throw RuntimeBriefError.notFound }
+        if inputs.insert(launchID + reply.requestId).inserted {
+            if let text = reply.text { conversations[launchID, default: []].append(ConversationMessage(id: reply.requestId, role: "user", text: text)) }
+            conversations[launchID, default: []].append(ConversationMessage(id: "reply-" + reply.requestId, role: "assistant", text: "Demo received your response. No work was sent to a Mac."))
+        }
+        return SessionReplyResult(accepted: true, unknown: nil)
     }
 
     func terminal(projectID: String, launchID: String) throws -> TerminalSnapshot {

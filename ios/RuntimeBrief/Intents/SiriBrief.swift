@@ -27,7 +27,7 @@ enum SiriBrief {
             text += " \(claim.text)"
         }
         if let evidenceDate = project.brief?.updatedAt {
-            text += " Evidence updated \(dateText(evidenceDate))."
+            text += " Last activity \(dateText(evidenceDate))."
         }
         return prefix(snapshot) + text
     }
@@ -40,9 +40,8 @@ enum SiriBrief {
             }
             return "I'm preparing an analysis for \(project.name). The current brief says: \(headline) Ask me again shortly."
         }
-        let lines = answer.split(separator: "\n").map { line in
+        let lines = EvidencePresentation.text(answer, evidence: status.evidence).split(separator: "\n").map { line in
             String(line)
-                .replacingOccurrences(of: #"\[[^\[\]]+\]"#, with: "", options: .regularExpression)
                 .trimmingCharacters(in: .whitespacesAndNewlines)
                 .replacingOccurrences(of: #"^Done:\s*"#, with: "Recently, ", options: [.regularExpression, .caseInsensitive])
                 .replacingOccurrences(of: #"^Now:\s*"#, with: "Currently, ", options: [.regularExpression, .caseInsensitive])

@@ -58,7 +58,7 @@ export const configSchema = z.object({
   }),
   project_roots: z.array(z.string()).default([]),
   projects: z.array(projectSchema).default([]),
-  claude_session_backend: z.enum(["t", "native"]).default("t"),
+  claude_session_backend: z.enum(["t", "native"]).default("native"),
   analyst: z
     .object({
       model: z.string().default("gpt-6-luna"),

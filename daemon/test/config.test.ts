@@ -66,7 +66,7 @@ describe("config load/save", () => {
     expect(loaded.server.host).toBe("127.0.0.1");
     expect(loaded.server.port).toBe(8484);
     expect(loaded.project_roots).toEqual([]);
-    expect(loaded.claude_session_backend).toBe("t");
+    expect(loaded.claude_session_backend).toBe("native");
     expect(loaded.projects[0]?.id).toBe("demo");
     expect(loaded.projects[0]?.allowed_actions).toEqual([]);
     expect(loaded.analyst.model).toBe("gpt-6-luna");
