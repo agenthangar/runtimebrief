@@ -163,7 +163,7 @@ struct APIClientTests {
         let answer = try await client.ask(projectID: "meal", question: "Did tests pass?")
         #expect(answer.evidence?.first?.id == "git-commit-abc")
         #expect(answer.spokenAnswer.contains("[git-commit-abc]") == false)
-        #expect(answer.spokenAnswer.contains("Evidence is available") == true)
+        #expect(answer.spokenAnswer == "Tests pass.")
     }
 
     @Test func streamsSSEChunksAndDone() async throws {

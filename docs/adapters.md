@@ -137,7 +137,8 @@ second transcript source, so the adapter reads and deduplicates one store.
   sessions within a project or in an external linked worktree sharing that
   project's Git metadata. Both folders must be Git roots for the latter match,
   so separately registered monorepo folders are not combined. Parent workspace
-  attribution requires concrete activity paths as described below.
+  attribution requires concrete activity paths from the current task turn.
+  A later unrelated task does not revive projects referenced by earlier turns.
   `~/.codex/session_index.jsonl`
   exists but has no cwd, so it can't be used for discovery.
 - **Record shape:** one JSON object per line, `{timestamp, type, payload}`
@@ -170,7 +171,12 @@ changes, sensitive paths filtered), tool-use count, lifecycle state from
 including a distinct waiting state while a `request_user_input` call has no
 output. A later user-stop event remains interrupted and is not treated as
 waiting. Parent-workspace desktop tasks can be attributed from structured
-`function_call.arguments` or `custom_tool_call.input` workdirs; developer
+`function_call.arguments` or `custom_tool_call.input` workdirs and explicit
+shell working directories. Those directories take priority over incidental
+reads or mentions of sibling repositories. Ownership survives follow-up
+questions without scoped operations; a new turn with another working directory
+replaces it. Without an established directory, only current-turn references
+count, including native `item_completed.UserMessage` boundaries. Developer
 context is excluded from attribution. Git branch is not recorded in rollouts
 and stays null.
 
@@ -227,8 +233,10 @@ agent threads plus older CLI chats appear together:
   surfaced. Assistant blocks carry `providerOptions.cursor.modelName`.
 - **Project linkage:** exact-workspace sessions match directly. A Cursor
   thread opened at a parent workspace is assigned to a child project only
-  when a concrete tool/file record references a path inside that project;
+  when a concrete tool/file record in the current task turn references a path inside that project;
   this prevents the same parent thread from leaking into sibling projects.
+  Historical touched files remain in session data but do not credit later
+  maintenance or unrelated tasks to the earlier project.
   External linked worktrees also match their owning Git root, with the same
   repository/subproject isolation as the Claude and Codex readers.
   Duplicate IDs present in more than one Cursor store collapse to one thread.

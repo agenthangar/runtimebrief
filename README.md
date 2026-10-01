@@ -18,7 +18,8 @@ from source; maintainers distribute internal TestFlight builds. See the
 
 - A deterministic, zero-model-cost portfolio brief with evidence for every
   claim.
-- Optional on-demand analysis of a single project's locally collected evidence.
+- Saved project analysis shared by the app and Siri, refreshed in the background,
+  plus on-demand questions about locally collected evidence.
 - Read-only summaries of Git, Claude Code, Codex, and Cursor activity.
 - Native Claude Code, Codex, and Cursor tasks, with model and permission
   choices, isolated native worktrees, and phone continuation.

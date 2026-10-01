@@ -15,9 +15,9 @@ function wantsSSE(req: FastifyRequest): boolean {
 }
 
 export function registerAnalystRoutes(app: FastifyInstance, deps: ServerDeps) {
-  // Siri must never wait for a model run. Read the last completed, cited
+  // Siri and the app share the last completed, cited
   // analysis and queue a refresh when it is missing or old.
-  app.get<{ Params: { id: string } }>("/v1/projects/:id/voice-status", async (req, reply) => {
+  app.get<{ Params: { id: string } }>("/v1/projects/:id/voice-status", { config: { rateLimit: { max: 120, timeWindow: 60000 } } }, async (req, reply) => {
     try {
       const { status, refreshing, unavailable } = deps.analyst.voiceStatus(req.params.id);
       return reply.send({

@@ -4,6 +4,34 @@ import Testing
 
 @MainActor
 struct AgentSessionsStoreTests {
+    @Test func backgroundPrefetchReusesFreshProjectsAcrossRepeatedForegroundRefreshes() async throws {
+        let json = #"{"capability":{"available":true,"message":"Ready"},"launches":[]}"#
+        let transport = MockTransport(stubs: ["/sessions": .init(body: Data(json.utf8))])
+        let source = LiveRuntimeBriefDataSource(client: RuntimeBriefClient(settings: .mock, transport: transport))
+        var now = Date()
+        let store = AgentSessionsStore(identity: { "fixture" }, source: { _ in source }, cacheDirectory: nil, now: { now })
+        let projects = (0..<28).map { ProjectSummary(id: "fixture-\($0)", name: "Fixture", lastActivityAt: nil, branch: nil, dirty: nil, brief: nil) }
+        await store.prefetch(projects); await store.prefetch(projects); await store.prefetch(projects)
+        #expect(transport.recorder.requests.count == 28)
+        await store.refresh(projectID: projects[0].id)
+        #expect(transport.recorder.requests.count == 29)
+        now = now.addingTimeInterval(61)
+        await store.prefetch(projects)
+        #expect(transport.recorder.requests.count == 57)
+    }
+
+    @Test func rateLimitWaitsBeforeRetryingRatherThanPollingEveryThreeSeconds() async throws {
+        let sourceTransport = MockTransport(stubs: ["/sessions": .init(status: 429, body: Data())])
+        let source = LiveRuntimeBriefDataSource(client: RuntimeBriefClient(settings: .mock, transport: sourceTransport))
+        var now = Date()
+        let store = AgentSessionsStore(identity: { "fixture" }, source: { _ in source }, cacheDirectory: nil, now: { now })
+        await store.refresh(projectID: "fixture"); await store.refresh(projectID: "fixture")
+        #expect(sourceTransport.recorder.requests.count == 1)
+        #expect(store.errors["fixture"] != nil)
+        now = now.addingTimeInterval(61); await store.refresh(projectID: "fixture")
+        #expect(sourceTransport.recorder.requests.count == 2)
+    }
+
     @Test func healthWarmsWithoutLoadingProjectModelsAndReusesItsResult() async throws {
         let transport = MockTransport(stubs: ["/v1/providers": .init(body: Data(#"{"providers":[{"id":"codex","available":true,"message":"Ready","checking":false}]}"#.utf8))])
         let source = LiveRuntimeBriefDataSource(client: RuntimeBriefClient(settings: .mock, transport: transport))

@@ -182,6 +182,19 @@ describe("sessionMatchesProject", () => {
     }
   });
 
+  it("does not credit a later maintenance turn to an earlier project", async () => {
+    const file = path.join(dir, "moved-task.jsonl");
+    fs.writeFileSync(file, [
+      sessionMeta("2026-07-11T20:00:00Z", "/Users/dev"),
+      line("event_msg", { type: "user_message", message: "Inspect /Users/dev/sample-site/app/page.tsx" }, "2026-07-11T20:01:00Z"),
+      line("event_msg", { type: "agent_message", message: "The project check is done." }, "2026-07-11T20:02:00Z"),
+      line("event_msg", { type: "user_message", message: "Check disk space on this computer" }, "2026-09-30T20:01:00Z"),
+      line("event_msg", { type: "agent_message", message: "The disk check is complete." }, "2026-09-30T20:02:00Z"),
+    ].join("\n"));
+    expect(await sessionMatchesProject(file, "/Users/dev", "/Users/dev/sample-site")).toBe(false);
+    expect(await sessionMatchesProject(file, "/Users/dev/sample-site", "/Users/dev/sample-site")).toBe(true);
+  });
+
   it("matches a parent-workspace session only when it references the project path", async () => {
     const sampleSite = path.join(dir, "sampleSite.jsonl");
     fs.writeFileSync(

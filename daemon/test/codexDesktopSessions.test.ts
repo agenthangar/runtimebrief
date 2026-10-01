@@ -376,4 +376,71 @@ describe("Codex desktop and CLI rollout discovery", () => {
       sessionMatchesProject(transcriptPath, workspace, projectPath),
     ).resolves.toBe(false);
   });
+
+  it("keeps a book task with its working directory despite reads from sibling projects", async () => {
+    const root = tmpdir("codex-project-ownership");
+    roots.push(root);
+    const workspace = path.join(root, "workspace");
+    const book = path.join(workspace, "book-project");
+    const cards = path.join(workspace, "cards-project");
+    const reference = path.join(workspace, "reference-project");
+    const completedMessage = (type: string, text: string) =>
+      line("event_msg", { type: "item_completed", item: { type, content: [{ type: "text", text }] } }, "2030-01-02T18:00:01Z");
+    const transcript = writeRollout(root, "project-ownership", [
+      sessionMeta({ id: "book-task", cwd: workspace, source: "vscode", originator: "Codex Desktop", timestamp: "2030-01-02T18:00:00Z" }),
+      completedMessage("UserMessage", "Build the coloring book"),
+      line("response_item", { type: "custom_tool_call", name: "exec", input: `await tools.exec_command({cmd: ${JSON.stringify(`rg --files ${cards} ${reference}`)}})` }, "2030-01-02T18:00:02Z"),
+      line("response_item", { type: "function_call", name: "exec_command", arguments: JSON.stringify({ cmd: "npm test", workdir: book }) }, "2030-01-02T18:00:03Z"),
+      completedMessage("UserMessage", "Which book settings should I choose?"),
+      line("response_item", { type: "function_call", name: "read_file", arguments: JSON.stringify({ file_path: path.join(cards, "README.md") }) }, "2030-01-02T18:01:02Z"),
+      completedMessage("AgentMessage", "Choose the settings matching your book."),
+    ]);
+    const adapter = new CodexSessionsAdapter(root);
+    const results = await Promise.all([book, cards, reference].map(projectPath =>
+      adapter.transcriptPaths({ id: path.basename(projectPath), name: "Fixture", path: projectPath }, 10)));
+    expect(results.map(refs => refs.map(ref => ref.id))).toEqual([["book-task"], [], []]);
+  });
+
+  it("resets unscoped references for native completed user messages", async () => {
+    const root = tmpdir("codex-native-current-turn");
+    roots.push(root);
+    const workspace = path.join(root, "workspace");
+    const oldProject = path.join(workspace, "old-project");
+    const transcript = writeRollout(root, "native-current-turn", [
+      sessionMeta({ id: "maintenance", cwd: workspace, source: "vscode", originator: "Codex Desktop", timestamp: "2030-01-02T18:00:00Z" }),
+      line("event_msg", { type: "item_completed", item: { type: "UserMessage", content: [{ type: "text", text: `Inspect ${oldProject}/README.md` }] } }, "2030-01-02T18:00:01Z"),
+      line("event_msg", { type: "item_completed", item: { type: "UserMessage", content: [{ type: "text", text: "Check computer disk space" }] } }, "2030-01-03T18:00:01Z"),
+    ]);
+    expect(await sessionMatchesProject(transcript, workspace, oldProject)).toBe(false);
+  });
+
+  it("replaces a focused project when the task moves to another working directory", async () => {
+    const root = tmpdir("codex-native-moved-workspace");
+    roots.push(root);
+    const workspace = path.join(root, "workspace");
+    const first = path.join(workspace, "first-project");
+    const second = path.join(workspace, "second-project");
+    const transcript = writeRollout(root, "moved-workspace", [
+      sessionMeta({ id: "moved-task", cwd: workspace, source: "vscode", originator: "Codex Desktop", timestamp: "2030-01-02T18:00:00Z" }),
+      line("response_item", { type: "function_call", name: "exec_command", arguments: JSON.stringify({ cmd: "npm test", workdir: first }) }, "2030-01-02T18:00:01Z"),
+      line("event_msg", { type: "item_completed", item: { type: "UserMessage", content: [{ type: "text", text: "Now work on the other project" }] } }, "2030-01-03T18:00:01Z"),
+      line("response_item", { type: "custom_tool_call", name: "exec", input: `await tools.exec_command({cmd: "npm test", workdir: ${JSON.stringify(second)}})` }, "2030-01-03T18:00:02Z"),
+    ]);
+    expect(await sessionMatchesProject(transcript, workspace, first)).toBe(false);
+    expect(await sessionMatchesProject(transcript, workspace, second)).toBe(true);
+  });
+
+  it("uses scoped shell directories without claiming incidental command paths", async () => {
+    const root = tmpdir("codex-shell-directory-ownership");
+    roots.push(root);
+    const workspace = path.join(root, "workspace");
+    const owner = path.join(workspace, "owner-project");
+    const reference = path.join(workspace, "reference-project");
+    const transcript = writeRollout(root, "shell-directory", [
+      sessionMeta({ id: "shell-task", cwd: workspace, source: "exec", originator: "codex_exec", timestamp: "2030-01-02T18:00:00Z" }),
+      line("response_item", { type: "function_call", name: "exec_command", arguments: JSON.stringify({ cmd: `cd '${owner}' && cat '${reference}/README.md'` }) }, "2030-01-02T18:00:01Z"),
+    ]);
+    expect(await sessionMatchesProject(transcript, workspace, owner)).toBe(true);
+    expect(await sessionMatchesProject(transcript, workspace, reference)).toBe(false);
+  });
 });

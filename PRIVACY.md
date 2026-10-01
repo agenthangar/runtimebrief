@@ -60,9 +60,12 @@ text. Demo data stays fictional and separate from live caches and networking.
 
 ## Codex analyst requests
 
-No model request occurs when loading the deterministic portfolio or project
-card. When the user explicitly requests analysis on macOS, RuntimeBrief starts
-one separately installed, exact Codex CLI 0.144.1 `codex app-server --stdio
+The deterministic portfolio and project card do not invoke a model. The daemon
+prepares project analyses in the background and refreshes them at the configured
+interval (three hours by default), with at most two running at once. Siri and the
+app reuse these saved answers; missing or old results queue the same background
+refresh. Explicit questions also use the analyst. For each analysis, RuntimeBrief starts
+one separately installed, exact Codex CLI 0.156.1 `codex app-server --stdio
 --strict-config` process for that request. It uses the ChatGPT OAuth login
 created by `codex login`. RuntimeBrief has no direct OpenAI or Anthropic API
 integration and no model API-key input or storage path.

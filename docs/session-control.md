@@ -47,6 +47,10 @@ demo mode uses its own in-memory state. Switching projects reuses provider
 health. Project opt-outs, task history, models, and workspace defaults retain
 their own project scope. Model catalogs load when the composer selects a
 provider. Cached cards remain visible while network refresh is pending.
+Background prefetch reuses task lists fetched within the last minute. A rate
+limit response pauses retries for a minute instead of continuing three-second
+polling. Agent reads have a bounded 600-request budget per minute; task creation
+and replies retain the separate 30-request limit.
 
 ## Authenticated endpoints
 

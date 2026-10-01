@@ -1,5 +1,23 @@
 # Agent Instructions
 
+## Test usage budget
+
+- Ordinary tests use mocks and must not start Claude, Codex, Cursor, or analyst
+  model turns. `npm test` blocks installed agent subprocesses.
+- Native CLI release smoke tests are explicitly opt-in:
+  `npm run test:release -- --live --release <build-number>` from `daemon`.
+  The default command uses mocks. Never run the legacy live XCTest launch flags.
+- Keep all live release checks in the stable **RuntimeBrief release tests**
+  workspace. Use Codex `gpt-6-luna` with low reasoning, Claude Haiku
+  `claude-haiku-4-5-20251001`, and
+  Cursor `composer-2.5`. Haiku and Composer use their native effort setting.
+- At most one new session per provider per release. The private receipt ledger
+  reserves this budget before launch, including failures. Reruns reuse receipts;
+  inspect or resume the recorded native session after a failure. Never delete
+  the ledger or change the release identifier to bypass the budget.
+- Do not register the fixture as a production project with background analysis.
+  That would spend model quota outside the release check.
+
 <!-- revyl:agents:start -->
 ## Revyl — run this app on a cloud device
 

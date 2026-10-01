@@ -24,6 +24,7 @@ struct ClaudeLaunchView: View {
             HStack {
                 Label("Coding agents", systemImage: "terminal")
                     .font(.headline)
+                    .accessibilityIdentifier("coding-agents-section-title")
                 Spacer()
                 Button { Task { await refresh() } } label: { Image(systemName: "arrow.clockwise") }
                     .accessibilityLabel("Refresh agent tasks")

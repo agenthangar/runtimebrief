@@ -60,11 +60,17 @@ personal signing change local; do not commit it or change the production
    loaded; health alone is not a successful data connection. Older builds that add
    port 8484 to a URL without a port should append `:443`. The token is stored
    in the Keychain only.
-4. The home screen immediately shows a zero-cost portfolio brief. Each claim
-   includes the git commit, working-tree scan, or agent session that supports it.
+4. The home screen immediately shows a zero-cost portfolio brief. Claims use Git and session records internally; the overview shows readable
+   updates without technical source cards.
    Tap an iOS project to also see its local Xcode version/build, latest
-   TestFlight build, and newest App Store version/state. The analyst runs only
-   after you tap **Generate analyst update** or ask a question.
+   TestFlight build, and newest App Store version/state. Project detail starts
+   with Analyst update expanded, followed by project work/status, Ask, recent
+   sessions, Coding agents, and commits. iOS release details follow on iOS projects.
+   Analysis shows readable descriptions without raw citation IDs, commit hashes,
+   or an Evidence section. Analyst update displays the same saved analysis as
+   Siri, including its analysis timestamp. The
+   daemon refreshes missing or old analysis in the background; **Check for updates**
+   reads that shared result. Asking a question remains an explicit analyst query.
 5. Say: *"Hey Siri, RuntimeBrief analysis for \<project\>"*. App
    Shortcuts register after the first launch; a successful refresh supplies
    project names for personalized phrases.
@@ -162,20 +168,18 @@ CodeQL uses its supported Xcode 26.6 / Swift 6.3 toolchain, including all sessio
 creation code. The iOS 27 SDK opening schema, on-screen annotations, and reindexing hooks compile with
 Swift 6.4 and are covered by the Xcode 27 build and system integration tests.
 If the runtime rejects this framework with security error 803, those tests
-explicitly skip; other errors fail. Existing live daemon and Claude tests need
-their separately documented E2E configuration.
+explicitly skip; other errors fail. HTTP fixture tests require `RUNTIMEBRIEF_E2E_MOCK=1` and their E2E connection settings.
 
 Session tests exercise the real client encoding and `/sessions` endpoint for
 all three providers, confirmation cancellation, invalid settings, removed
 projects, authorization/setup failures, uncertain retries, and demo isolation.
 Cloud Shortcuts checks cover the actual parameter chooser and confirmation UI.
-For opt-in native Siri coverage, set `RUNTIMEBRIEF_E2E_SIRI_LIVE=1` plus
-`RUNTIMEBRIEF_E2E_SERVER_URL`, `RUNTIMEBRIEF_E2E_TOKEN`, and
-`RUNTIMEBRIEF_E2E_PROJECT_ID` for an isolated daemon and disposable Git fixture.
-Run `SiriIntegrationUITests/testLiveSiriCreatesNativeSessions`. It checks real
-project-scoped native receipts for each provider; native workspace trust, sign-in,
-and final task completion need separate observation on the fixture.
+Ordinary tests use demo data, mock transports, or an isolated HTTP mock fixture.
+They never launch installed coding agents. The old live XCTest launch flags have
+been removed so a full test run or retry cannot spend model quota.
 
+Live native CLI smoke checks are separate and limited to one session per tool
+per release; see [testing.md](../docs/testing.md).
 Before release, test spoken requests and the Siri card on a physical iOS 27
 device with Siri configured, including ambiguous names, an offline Mac, and
 discovery opt-out. A simulator test does not verify speech recognition or
@@ -236,7 +240,8 @@ for the API and ownership rules.
 The portfolio refreshes when the app becomes active, when Settings closes,
 and when you pull to refresh. A failed refresh keeps the saved brief on screen
 with its saved time and the actual error. A project's activity timestamp is
-the time of its evidence, so it can remain old even after a successful refresh.
+the time of recorded work, not the last scan or analysis refresh. Projects are
+sorted by this activity time, so old projects remain below recently used ones.
 
 | What you see | What to check |
 | --- | --- |

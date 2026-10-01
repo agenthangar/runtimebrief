@@ -2,7 +2,7 @@ import XCTest
 
 final class PortfolioBriefUITests: XCTestCase {
     @MainActor
-    func testFocusedCodexProjectEvidenceAndOptInAnalyst() throws {
+    func testFocusedCodexProjectEvidenceAndSharedAnalyst() async throws {
         let environment = ProcessInfo.processInfo.environment
         let testBundle = Bundle(for: Self.self)
         let serverURL = environment["RUNTIMEBRIEF_E2E_SERVER_URL"]
@@ -12,7 +12,8 @@ final class PortfolioBriefUITests: XCTestCase {
         let projectID = environment["RUNTIMEBRIEF_E2E_PROJECT_ID"]
             ?? testBundle.object(forInfoDictionaryKey: "RUNTIMEBRIEF_E2E_PROJECT_ID") as? String
 
-        guard let serverURL,
+        guard (environment["RUNTIMEBRIEF_E2E_MOCK"] ?? testBundle.object(forInfoDictionaryKey: "RUNTIMEBRIEF_E2E_MOCK") as? String) == "1",
+              let serverURL,
               let token,
               let projectID,
               !serverURL.isEmpty,
@@ -24,11 +25,12 @@ final class PortfolioBriefUITests: XCTestCase {
         else {
             throw XCTSkip(
                 "Set RUNTIMEBRIEF_E2E_SERVER_URL, RUNTIMEBRIEF_E2E_TOKEN, and "
-                    + "RUNTIMEBRIEF_E2E_PROJECT_ID for focused live Codex UI testing."
+                    + "RUNTIMEBRIEF_E2E_PROJECT_ID for mock HTTP fixture UI testing."
             )
         }
 
         continueAfterFailure = false
+        let sharedAnswer = try await savedAnalysis(serverURL: serverURL, token: token, projectID: projectID)
         let app = XCUIApplication()
         app.launchEnvironment["RUNTIMEBRIEF_E2E_CLEAR_STATE"] = "1"
         app.launchEnvironment["RUNTIMEBRIEF_E2E_SERVER_URL"] = serverURL
@@ -40,13 +42,23 @@ final class PortfolioBriefUITests: XCTestCase {
             "The evidence-backed portfolio should load from the daemon."
         )
 
+        let recentRow = app.buttons["project-link-\(projectID)"]
+        let earlierRow = app.buttons["project-link-earlier-project"]
+        XCTAssertTrue(recentRow.exists)
+        XCTAssertTrue(earlierRow.exists)
+        XCTAssertLessThan(recentRow.frame.minY, earlierRow.frame.minY)
+        XCTAssertTrue(app.descendants(matching: .any)["project-activity-\(projectID)"].exists)
+        XCTAssertFalse(app.descendants(matching: .any)["evidence-source"].exists)
         let projectLink = app.buttons["project-link-\(projectID)"]
         XCTAssertTrue(
             projectLink.waitForExistence(timeout: 10),
             "The configured Codex project should be selectable by its stable project ID."
         )
         projectLink.tap()
+        assertSavedAnalysis(app: app, answer: sharedAnswer)
 
+        XCTAssertFalse(app.staticTexts["Evidence"].exists)
+        XCTAssertFalse(app.descendants(matching: .any)["evidence-source"].exists)
         let briefToggle = app.buttons["brief-section-toggle"]
         XCTAssertTrue(
             briefToggle.waitForExistence(timeout: 10),
@@ -57,21 +69,11 @@ final class PortfolioBriefUITests: XCTestCase {
         XCTAssertEqual(briefToggle.value as? String, "Expanded")
         XCTAssertTrue(
             app.descendants(matching: .any)
-                .matching(identifier: "evidence-source")
+                .matching(identifier: "project-brief-claim")
                 .firstMatch
                 .waitForExistence(timeout: 5),
-            "The Codex project brief should cite at least one evidence source."
+            "The project brief should show readable claims."
         )
-        app.buttons["analyst-section-toggle"].tap()
-        XCTAssertTrue(
-            app.buttons["generate-analyst-update"].exists,
-            "The Codex CLI analyst should remain an explicit opt-in action."
-        )
-        XCTAssertFalse(
-            app.staticTexts["Asking the analyst…"].exists,
-            "Opening the Codex project must not automatically issue an analyst request."
-        )
-
         let sessionsToggle = app.buttons["sessions-section-toggle"]
         for _ in 0..<6 where !sessionsToggle.exists {
             app.swipeUp()
@@ -83,12 +85,12 @@ final class PortfolioBriefUITests: XCTestCase {
         sessionsToggle.tap()
         XCTAssertTrue(
             app.staticTexts["session-source-codex"].waitForExistence(timeout: 10),
-            "The live project evidence should include a Codex session."
+            "The mock project evidence should include a Codex session."
         )
     }
 
     @MainActor
-    func testPortfolioBriefEvidenceAndOptInAnalyst() async throws {
+    func testPortfolioBriefEvidenceAndSharedAnalyst() async throws {
         let environment = ProcessInfo.processInfo.environment
         let testBundle = Bundle(for: Self.self)
         let serverURL = environment["RUNTIMEBRIEF_E2E_SERVER_URL"]
@@ -96,14 +98,15 @@ final class PortfolioBriefUITests: XCTestCase {
         let token = environment["RUNTIMEBRIEF_E2E_TOKEN"]
             ?? testBundle.object(forInfoDictionaryKey: "RUNTIMEBRIEF_E2E_TOKEN") as? String
 
-        guard let serverURL,
+        guard (environment["RUNTIMEBRIEF_E2E_MOCK"] ?? testBundle.object(forInfoDictionaryKey: "RUNTIMEBRIEF_E2E_MOCK") as? String) == "1",
+              let serverURL,
               let token,
               !serverURL.isEmpty,
               !token.isEmpty,
               !serverURL.hasPrefix("$("),
               !token.hasPrefix("$(")
         else {
-            throw XCTSkip("Set RUNTIMEBRIEF_E2E_SERVER_URL and RUNTIMEBRIEF_E2E_TOKEN for live daemon UI testing.")
+            throw XCTSkip("Set RUNTIMEBRIEF_E2E_SERVER_URL and RUNTIMEBRIEF_E2E_TOKEN for mock HTTP fixture UI testing.")
         }
 
         let app = XCUIApplication()
@@ -130,6 +133,7 @@ final class PortfolioBriefUITests: XCTestCase {
             .firstMatch
         XCTAssertTrue(projectLink.waitForExistence(timeout: 5))
         let selectedProjectID = String(projectLink.identifier.dropFirst("project-link-".count))
+        let sharedAnswer = try await savedAnalysis(serverURL: serverURL, token: token, projectID: selectedProjectID)
         var request = URLRequest(url: try XCTUnwrap(URL(string: "\(serverURL)/v1/projects/\(selectedProjectID)")))
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         let (data, response) = try await URLSession.shared.data(for: request)
@@ -140,7 +144,10 @@ final class PortfolioBriefUITests: XCTestCase {
         let hasTestFlightBuild = storeData["latestTestFlightBuild"] as? [String: Any] != nil
         let hasAppStoreVersion = storeData["appStoreVersion"] as? [String: Any] != nil
         projectLink.tap()
+        assertSavedAnalysis(app: app, answer: sharedAnswer)
 
+        XCTAssertFalse(app.staticTexts["Evidence"].exists)
+        XCTAssertFalse(app.descendants(matching: .any)["evidence-source"].exists)
         let briefToggle = app.buttons["brief-section-toggle"]
         XCTAssertTrue(
             briefToggle.waitForExistence(timeout: 10),
@@ -152,35 +159,25 @@ final class PortfolioBriefUITests: XCTestCase {
         XCTAssertEqual(briefToggle.value as? String, "Expanded")
         XCTAssertTrue(
             app.descendants(matching: .any)
-                .matching(identifier: "evidence-source")
+                .matching(identifier: "project-brief-claim")
                 .firstMatch
                 .waitForExistence(timeout: 5),
-            "At least one source record should be visible for the brief claims."
+            "The project brief should show readable claims."
         )
-        app.buttons["analyst-section-toggle"].tap()
-        XCTAssertTrue(
-            app.buttons["generate-analyst-update"].exists,
-            "The analyst must remain an explicit opt-in action."
-        )
-        XCTAssertFalse(
-            app.staticTexts["Asking the analyst…"].exists,
-            "Opening a project must not automatically spend an analyst query."
-        )
-
         briefToggle.tap()
         XCTAssertEqual(briefToggle.value as? String, "Collapsed")
         XCTAssertFalse(
             app.descendants(matching: .any)
-                .matching(identifier: "evidence-source")
+                .matching(identifier: "project-brief-claim")
                 .firstMatch
                 .exists,
-            "Collapsing the project brief should hide all of its claims and evidence."
+            "Collapsing the project brief should hide all of its claims."
         )
         briefToggle.tap()
         XCTAssertEqual(briefToggle.value as? String, "Expanded")
         XCTAssertTrue(
             app.descendants(matching: .any)
-                .matching(identifier: "evidence-source")
+                .matching(identifier: "project-brief-claim")
                 .firstMatch
                 .waitForExistence(timeout: 5)
         )
@@ -222,7 +219,7 @@ final class PortfolioBriefUITests: XCTestCase {
 
         let sessionsToggle = app.buttons["sessions-section-toggle"]
         for _ in 0..<30 where !sessionsToggle.isHittable {
-            app.swipeUp()
+            app.swipeDown()
         }
         XCTAssertTrue(
             sessionsToggle.waitForExistence(timeout: 15),
@@ -235,5 +232,27 @@ final class PortfolioBriefUITests: XCTestCase {
                 "The rendered project detail should include a \(source) desktop or CLI session."
             )
         }
+    }
+
+    @MainActor
+    private func assertSavedAnalysis(app: XCUIApplication, answer: String) {
+        let toggle = app.buttons["analyst-section-toggle"]
+        XCTAssertTrue(toggle.waitForExistence(timeout: 10))
+        XCTAssertEqual(toggle.value as? String, "Expanded")
+        let analysis = app.staticTexts["analyst-update-text"]
+        XCTAssertTrue(analysis.waitForExistence(timeout: 10))
+        XCTAssertEqual(analysis.label, answer, "Project detail must reuse the saved analysis without a Generate step.")
+        XCTAssertTrue(app.buttons["check-analyst-update"].exists)
+        toggle.tap()
+    }
+
+    @MainActor
+    private func savedAnalysis(serverURL: String, token: String, projectID: String) async throws -> String {
+        var request = URLRequest(url: try XCTUnwrap(URL(string: "\(serverURL)/v1/projects/\(projectID)/voice-status")))
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let (data, response) = try await URLSession.shared.data(for: request)
+        XCTAssertEqual((response as? HTTPURLResponse)?.statusCode, 200)
+        let result = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        return try XCTUnwrap(result["answer"] as? String, "The mock fixture must have a saved analysis for the shared-cache check.")
     }
 }

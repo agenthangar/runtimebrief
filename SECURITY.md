@@ -20,7 +20,7 @@ RuntimeBrief is designed for a user-controlled Mac and private network:
   hostname is resolved once and the validated numeric address is bound.
 - The plaintext token is shown once, stored in the iOS Keychain, and retained
   by the daemon only as a scrypt hash.
-- The macOS-only analyst backend invokes exactly Codex CLI 0.144.1 as a fresh
+- The macOS-only analyst backend invokes exactly Codex CLI 0.156.1 as a fresh
   `codex app-server --stdio --strict-config` process for every request. It uses
   separate temporary workspace, user-home, and Codex-home directories, ignores
   repository rules and user configuration, disables persistence, analytics,
@@ -86,7 +86,8 @@ RuntimeBrief is designed for a user-controlled Mac and private network:
   to the public internet or an untrusted network.
 
 The Codex CLI sends selected repository and agent-session context to its remote
-service when analysis is requested. Processing follows the permissions and
+service for scheduled background analysis and explicit questions. Siri and the
+app share saved analysis results. Processing follows the permissions and
 data-handling policies of the ChatGPT workspace selected at `codex login`.
 Review [PRIVACY.md](PRIVACY.md) before enabling a project or connecting an MCP
 client.

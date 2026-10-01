@@ -31,7 +31,9 @@ const replySchema = z.object({
   answers: z.record(z.string().max(128), z.array(z.string().max(2000)).min(1).max(20)).optional(),
 }).strict().refine(body => (!!body.text !== !!body.approvalId) && (!body.text || (!body.optionId && !body.answers)), "Send one message or one decision.");
 
-const pollOptions = { config: { rateLimit: { max: 120, timeWindow: 60000 } } };
+// One app warms every project, then keeps the visible conversation current.
+// Reserve enough read capacity for a portfolio without relaxing mutation limits.
+const pollOptions = { config: { rateLimit: { max: 600, timeWindow: 60000 } } };
 
 export function registerLaunchRoutes(app: FastifyInstance, deps: ServerDeps): void {
   app.register(async routes => {

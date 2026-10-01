@@ -26,14 +26,33 @@ final class DemoModeUITests: XCTestCase {
 
         XCTAssertTrue(app.staticTexts["demo-detail-banner"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.buttons["brief-section-toggle"].exists)
-        XCTAssertTrue(app.buttons["ios-release-section-toggle"].exists)
-        for id in ["brief", "ios-release", "analyst", "ask", "sessions", "commits"] {
+        XCTAssertTrue(app.buttons["ios-release-section-toggle"].waitForExistence(timeout: 5))
+        let analystToggle = app.buttons["analyst-section-toggle"]
+        XCTAssertEqual(analystToggle.value as? String, "Expanded")
+        let analyst = app.staticTexts["analyst-update-text"]
+        XCTAssertTrue(analyst.waitForExistence(timeout: 5))
+        XCTAssertFalse(analyst.label.contains("[demo-evidence-"))
+        XCTAssertFalse(app.staticTexts["Commit a1b2c3d"].exists)
+        XCTAssertFalse(app.staticTexts["Evidence"].exists)
+        XCTAssertFalse(app.descendants(matching: .any)["evidence-source"].exists)
+        XCTAssertFalse(app.buttons["generate-analyst-update"].exists)
+        keepScreenshot(named: "02-automatic-analysis")
+        analystToggle.tap()
+        let orderedSections = [
+            analystToggle, app.buttons["brief-section-toggle"], app.buttons["ask-section-toggle"],
+            app.buttons["sessions-section-toggle"], app.buttons["new-claude-task"],
+            app.buttons["commits-section-toggle"], app.buttons["ios-release-section-toggle"],
+        ]
+        for (first, second) in zip(orderedSections, orderedSections.dropFirst()) {
+            XCTAssertLessThan(first.frame.minY, second.frame.minY, "Project sections must follow the requested order.")
+        }
+        for id in ["brief", "ask", "sessions", "commits", "ios-release"] {
             let toggle = app.buttons["\(id)-section-toggle"]
             for _ in 0..<4 where !toggle.isHittable { app.swipeUp() }
             XCTAssertTrue(toggle.exists)
             XCTAssertEqual(toggle.value as? String, "Collapsed")
         }
-        app.swipeDown(); app.swipeDown()
+        app.swipeDown(); app.swipeDown(); app.swipeDown()
         let brief = app.buttons["brief-section-toggle"]
         // Tap the header, not the center of the expanded card; its center
         // moves into the evidence content after expansion.
@@ -43,12 +62,12 @@ final class DemoModeUITests: XCTestCase {
         keepScreenshot(named: "02-project-brief")
         app.buttons["analyst-section-toggle"].tap()
 
-        let analyst = app.buttons["generate-analyst-update"]
         for _ in 0..<4 where !analyst.exists { app.swipeUp() }
         XCTAssertTrue(analyst.waitForExistence(timeout: 5))
-        analyst.tap()
+        XCTAssertFalse(app.buttons["generate-analyst-update"].exists)
         XCTAssertTrue(app.staticTexts["Demo response"].waitForExistence(timeout: 5))
         keepScreenshot(named: "03-analyst-update")
+        analystToggle.tap()
 
         app.buttons["ask-section-toggle"].tap()
         let question = app.textFields["demo-question-field"]
@@ -61,6 +80,9 @@ final class DemoModeUITests: XCTestCase {
         for _ in 0..<4 where !submit.isHittable { app.swipeUp() }
         submit.tap()
         XCTAssertTrue(app.staticTexts["project-answer"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.staticTexts["project-answer"].label.contains("[demo-evidence-"))
+        XCTAssertFalse(app.staticTexts["Evidence"].exists)
+        XCTAssertFalse(app.descendants(matching: .any)["evidence-source"].exists)
 
         app.navigationBars.buttons.firstMatch.tap()
         let exitDemo = app.buttons["exit-demo"]

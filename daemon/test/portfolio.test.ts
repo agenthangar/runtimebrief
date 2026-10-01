@@ -13,6 +13,26 @@ describe("PortfolioService", () => {
     repo = undefined;
   });
 
+  it("keeps months-old projects below recent work across repeated scans", async () => {
+    let now = new Date("2026-09-30T12:00:00Z");
+    const adapter: RuntimeAdapter = {
+      id: "mock", discover: async () => true, recentActivity: async () => [],
+      transcriptPaths: async project => [{ source: "codex", id: project.id, path: "/fixture/session.jsonl", state: "completed",
+        endedAt: new Date(project.id === "old" ? "2026-07-30T12:00:00Z" : "2026-09-30T11:00:00Z") }],
+    };
+    const portfolio = new PortfolioService(() => [
+      { id: "old", name: "Earlier project", path: "/fixture/old" },
+      { id: "recent", name: "Recent project", path: "/fixture/recent" },
+    ], [adapter], () => now);
+    const first = await portfolio.listProjects();
+    now = new Date("2026-09-30T12:00:14Z");
+    const refreshed = await portfolio.listProjects();
+    expect(refreshed).toEqual(first);
+    expect(refreshed.map(p => p.id)).toEqual(["recent", "old"]);
+    expect(refreshed[1]?.lastActivityAt).toBe("2026-07-30T12:00:00.000Z");
+    expect(refreshed[1]?.brief.state).toBe("quiet");
+  });
+
   it("returns only unresolved input waits as attention", async () => {
     repo = makeFixtureRepo({ dirty: true });
     const project: ProjectConfig = { id: "fixture", name: "Fixture", path: repo };

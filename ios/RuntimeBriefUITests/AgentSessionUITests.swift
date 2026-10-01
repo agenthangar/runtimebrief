@@ -1,101 +1,6 @@
 import XCTest
 
 final class AgentSessionUITests: XCTestCase {
-    /// Explicit live coverage uses an isolated daemon and already-running native fixtures.
-    @MainActor
-    func testLiveCodexAndCursorConversationContinuation() async throws {
-        let bundle = Bundle(for: Self.self)
-        let environment = ProcessInfo.processInfo.environment
-        func setting(_ key: String) -> String? {
-            let value = environment[key] ?? bundle.object(forInfoDictionaryKey: key) as? String
-            return value.flatMap { $0.isEmpty || $0.hasPrefix("$(") ? nil : $0 }
-        }
-        guard setting("RUNTIMEBRIEF_E2E_NATIVE_LIVE") == "1",
-              let server = setting("RUNTIMEBRIEF_E2E_SERVER_URL"),
-              let token = setting("RUNTIMEBRIEF_E2E_TOKEN"),
-              let projectID = setting("RUNTIMEBRIEF_E2E_PROJECT_ID"),
-              URL(string: "\(server)/v1/projects/\(projectID)/sessions") != nil
-        else { throw XCTSkip("Configure an isolated native-session fixture for live conversation coverage.") }
-        continueAfterFailure = false
-        for provider in ["Codex", "Cursor"] {
-            let app = XCUIApplication()
-            app.launchEnvironment["RUNTIMEBRIEF_E2E_CLEAR_STATE"] = "1"
-            app.launchEnvironment["RUNTIMEBRIEF_E2E_SERVER_URL"] = server
-            app.launchEnvironment["RUNTIMEBRIEF_E2E_TOKEN"] = token
-            app.launch()
-            let project = app.buttons["project-link-\(projectID)"]
-            XCTAssertTrue(project.waitForExistence(timeout: 20)); project.tap()
-            let newTask = app.buttons["new-claude-task"]
-            for _ in 0..<8 where !newTask.isHittable { app.swipeUp() }
-            XCTAssertTrue(newTask.waitForExistence(timeout: 15))
-            let cards = app.otherElements.matching(NSPredicate(format: "identifier BEGINSWITH %@", "claude-launch-"))
-            let before = Set(cards.allElementsBoundByIndex.map(\.identifier))
-            newTask.tap()
-            app.buttons["session-provider-picker"].tap(); app.buttons[provider].tap()
-            let modelPicker = app.buttons["session-model-picker"]
-            XCTAssertTrue(modelPicker.waitForExistence(timeout: 5))
-            XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == true"), object: modelPicker)], timeout: 30), .completed)
-            let permissions = app.buttons["session-permissions-picker"]
-            for _ in 0..<4 where !permissions.isHittable { app.swipeUp() }
-            let permissionLabel = provider == "Codex" ? "Plan" : "Ask"
-            let option = app.descendants(matching: .any).matching(NSPredicate(format: "label == %@", permissionLabel)).firstMatch
-            for _ in 0..<3 {
-                permissions.tap()
-                if option.waitForExistence(timeout: 2) { break }
-                app.swipeUp()
-            }
-            let permissionScreenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
-            permissionScreenshot.name = "\(provider) native permission menu"; permissionScreenshot.lifetime = .keepAlways; add(permissionScreenshot)
-            XCTAssertTrue(option.exists); option.tap()
-            assertSelection(permissions, contains: permissionLabel)
-            let prompt = app.textFields["claude-task-prompt"]
-            // Older simulator accessibility reports a field under the sheet's
-            // navigation bar as hittable. Bring its frame below that bar first.
-            for _ in 0..<6 where prompt.frame.minY < 120 || !prompt.isHittable { app.swipeDown() }
-            prompt.tap(); prompt.typeText("Do not run tools or change files. Reply IOS_NATIVE_BEGIN only. Fixture run \(UUID().uuidString).")
-            let start = app.buttons["start-claude-task"]
-            XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == true"), object: start)], timeout: 30), .completed)
-            start.tap()
-            XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: prompt)], timeout: 90), .completed)
-            XCTAssertTrue(newTask.waitForExistence(timeout: 90))
-            let card = cards.matching(NSPredicate(format: "NOT (identifier IN %@)", Array(before))).firstMatch
-            XCTAssertTrue(card.waitForExistence(timeout: 20))
-            let conversation = card.buttons["open-session-conversation"]
-            for _ in 0..<8 where !conversation.isHittable { app.swipeUp() }
-            XCTAssertTrue(conversation.waitForExistence(timeout: 120)); conversation.tap()
-            let input = app.textFields["session-conversation-input"]
-            XCTAssertTrue(input.waitForExistence(timeout: 20))
-            let marker = "IOS-\(provider.uppercased())-\(UUID().uuidString.prefix(8))"
-            input.tap(); input.typeText("Do not run tools. Reply exactly \(marker).")
-            let send = app.buttons["session-conversation-send"]
-            let ready = XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == true"), object: send)
-            XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: 120), .completed)
-            send.tap()
-            let response = app.staticTexts.matching(identifier: "session-message-assistant")
-                .matching(NSPredicate(format: "label CONTAINS %@", marker)).firstMatch
-            XCTAssertTrue(response.waitForExistence(timeout: 120), "The native provider must answer the UI follow-up.")
-            if provider == "Codex" {
-                input.tap(); input.typeText("Run only printf 'IOS_NATIVE_APPROVAL_READY' with sandbox_permissions=require_escalated. Ask for approval. Do not write files or run any other command.")
-                send.tap()
-                let approval = app.buttons["session-decision-accept"]
-                XCTAssertTrue(approval.waitForExistence(timeout: 120))
-                for _ in 0..<8 {
-                    if approval.frame.minY < 120 { app.swipeDown() }
-                    else if approval.frame.maxY > app.frame.maxY - 140 || !approval.isHittable { app.swipeUp() }
-                    else { break }
-                }
-                XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "printf")).firstMatch.exists)
-                approval.tap()
-                let completed = app.staticTexts.matching(identifier: "session-message-assistant")
-                    .matching(NSPredicate(format: "label CONTAINS %@", "IOS_NATIVE_APPROVAL_READY")).firstMatch
-                XCTAssertTrue(completed.waitForExistence(timeout: 120))
-            }
-            let screenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
-            screenshot.name = "\(provider) live native conversation"; screenshot.lifetime = .keepAlways; add(screenshot)
-            app.buttons["Done"].tap(); app.terminate()
-        }
-    }
-
     @MainActor
     func testCodexAndCursorNativeConversationFlowInDemo() {
         continueAfterFailure = false
@@ -116,18 +21,16 @@ final class AgentSessionUITests: XCTestCase {
             XCTAssertEqual(remoteToggle.value as? String, "1")
             app.swipeDown()
             let modelPicker = app.buttons["session-model-picker"]
-            modelPicker.tap(); app.buttons["Demo model"].tap()
-            assertSelection(modelPicker, contains: "Demo model")
+            selectMenuOption("Demo model", picker: modelPicker, app: app)
             let reasoning = app.buttons["session-reasoning-picker"]
             assertSelection(reasoning, contains: "Default")
-            reasoning.tap(); app.buttons["High"].tap()
-            assertSelection(reasoning, contains: "High")
+            selectMenuOption("High", picker: reasoning, app: app)
             let permissions = app.buttons["session-permissions-picker"]
-            permissions.tap(); app.buttons["Bypass"].tap()
-            assertSelection(permissions, contains: "Bypass")
+            selectMenuOption("Bypass", picker: permissions, app: app)
             let options = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
             options.name = "\(provider) selected model and Bypass"; options.lifetime = .keepAlways; add(options)
             let prompt = app.textFields["claude-task-prompt"]
+            for _ in 0..<6 where prompt.frame.minY < 120 || !prompt.isHittable { app.swipeDown() }
             prompt.tap(); prompt.typeText("Inspect the fictional native conversation")
             app.buttons["start-claude-task"].tap()
             XCTAssertTrue(newTask.waitForExistence(timeout: 10))
@@ -150,6 +53,28 @@ final class AgentSessionUITests: XCTestCase {
             app.buttons["Done"].tap()
             app.terminate()
         }
+    }
+
+    @MainActor
+    private func selectMenuOption(_ label: String, picker: XCUIElement, app: XCUIApplication,
+                                  file: StaticString = #filePath, line: UInt = #line) {
+        for _ in 0..<6 {
+            if picker.frame.minY < 120 { app.swipeDown() }
+            else if picker.frame.maxY > app.frame.maxY - 160 || !picker.isHittable { app.swipeUp() }
+            else { break }
+        }
+        let option = app.buttons[label]
+        picker.tap()
+        for _ in 0..<3 {
+            XCTAssertTrue(option.waitForExistence(timeout: 3), file: file, line: line)
+            option.tap()
+            let selected = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label CONTAINS %@", label), object: picker)
+            if XCTWaiter.wait(for: [selected], timeout: 2) == .completed { return }
+            // Simulator menu taps can be ignored while its layout is settling.
+            // Retry the same visible choice and still verify the saved receipt.
+            if !option.exists { picker.tap() }
+        }
+        assertSelection(picker, contains: label, file: file, line: line)
     }
 
     @MainActor

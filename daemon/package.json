@@ -17,7 +17,8 @@
   },
   "scripts": {
     "pretest": "npm run build",
-    "test": "vitest run",
+    "test": "node --import ./scripts/test-no-agent-usage.mjs ./node_modules/vitest/vitest.mjs run",
+    "test:release": "node scripts/release-agent-smoke.mjs",
     "prebuild": "node scripts/clean.mjs",
     "build": "tsc && node scripts/ensure-cli-executable.mjs && node scripts/ensure-native-helpers.mjs",
     "postinstall": "node scripts/ensure-native-helpers.mjs",

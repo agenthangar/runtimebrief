@@ -4,9 +4,9 @@
 authenticated REST, buffered SSE, and MCP interfaces used by the RuntimeBrief
 iOS app and Codex plugin.
 
-The daemon reads explicitly configured local project evidence. Optional
-on-demand analysis is macOS-only and starts the separately installed, exact
-Codex CLI 0.144.1 as a new `codex app-server --stdio --strict-config` process
+The daemon reads explicitly configured local project evidence. Background
+project analysis and on-demand questions are macOS-only and start the
+separately installed, exact Codex CLI 0.156.1 as a new `codex app-server --stdio --strict-config` process
 for each request. It uses the ChatGPT OAuth login created by `codex login`;
 RuntimeBrief never calls the OpenAI or Anthropic API directly and has no model
 API-key input or storage path.

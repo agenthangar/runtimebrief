@@ -175,6 +175,16 @@ struct ProjectsListView: View {
 private struct ProjectRow: View {
     let project: ProjectSummary
     @AppStorage(ProjectDiscoverySettings.key) private var discoveryEnabled = true
+    private var activityTime: some View {
+        HStack(spacing: 4) {
+            Text("Last activity")
+            RelativeTimeText(date: project.lastActivityAt)
+        }
+        .font(.caption)
+        .foregroundStyle(.secondary)
+        .accessibilityIdentifier("project-activity-\(project.id)")
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 7) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
@@ -197,7 +207,7 @@ private struct ProjectRow: View {
                         MonoLabel(text: branch)
                     }
                     Spacer()
-                    RelativeTimeText(date: brief.updatedAt ?? project.lastActivityAt)
+                    activityTime
                 }
             } else {
                 HStack(spacing: 8) {
@@ -206,7 +216,7 @@ private struct ProjectRow: View {
                         MonoLabel(text: branch)
                     }
                     Spacer()
-                    RelativeTimeText(date: project.lastActivityAt)
+                    activityTime
                 }
             }
         }

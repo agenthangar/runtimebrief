@@ -10,10 +10,10 @@ import { authHeaders, testConfig, tmpdir } from "./helpers.js";
 
 const cleanup: (() => Promise<unknown> | void)[] = [];
 afterEach(async () => { for (const fn of cleanup.splice(0).reverse()) await fn(); });
-function setup() {
+function setup(projectCount = 1) {
   const root = tmpdir("native-launch");
   cleanup.push(() => fs.rmSync(root, { recursive: true, force: true }));
-  const config = testConfig({ projects: [{ id: "fixture", name: "Fixture", path: root, allowed_actions: [] }] });
+  const config = testConfig({ projects: Array.from({ length: projectCount }, (_, index) => ({ id: index === 0 ? "fixture" : `fixture-${index}`, name: `Fixture ${index}`, path: root, allowed_actions: [] })) });
   const provider: ClaudeProvider = { capability: async () => ({ available: true, message: "Ready" }), start: vi.fn(), sessions: async () => [], desktopHas: () => false, open: vi.fn() };
   const store = new LaunchStore(path.join(root, "receipts.db"));
   const backends: ClaudeSessionBackend[] = (["codex", "cursor"] as const).map(provider => ({
@@ -83,10 +83,22 @@ describe("native provider sessions and remote terminal", () => {
     expect(f.backends[0]!.reply).toHaveBeenCalledTimes(1);
   });
 
-  it("allows sustained polling while keeping a bounded request budget", async () => {
+  it("bounds polling attempts while keeping authentication enforced", async () => {
     const f = setup();
-    for (let count = 0; count < 120; count++) expect((await f.app.inject({ url: "/v1/providers", headers: authHeaders() })).statusCode).toBe(200);
-    expect((await f.app.inject({ url: "/v1/providers", headers: authHeaders() })).statusCode).toBe(429);
+    for (let count = 0; count < 600; count++) expect((await f.app.inject({ url: "/v1/providers" })).statusCode).toBe(401);
+    expect((await f.app.inject({ url: "/v1/providers" })).statusCode).toBe(429);
+  });
+  it("loads a 28-project portfolio repeatedly without starving the visible card or mutations", async () => {
+    const f = setup(28);
+    for (let pass = 0; pass < 6; pass++) {
+      for (const project of f.config.projects) {
+        expect((await f.app.inject({ url: `/v1/projects/${project.id}/sessions`, headers: authHeaders() })).statusCode).toBe(200);
+      }
+    }
+    for (let count = 0; count < 20; count++) expect((await f.app.inject({ url: sessions, headers: authHeaders() })).statusCode).toBe(200);
+    for (let count = 0; count < 30; count++) expect((await f.app.inject({ method: "POST", url: sessions, headers: authHeaders(), payload: {} })).statusCode).toBe(400);
+    expect((await f.app.inject({ method: "POST", url: sessions, headers: authHeaders(), payload: {} })).statusCode).toBe(429);
+    expect((await f.app.inject({ url: sessions, headers: authHeaders() })).statusCode).toBe(200);
   });
   it.each(["codex", "cursor"])("defaults remote control on and dispatches %s once across retries", async provider => {
     const f = setup(); const body = task(provider);
