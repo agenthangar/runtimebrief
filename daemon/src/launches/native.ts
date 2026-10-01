@@ -14,7 +14,7 @@ import { NativeModelCatalog, discoverNativeModels } from "./nativeModels.js";
 import { discoverClaudeModels } from "./claudeModels.js";
 import { resolveClaudeSettings, resolveCodexSettings, resolveCursorSettings } from "./nativeSettings.js";
 import { parseClaudeSessionFile } from "../adapters/claudeCodeSessions.js";
-import { nativeRemoteURL, promptHash } from "./tLegacy.js";
+import { nativeRemoteURL, promptHash } from "./identity.js";
 import { LaunchError, permissionModes, type ClaudeSessionBackend, type ClaudeLaunch, type LaunchCapability, type ClaudeLaunchOptions, type ConversationSnapshot, type SessionReply } from "./types.js";
 
 const exec = promisify(execFile);

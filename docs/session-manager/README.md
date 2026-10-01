@@ -2,19 +2,10 @@
 
 **Draft · Updated 2026-09-29 · t API not implemented**
 
-RuntimeBrief now implements a [compatibility backend for unchanged current t](../session-control.md).
-It owns interim receipts and uses the public shell launcher; this document
-specifies the future machine API that will replace that adapter.
-
-RuntimeBrief starts a task through `t`, reads its status, and opens the native
-agent when the user needs to act. `t` owns the process, tmux, worktree, and durable
-session record. The agent owns conversation, tools, and approvals. Human `t`
-commands and the machine interface use the same lifecycle code and store.
-
-The current RuntimeBrief compatibility adapter supports Claude, Codex, and
-Cursor on the local Mac. Advertise providers only after their adapters work. Remote Control is requested by default; local-only is an explicit
-opt-out. Existing background and t launches keep their original owner when
-this machine API becomes available.
+This is a historical proposal for a t API. RuntimeBrief now uses
+[direct native adapters](../session-control.md) for Claude Code, Codex App Server,
+and Cursor ACP. The draft schema and examples below are retained for reference;
+they are not the current RuntimeBrief execution API.
 
 ## Four methods, one record
 

@@ -10,17 +10,26 @@ final class AgentSessionsStore {
     private(set) var lists: [String: ClaudeLaunchList] = [:]
     private(set) var savedProjects = Set<String>()
     private(set) var errors: [String: String] = [:]
+    private let identityOverride: (() -> String)?
+    private let sourceFactory: (TimeInterval) -> any RuntimeBriefDataSource
+    private let cacheDirectory: URL?
+    init(identity: (() -> String)? = nil, source: ((TimeInterval) -> any RuntimeBriefDataSource)? = nil,
+         cacheDirectory: URL? = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first) {
+        identityOverride = identity
+        sourceFactory = source ?? { RuntimeBriefDataSourceFactory.current(timeout: $0) }
+        self.cacheDirectory = cacheDirectory
+    }
     private var scope = ""
-    private var warming = false
+    private var warmingScope: String?
     private var pending = Set<String>()
     private var healthAt: Date?
     private var file: URL? {
         guard scope != "demo", scope != "unconfigured" else { return nil }
-        return FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first?.appendingPathComponent("agent-sessions-\(scope).json")
+        return cacheDirectory?.appendingPathComponent("agent-sessions-\(scope).json")
     }
     private func synchronizeScope() {
         let settings = ServerSettings.load()
-        let identity = RuntimeBriefModeStore.isDemoEnabled ? "demo" : settings.isConfigured ? "\(settings.baseURL!.absoluteString)|\(settings.token!)" : "unconfigured"
+        let identity = identityOverride?() ?? (RuntimeBriefModeStore.isDemoEnabled ? "demo" : settings.isConfigured ? "\(settings.baseURL!.absoluteString)|\(settings.token!)" : "unconfigured")
         let current = identity == "demo" || identity == "unconfigured" ? identity : SHA256.hash(data: Data(identity.utf8)).map { String(format: "%02x", $0) }.joined()
         guard current != scope else { return }
         scope = current; providers = []; lists = [:]; errors = [:]; healthAt = nil; pending = []; savedProjects = []
@@ -30,11 +39,11 @@ final class AgentSessionsStore {
     func cached(projectID: String) -> ClaudeLaunchList? { synchronizeScope(); return lists[projectID] }
     func warm(force: Bool = false) async {
         synchronizeScope()
-        guard !warming, scope != "unconfigured", force || healthAt == nil || Date().timeIntervalSince(healthAt!) > 60 else { return }
-        warming = true
-        defer { warming = false }
+        guard warmingScope != scope, scope != "unconfigured", force || healthAt == nil || Date().timeIntervalSince(healthAt!) > 60 else { return }
         let expected = scope
-        let source = RuntimeBriefDataSourceFactory.current(timeout: 6)
+        warmingScope = expected
+        defer { if warmingScope == expected { warmingScope = nil } }
+        let source = sourceFactory(6)
         for _ in 0..<8 {
             do {
                 let result = try await source.agentProviders()
@@ -52,7 +61,7 @@ final class AgentSessionsStore {
         pending.insert(projectID)
         defer { if expected == scope { pending.remove(projectID) } }
         do {
-            let result = try await RuntimeBriefDataSourceFactory.current(timeout: 6).sessions(projectID: projectID)
+            let result = try await sourceFactory(6).sessions(projectID: projectID)
             guard expected == scope else { return }
             lists[projectID] = result; savedProjects.remove(projectID); errors.removeValue(forKey: projectID)
             if let value = result.providers, !value.contains(where: { $0.message == "Starting tasks is disabled for this project." }) { providers = value }

@@ -62,21 +62,21 @@ RuntimeBrief is designed for a user-controlled Mac and private network:
 - Action proposals are denied unless their kind is allowlisted for the project.
   Resolving a decision is idempotent, expires with the proposal, and only
   updates RuntimeBrief's local decision database. It does not execute proposals.
-- Native Claude launches require an authenticated daemon client and a registered
-  project. Configured and discovered projects allow launches by default;
-  `claude_launch_enabled: false` explicitly disables launches and handoff for a
-  project. All paired clients share this scope. Clients choose a supported model
-  and native permission mode, defaulting to the configured Claude model and
-  Manual. Bypass explicitly skips tool permission checks. Native permissions,
-  hooks, and workspace trust belong to Claude. Desktop handoff may apply
-  Desktop's own permission setting; the receipt records launch choices only.
-  This execution path is separate from the isolated evidence analyst.
-- Launch commands use argument arrays, with task text after `--`. A durable
-  receipt precedes dispatch, and an uncertain result is reconciled without
-  replaying the prompt. Handoff stops the exact native background session,
-  honors native writer locks, and uses `/desktop`; RuntimeBrief never writes
-  native transcripts or forwards tool approvals. After handoff it only opens
-  Desktop, even if the native catalog entry later disappears.
+- Native Claude, Codex, and Cursor launches require an authenticated client and
+  registered project. `claude_launch_enabled: false` disables new launches and
+  continuation writes for all providers. Native provider permission modes,
+  hooks, workspace trust, and authentication remain provider-owned. These coding
+  sessions are separate from the restricted evidence analyst.
+- Each task has an isolated Git worktree based on local HEAD, a detached owner,
+  private state files, and an authenticated local socket. RuntimeBrief verifies
+  the exact owner, native identity, and workspace before continuation. Claude
+  Remote Control links require native history and a live owner. Codex and Cursor
+  approvals are forwarded only after an explicit matching user choice.
+- Durable receipts precede initial dispatch. Reply IDs and payload fingerprints
+  are recorded before sending; retries never repeat uncertain prompts or
+  decisions. Unknown native methods fail closed. Exited owners are not restarted
+  automatically. Conversation snapshots and reply journals are private local
+  data; snapshots are bounded and iOS caches are protected and connection-scoped.
 - Repository paths that commonly contain credentials are filtered before
   context is constructed. Filtering reduces risk but is not a substitute for
   reviewing which repositories and transcripts are made available.

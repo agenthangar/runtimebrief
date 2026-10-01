@@ -4,6 +4,7 @@ import Foundation
 actor DemoClaudeTasks {
     static let shared = DemoClaudeTasks()
     private var tasks: [ClaudeLaunch] = []
+    private var conversations: [String: [ConversationMessage]] = [:]
     private var screens: [String: String] = [:]
     private var inputs: Set<String> = []
 
@@ -39,16 +40,20 @@ actor DemoClaudeTasks {
         launch.backend = "native-\(request.provider.rawValue)"
         tasks[0] = launch
         screens[launch.id] = "Your sample project summary is ready to review. This is a fictional \(request.provider.label) response; no Mac is connected."
+        conversations[launch.id] = [ConversationMessage(id: "demo-reply", role: "assistant", text: screens[launch.id]!)]
         return launch
     }
 
     func conversation(projectID: String, launchID: String) throws -> ConversationSnapshot {
         guard let launch = tasks.first(where: { $0.id == launchID && $0.projectId == projectID }) else { throw RuntimeBriefError.notFound }
-        return ConversationSnapshot(state: "completed", message: "Fictional conversation. No Mac is connected.", writable: launch.requestedRemoteControl != false, messages: [ConversationMessage(id: "demo-reply", role: "assistant", text: screens[launchID] ?? "Your demo task is ready to review.")], requests: [])
+        return ConversationSnapshot(state: "completed", message: "Fictional conversation. No Mac is connected.", writable: launch.requestedRemoteControl != false, messages: conversations[launchID] ?? [ConversationMessage(id: "demo-reply", role: "assistant", text: "Your demo task is ready to review.")], requests: [])
     }
     func reply(projectID: String, launchID: String, reply: SessionReply) throws -> SessionReplyResult {
-        _ = try conversation(projectID: projectID, launchID: launchID)
-        if inputs.insert(launchID + reply.requestId).inserted { screens[launchID, default: ""] += "\nDemo received your response. No work was sent to a Mac." }
+        guard try conversation(projectID: projectID, launchID: launchID).writable == true else { throw RuntimeBriefError.notFound }
+        if inputs.insert(launchID + reply.requestId).inserted {
+            if let text = reply.text { conversations[launchID, default: []].append(ConversationMessage(id: reply.requestId, role: "user", text: text)) }
+            conversations[launchID, default: []].append(ConversationMessage(id: "reply-" + reply.requestId, role: "assistant", text: "Demo received your response. No work was sent to a Mac."))
+        }
         return SessionReplyResult(accepted: true, unknown: nil)
     }
 

@@ -40,7 +40,7 @@ describe("native Claude launch lifecycle", () => {
     const { service, config, dir, provider } = setup();
     config.project_roots = [dir];
     fs.mkdirSync(path.join(dir, "new-project", ".git"), { recursive: true });
-    expect((await service.list("new-project")).capability.available).toBe(true);
+    await vi.waitFor(async () => expect((await service.list("new-project")).capability.available).toBe(true));
     expect((await service.start("new-project", randomUUID(), "Inspect the new fictional project")).nativeId).toBe("1234abcd");
     expect(provider.start).toHaveBeenCalledTimes(1);
     config.projects.push({ id: "new-project", name: "New project", path: path.join(dir, "new-project"), allowed_actions: [], claude_launch_enabled: false });
@@ -163,7 +163,7 @@ describe("Claude launch API", () => {
 describe("replaceable session backend", () => {
   function backend(): ClaudeSessionBackend {
     return {
-      id: "t-legacy",
+      id: "native-claude",
       capability: vi.fn(async () => ({ available: true, message: "Ready" })),
       create: vi.fn(async () => {}),
       get: vi.fn(async receipt => ({ ...receipt, state: "starting", tmuxTarget: "fixture-terminal" })),
@@ -202,13 +202,13 @@ describe("replaceable session backend", () => {
     expect(new Set(receipts.map(r => r.id)).size).toBe(1);
     expect(t.create).toHaveBeenCalledTimes(1);
     expect(f.provider.start).not.toHaveBeenCalled();
-    expect(receipts[0]).toMatchObject({ backend: "t-legacy", requestedRemoteControl: true, projectRoot: fs.realpathSync(f.dir) });
+    expect(receipts[0]).toMatchObject({ backend: "native-claude", requestedRemoteControl: true, projectRoot: fs.realpathSync(f.dir) });
   });
 
   it("does not reserve setup failures or execute again after losing the launch response", async () => {
     const f = setup(); const t = backend();
     const service = new LaunchService(f.config, f.provider, f.store, t);
-    vi.mocked(t.capability).mockResolvedValueOnce({ available: false, message: "Install t" });
+    vi.mocked(t.capability).mockResolvedValueOnce({ available: false, message: "Install Claude Code" });
     const request = randomUUID(); const prompt = "Inspect the fictional workflow";
     await expect(service.start("fixture", request, prompt)).rejects.toMatchObject({ code: "requires_setup" });
     expect(f.store.list("fixture")).toEqual([]);
@@ -237,15 +237,16 @@ describe("replaceable session backend", () => {
     const service = new LaunchService(f.config, f.provider, f.store, current);
     const request = randomUUID(); const prompt = "Inspect the fictional workflow";
     const first = await service.start("fixture", request, prompt);
-    const replacement = backend(); Object.assign(replacement, { id: "t-api" });
+    const replacement = backend(); Object.assign(replacement, { id: "native-replacement" });
     const upgraded = new LaunchService(f.config, f.provider, f.store, replacement);
+    await vi.waitFor(async () => expect((await upgraded.list("fixture")).launches[0]?.state).toBe("unknown"));
     const old = (await upgraded.list("fixture")).launches[0]!;
-    expect(old).toMatchObject({ backend: "t-legacy", state: "unknown" });
+    expect(old).toMatchObject({ backend: "native-claude", state: "unknown" });
     expect((await upgraded.start("fixture", request, prompt)).id).toBe(first.id);
     expect(replacement.create).not.toHaveBeenCalled();
     expect(replacement.get).not.toHaveBeenCalled();
     const withLegacy = new LaunchService(f.config, f.provider, f.store, replacement, [current]);
-    expect((await withLegacy.list("fixture")).launches[0]?.backend).toBe("t-legacy");
+    expect((await withLegacy.list("fixture")).launches[0]?.backend).toBe("native-claude");
     expect(current.get).toHaveBeenCalled();
     expect(replacement.get).not.toHaveBeenCalled();
   });

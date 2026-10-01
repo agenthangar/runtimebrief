@@ -2,7 +2,7 @@ import XCTest
 
 final class ClaudeLaunchUITests: XCTestCase {
     @MainActor
-    func testLiveNativeLaunchAndDesktopTakeover() throws {
+    func testLiveNativeLaunchAndVerifiedContinuation() throws {
         let bundle = Bundle(for: Self.self)
         func setting(_ key: String) -> String? {
             let value = ProcessInfo.processInfo.environment[key] ?? bundle.object(forInfoDictionaryKey: key) as? String
@@ -29,10 +29,6 @@ final class ClaudeLaunchUITests: XCTestCase {
         let cards = app.otherElements.matching(NSPredicate(format: "identifier BEGINSWITH %@", "claude-launch-"))
         let existingIDs = Set(cards.allElementsBoundByIndex.map(\.identifier))
         newTask.tap()
-        app.buttons["claude-model-picker"].tap()
-        app.buttons["Fable"].tap()
-        app.buttons["claude-permissions-picker"].tap()
-        app.buttons["Auto"].tap()
         let prompt = app.textFields["claude-task-prompt"]
         XCTAssertTrue(prompt.waitForExistence(timeout: 5))
         prompt.tap()
@@ -45,14 +41,12 @@ final class ClaudeLaunchUITests: XCTestCase {
         let card = app.otherElements["claude-launch-\(newID)"]
         for _ in 0..<4 where !card.isHittable { app.swipeUp() }
         XCTAssertTrue(card.staticTexts["Ready to review"].waitForExistence(timeout: 90))
-        let takeover = app.buttons["take-over-claude-\(newID)"]
-        for _ in 0..<4 where !takeover.isHittable { app.swipeUp() }
-        XCTAssertTrue(takeover.waitForExistence(timeout: 10))
-        takeover.tap()
-        XCTAssertTrue(card.staticTexts["In Claude Desktop"].waitForExistence(timeout: 50))
-        XCTAssertTrue(card.staticTexts["Started with Fable · Auto"].exists)
+        let continuation = app.buttons["remote-control-\(newID)"]
+        for _ in 0..<4 where !continuation.isHittable { app.swipeUp() }
+        XCTAssertTrue(continuation.waitForExistence(timeout: 120))
+        XCTAssertFalse(app.buttons["take-over-claude-\(newID)"].exists)
         let screenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
-        screenshot.name = "Live native Claude Desktop handoff"
+        screenshot.name = "Live native Claude verified continuation"
         screenshot.lifetime = .keepAlways
         add(screenshot)
     }

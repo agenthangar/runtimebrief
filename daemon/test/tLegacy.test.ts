@@ -108,7 +108,8 @@ describe("current t observation", () => {
     fs.unlinkSync(path.join(f.directory, "native.json"));
     f.terminal.mockRejectedValue(new Error("no server"));
     const result = await f.backend.get(f.receipt);
-    expect(result).toMatchObject({ launchState: "unknown", state: "unknown", activity: "stopped", tmuxTarget: undefined });
+    expect(result).toMatchObject({ launchState: "unknown", state: "unknown", activity: "stopped" });
+    expect(result).not.toHaveProperty("tmuxTarget");
     expect(result.message).toContain("not available in Claude");
     expect(result.message).not.toContain("saved conversation");
   });

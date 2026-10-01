@@ -55,7 +55,10 @@ Native socket ownership is checked using the exact worktree and a private
 per-task token. Approval choices are tied to the current native request.
 Replies are durably reserved before dispatch; retries with identical request
 IDs never repeat a follow-up or decision, including uncertain acknowledgments.
-The initial launch receipt is also reserved before dispatch.
+The initial launch receipt is also reserved before dispatch. Polling endpoints
+have a separate bounded request budget, so conversation refresh and background
+prefetch do not consume the mutation budget. Siri and Shortcuts use the selected
+provider catalog endpoint before confirming a native launch.
 
 Claude's setup screen uses bounded terminal input only for the verified owner.
 The task list displays human states and continuation actions, without tmux

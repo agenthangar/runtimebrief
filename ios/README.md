@@ -1,7 +1,6 @@
 # RuntimeBrief iOS app
 
-SwiftUI + App Intents client for [runtimebriefd](../daemon). No third-party
-dependencies.
+SwiftUI + App Intents client for [runtimebriefd](../daemon). Claude setup terminals use the pinned SwiftTerm package.
 
 ## Build
 
@@ -83,7 +82,7 @@ personal signing change local; do not commit it or change the production
 | Start coding session | Start a Codex session in RuntimeBrief | Session receipt ID |
 
 **Start Coding Session** supports Claude Code, Codex, and Cursor through the
-same `/sessions` API and `t` launchers as the app. Siri asks for the project,
+same native adapters and `/sessions` API as the app. Siri asks for the project,
 agent, and task, then confirms the destination and settings before writing.
 The device must be locally authenticated. Advanced Shortcuts parameters offer
 the Mac's current model choices, reasoning, permissions (Manual by default),
@@ -174,7 +173,7 @@ For opt-in native Siri coverage, set `RUNTIMEBRIEF_E2E_SIRI_LIVE=1` plus
 `RUNTIMEBRIEF_E2E_SERVER_URL`, `RUNTIMEBRIEF_E2E_TOKEN`, and
 `RUNTIMEBRIEF_E2E_PROJECT_ID` for an isolated daemon and disposable Git fixture.
 Run `SiriIntegrationUITests/testLiveSiriCreatesNativeSessions`. It checks real
-project-scoped `t` receipts for each provider; native workspace trust, sign-in,
+project-scoped native receipts for each provider; native workspace trust, sign-in,
 and final task completion need separate observation on the fixture.
 
 Before release, test spoken requests and the Siri card on a physical iOS 27
@@ -200,7 +199,7 @@ it does not load the connected daemon's project names or verify speech.
 
 ## Start a coding task
 
-Use an updated daemon with the `t` session launchers. Install and sign in to
+Use an updated daemon with the native provider adapters. Install and sign in to
 the coding agents you want to use on your Mac.
 All registered projects allow tasks by default, including projects discovered
 later under a trusted root.
@@ -213,10 +212,14 @@ later under a trusted root.
 4. Enter a task of 10–8,000 characters and tap **Start in** the selected agent.
    The button remains visible above the keyboard. The receipt shows status
    and the original model/permission choices under **Started with**.
-5. Continue Claude through its Remote Control link, or open the Codex/Cursor
-   terminal when its connection is ready. Legacy Claude receipts may offer
-   Desktop handoff; that stops a current response and Desktop can apply its
-   own permissions.
+5. Use **Continue in Claude** when its verified Remote Control link is ready.
+   Codex and Cursor use **Open conversation** for messages, follow-ups, approval
+   choices, and questions. **Finish Claude setup** appears for a verified native
+   trust/setup prompt. Desktop sidebar visibility is not implied by an identity.
+
+Provider health loads in the background on app opening and is shared across
+projects. Saved cards appear immediately; task lists are prefetched with bounded
+concurrency. Models and workspace defaults load for the selected composer.
 
 Claude keeps working when the phone disconnects. If a request has an uncertain
 result, refresh its receipt before starting another task. Retrying the same
@@ -243,7 +246,7 @@ the time of its evidence, so it can remain old even after a successful refresh.
 | Claude asks for per-project enabling | Update the daemon and restart its service, then tap the refresh icon in the project's Claude Code section. Build 15 can use the new default access without an iOS update. |
 | Claude says launches were disabled | The project has an explicit opt-out. On the Mac, run `runtimebriefd enable-claude <project-id>` and `runtimebriefd install-service`. |
 | No model or permission selectors | Update the iOS app to build 16 or newer, along with the daemon. |
-| Claude cannot launch or hand off | Follow the capability message: check Claude installation, sign-in, and workspace trust on the Mac. CLI and Desktop sign-in must both work. |
+| Claude cannot launch or continue | Follow the capability message: check Claude installation, sign-in, and workspace trust on the Mac. Claude Code sign-in must work. |
 
 Keep bearer tokens and private project data out of screenshots and bug reports.
 
@@ -269,10 +272,8 @@ The app icon's generation and licensing provenance is documented in
 [ASSET_PROVENANCE.md](ASSET_PROVENANCE.md).
 
 
-Coding agents use the same task composer. Claude continues through native
-Remote Control; Codex and Cursor continue in their live terminals through the
-RuntimeBrief connection. Remote Control defaults on. The terminal renderer is
-pinned to SwiftTerm 1.5.1 (MIT); snapshots are read-only and cannot open links,
-read/write the clipboard, or send automatic terminal replies. Input goes through
-explicit controls with a durable request ID. Demo terminals use fictional
-in-memory data and never connect to a Mac.
+Coding agents share the native task composer and durable retry IDs. Claude setup
+uses the SwiftTerm 1.5.1 renderer (MIT) with explicit input controls; Codex and
+Cursor use structured native conversations. Demo conversations are fictional,
+in memory, and never contact a Mac. See the native session guide for ownership,
+project scope, stopped-session behavior, and delivery guarantees.

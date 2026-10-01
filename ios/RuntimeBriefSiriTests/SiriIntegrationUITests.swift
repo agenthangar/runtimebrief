@@ -160,7 +160,7 @@ final class SiriIntegrationUITests: XCTestCase {
             XCTAssertEqual(receipt["provider"] as? String, provider)
             XCTAssertEqual(receipt["projectId"] as? String, projectID)
             XCTAssertEqual(receipt["requestedRemoteControl"] as? Bool, true)
-            XCTAssertEqual(receipt["backend"] as? String, provider == "claude" ? "t-legacy" : "t-\(provider)")
+            XCTAssertEqual(receipt["backend"] as? String, "native-\(provider)")
             XCTAssertNotEqual(receipt["state"] as? String, "failed")
             XCTAssertNotEqual(receipt["state"] as? String, "unknown")
         }

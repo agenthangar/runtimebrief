@@ -4,7 +4,7 @@ import type { RuntimeBriefConfig } from "../config.js";
 import { projectsForConfig } from "../projectRegistry.js";
 import { LaunchStore } from "./store.js";
 import { DEFAULT_LAUNCH_OPTIONS, MODEL_ID, REASONING_EFFORTS, permissionModes, LaunchError, type ClaudeLaunchOptions, type ClaudeLaunch, type ClaudeProvider, type NativeClaudeSession, type ClaudeSessionBackend, type SessionProvider, type LaunchCapability, type SessionReply } from "./types.js";
-import { promptHash } from "./tLegacy.js";
+import { promptHash } from "./identity.js";
 
 export const CLAUDE_LAUNCH_ACTION = "launch-claude";
 
@@ -193,7 +193,7 @@ export class LaunchService {
       try { receipt = await backend.get(receipt); }
       catch {
         receipt.state = "unknown";
-        receipt.message = "Current t status is unavailable. Check its native session on your Mac.";
+        receipt.message = "Current native agent status is unavailable. Check its native session on your Mac.";
         if (receipt.remoteControl) receipt.remoteControl = { state: "unknown", url: null, observedAt: new Date().toISOString() };
       }
     }

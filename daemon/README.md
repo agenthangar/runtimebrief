@@ -75,9 +75,9 @@ runtimebriefd install-service
 
 Run the disable and restore commands as alternatives, not both at once.
 These commands write the optional `claude_launch_enabled` project setting.
-Only `false` disables launches and Desktop handoff; observation and existing
-Claude sessions remain available. The decision inbox's `allowed_actions`
-setting does not control Claude launches.
+Only `false` disables launches and continuation writes; observation and existing
+native sessions remain available. The decision inbox's `allowed_actions`
+setting does not control coding-agent launches.
 
 The authenticated launch API accepts a task, stable request UUID, optional
 model alias, permission mode, and `remoteControl` boolean. Defaults are the

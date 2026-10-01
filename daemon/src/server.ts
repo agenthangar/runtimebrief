@@ -47,10 +47,12 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
   });
 
   app.after(() => {
-    // The plugin installs its onRoute hook during boot, so declare routes only
-    // after it is ready. The root hook also covers unknown URLs; the plugin's
-    // per-request guard prevents known routes from being counted twice.
-    app.addHook("onRequest", app.rateLimit());
+    // Registered routes use the plugin's route limiter, including polling budgets.
+    // Unknown paths still need a limiter before authentication.
+    const unknownLimiter = app.rateLimit();
+    app.addHook("onRequest", async (request, reply) => {
+      if (!request.routeOptions.url) await unknownLimiter.call(app, request, reply);
+    });
     app.addHook("preParsing", makeAuthHook(deps.config.auth.token_hash));
 
     registerHealthRoutes(app, VERSION);

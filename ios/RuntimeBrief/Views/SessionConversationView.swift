@@ -21,7 +21,7 @@ struct SessionConversationView: View {
                     ForEach(snapshot?.messages ?? []) { message in
                         VStack(alignment: .leading, spacing: 5) {
                             Text(message.role == "user" ? "You" : message.role == "tool" ? "Activity" : launch.agent.label).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
-                            Text(message.text).textSelection(.enabled)
+                            Text(message.text).textSelection(.enabled).accessibilityIdentifier("session-message-\(message.role)")
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(12).background(message.role == "user" ? Color.blue.opacity(0.08) : Color.secondary.opacity(0.06), in: RoundedRectangle(cornerRadius: 12))
@@ -31,7 +31,7 @@ struct SessionConversationView: View {
                             Text(request.title).font(.headline)
                             if !request.body.isEmpty { Text(request.body).font(.callout).textSelection(.enabled) }
                             ForEach(request.options) { option in
-                                Button(option.label) { Task { await send(SessionReply(requestId: UUID().uuidString.lowercased(), approvalId: request.id, optionId: option.id)) } }.buttonStyle(.bordered)
+                                Button(option.label) { Task { await send(SessionReply(requestId: UUID().uuidString.lowercased(), approvalId: request.id, optionId: option.id)) } }.buttonStyle(.bordered).accessibilityIdentifier("session-decision-\(option.id)")
                             }
                             ForEach(request.questions) { question in
                                 Text(question.prompt).font(.callout.weight(.medium))
@@ -59,9 +59,10 @@ struct SessionConversationView: View {
             .safeAreaInset(edge: .bottom) {
                 if snapshot?.writable == true {
                     HStack(alignment: .bottom) {
-                        TextField("Follow up", text: $text, axis: .vertical).lineLimit(1...5)
+                        TextField("Follow up", text: $text, axis: .vertical).lineLimit(1...5).accessibilityIdentifier("session-conversation-input")
                         Button { Task { await send(SessionReply(requestId: UUID().uuidString.lowercased(), text: text)) } } label: { Image(systemName: "arrow.up.circle.fill").font(.title) }
-                            .disabled(sending || retry != nil || text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || snapshot?.state == "running" || !(snapshot?.requests.isEmpty ?? true))
+                            .accessibilityIdentifier("session-conversation-send")
+                            .disabled(sending || retry != nil || text.utf16.count > 8000 || text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || snapshot?.state == "running" || !(snapshot?.requests.isEmpty ?? true))
                     }.padding().background(.bar)
                 }
             }
@@ -95,7 +96,7 @@ struct SessionConversationView: View {
 }
 
 /// Preserve response IDs across app restarts without storing message contents.
-private enum SessionReplyDraft {
+enum SessionReplyDraft {
     private static func key(scope: String, launchID: String, body: SessionReply) -> String {
         let encoder = JSONEncoder(); encoder.outputFormatting = [.sortedKeys]
         let identity = SessionReply(requestId: "", text: body.text, approvalId: body.approvalId, optionId: body.optionId, answers: body.answers)
@@ -103,13 +104,13 @@ private enum SessionReplyDraft {
         let digest = SHA256.hash(data: Data((scope + launchID).utf8) + bytes).map { String(format: "%02x", $0) }.joined()
         return "runtimebrief.reply.\(digest)"
     }
-    static func request(scope: String, launchID: String, body: SessionReply) -> SessionReply {
+    static func request(scope: String, launchID: String, body: SessionReply, defaults: UserDefaults = .standard) -> SessionReply {
         let key = key(scope: scope, launchID: launchID, body: body)
-        let id = UserDefaults.standard.string(forKey: key) ?? UUID().uuidString.lowercased()
-        UserDefaults.standard.set(id, forKey: key)
+        let id = defaults.string(forKey: key) ?? UUID().uuidString.lowercased()
+        defaults.set(id, forKey: key)
         return SessionReply(requestId: id, text: body.text, approvalId: body.approvalId, optionId: body.optionId, answers: body.answers)
     }
-    static func clear(scope: String, launchID: String, body: SessionReply) {
-        UserDefaults.standard.removeObject(forKey: key(scope: scope, launchID: launchID, body: body))
+    static func clear(scope: String, launchID: String, body: SessionReply, defaults: UserDefaults = .standard) {
+        defaults.removeObject(forKey: key(scope: scope, launchID: launchID, body: body))
     }
 }

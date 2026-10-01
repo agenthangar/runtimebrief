@@ -41,27 +41,28 @@ struct AgentSessionTests {
         #expect(claude.requestId == ClaudeLaunchDraft.request(projectID: "fixture", scope: "fixture", prompt: prompt, defaults: defaults).requestId)
     }
 
-    @Test func demoTerminalCannotFallThroughToLiveControl() async throws {
+    @Test func demoConversationCannotFallThroughToLiveControl() async throws {
         let source = RuntimeBriefDataSourceFactory.make(isDemo: true)
         for provider in [AgentProvider.codex, .cursor] {
             let request = SessionLaunchRequest(requestId: UUID().uuidString, prompt: "Inspect the fictional task", provider: provider)
             let launch = try await source.startSession(projectID: "demo-sample-tracker", request: request)
             #expect(launch.agent == provider)
             #expect(launch.remoteControl?.state == "ready")
-            let input = TerminalInput(requestId: UUID().uuidString, data: "Follow-up\r")
-            #expect(try await source.sendInput(projectID: launch.projectId, launchID: launch.id, input: input).state == "sent")
-            _ = try await source.sendInput(projectID: launch.projectId, launchID: launch.id, input: input)
-            let terminal = try await source.terminal(projectID: launch.projectId, launchID: launch.id)
-            #expect(terminal.screen.components(separatedBy: "Follow-up").count == 2)
-            #expect(terminal.screen.contains("No Mac is connected"))
+            let reply = SessionReply(requestId: UUID().uuidString, text: "Follow-up")
+            #expect(try await source.reply(projectID: launch.projectId, launchID: launch.id, reply: reply).accepted)
+            _ = try await source.reply(projectID: launch.projectId, launchID: launch.id, reply: reply)
+            let conversation = try await source.conversation(projectID: launch.projectId, launchID: launch.id)
+            #expect(conversation.messages.filter { $0.role == "user" && $0.text == "Follow-up" }.count == 1)
+            #expect(conversation.message.contains("No Mac is connected"))
         }
     }
 
-    @Test func optOutRemovesDemoTerminalAccess() async throws {
+    @Test func optOutRemovesDemoContinuationAccess() async throws {
         let source = RuntimeBriefDataSourceFactory.make(isDemo: true)
         let request = SessionLaunchRequest(requestId: UUID().uuidString, prompt: "Inspect the fictional task", provider: .cursor, remoteControl: false)
         let launch = try await source.startSession(projectID: "demo-sample-tracker", request: request)
         #expect(launch.remoteControl?.state == "disabled")
-        await #expect(throws: RuntimeBriefError.notFound) { try await source.terminal(projectID: launch.projectId, launchID: launch.id) }
+        #expect(try await source.conversation(projectID: launch.projectId, launchID: launch.id).writable == false)
+        await #expect(throws: RuntimeBriefError.notFound) { try await source.reply(projectID: launch.projectId, launchID: launch.id, reply: SessionReply(requestId: UUID().uuidString, text: "Follow up")) }
     }
 }

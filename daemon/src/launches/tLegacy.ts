@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import fs from "node:fs";
@@ -16,18 +16,13 @@ const exec = promisify(execFile);
 const scripts = fileURLToPath(new URL("../../scripts/", import.meta.url));
 const uuid = /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/;
 const sleep = (milliseconds: number) => new Promise(resolve => setTimeout(resolve, milliseconds));
-export const promptHash = (prompt: string) => createHash("sha256").update(prompt).digest("hex");
+import { promptHash, nativeRemoteURL } from "./identity.js";
+export { promptHash, nativeRemoteURL } from "./identity.js";
 export const tSlot = (id: string) => {
   if (!uuid.test(id)) throw new Error("Invalid launch identity");
   return BigInt(`0x${id.replaceAll("-", "")}`).toString();
 };
 export const tTarget = (id: string) => `dev-runtimebrief-${tSlot(id)}`;
-
-/** Accept only the exact native session link, never arbitrary transcript URLs. */
-export function nativeRemoteURL(value: unknown): string | null {
-  if (typeof value !== "string" || !/^https:\/\/claude\.ai\/code\/session_[A-Za-z0-9_-]+$/.test(value)) return null;
-  return value;
-}
 
 export interface TLegacyOptions {
   root?: string;
