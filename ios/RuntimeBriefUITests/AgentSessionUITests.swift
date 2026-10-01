@@ -31,7 +31,8 @@ final class AgentSessionUITests: XCTestCase {
             options.name = "\(provider) selected model and Bypass"; options.lifetime = .keepAlways; add(options)
             let prompt = app.textFields["claude-task-prompt"]
             for _ in 0..<6 where prompt.frame.minY < 120 || !prompt.isHittable { app.swipeDown() }
-            prompt.tap(); prompt.typeText("Inspect the fictional native conversation")
+            prompt.tap(); prompt.typeText("x")
+            XCTAssertTrue(app.buttons["start-claude-task"].isEnabled, "A single-character task must be accepted.")
             app.buttons["start-claude-task"].tap()
             XCTAssertTrue(newTask.waitForExistence(timeout: 10))
             let settings = app.staticTexts.matching(NSPredicate(
@@ -53,6 +54,30 @@ final class AgentSessionUITests: XCTestCase {
             app.buttons["Done"].tap()
             app.terminate()
         }
+    }
+
+    @MainActor
+    func testClaudeAcceptsAShortDemoTask() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment["RUNTIMEBRIEF_E2E_CLEAR_STATE"] = "1"
+        app.launchEnvironment["RUNTIMEBRIEF_E2E_DEMO"] = "1"
+        app.launch()
+        let project = app.buttons["project-link-demo-sample-tracker"]
+        XCTAssertTrue(project.waitForExistence(timeout: 10)); project.tap()
+        let newTask = app.buttons["new-claude-task"]
+        for _ in 0..<4 where !newTask.isHittable { app.swipeUp() }
+        XCTAssertTrue(newTask.waitForExistence(timeout: 10)); newTask.tap()
+        let start = app.buttons["start-claude-task"]
+        XCTAssertFalse(start.isEnabled)
+        let prompt = app.textFields["claude-task-prompt"]
+        XCTAssertTrue(prompt.waitForExistence(timeout: 5)); prompt.tap(); prompt.typeText("ok")
+        XCTAssertTrue(start.isEnabled); start.tap()
+        XCTAssertTrue(newTask.waitForExistence(timeout: 10))
+        let continuation = app.buttons.matching(NSPredicate(format: "label == %@", "Continue in Claude")).firstMatch
+        for _ in 0..<4 where !continuation.isHittable { app.swipeUp() }
+        XCTAssertTrue(continuation.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Ready to review"].exists)
     }
 
     @MainActor

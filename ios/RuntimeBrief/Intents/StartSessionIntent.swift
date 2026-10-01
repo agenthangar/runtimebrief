@@ -108,9 +108,8 @@ enum SiriSessionLauncher {
         confirm: (String, String) async throws -> Void
     ) async throws -> Result {
         let prompt = task.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard (10...8_000).contains(prompt.utf16.count), !prompt.hasPrefix("/"),
-              !prompt.unicodeScalars.contains(where: { (0...8).contains($0.value) || (11...12).contains($0.value) || (14...31).contains($0.value) || $0.value == 127 }) else {
-            throw SiriIntentFailure(message: "Describe a task in 10 to 8,000 characters, without slash commands or control characters.")
+        guard SessionTaskPrompt.isValid(prompt) else {
+            throw SiriIntentFailure(message: SessionTaskPrompt.validationMessage)
         }
         let statusQuestion = #"^(?:what(?:'s| is)|tell me|give me|get me|show me|check|find out|summarize)\b.*\b(?:status|progress|update)\b"#
         if prompt.range(of: statusQuestion, options: [.regularExpression, .caseInsensitive]) != nil {

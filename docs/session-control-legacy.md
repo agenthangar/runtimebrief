@@ -260,7 +260,7 @@ Send `POST /v1/projects/:id/claude-launches` with JSON such as:
 ```
 
 Generate a fresh UUID for each new task; the UUID above is only an example.
-Prompts are trimmed and must contain 10–8,000 characters. Slash commands,
+Prompts are trimmed and may contain any non-empty text up to 8,000 characters. Slash commands,
 unsupported control characters, unknown fields, and unsupported option values
 are rejected with HTTP 400.
 Omitted `remoteControl` means true for the t backend; false explicitly disables

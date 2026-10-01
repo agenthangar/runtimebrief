@@ -138,6 +138,14 @@ describe("native Claude launch lifecycle", () => {
 });
 
 describe("Claude launch API", () => {
+  it("accepts a short task through the legacy Claude endpoint", async () => {
+    const { config, service, provider } = setup();
+    const app = buildServer({ config, adapters: [], analyst: {} as never, launches: service });
+    service.close = () => {}; cleanups.push(() => app.close());
+    const response = await app.inject({ method: "POST", url: "/v1/projects/fixture/claude-launches", headers: authHeaders(), payload: { requestId: randomUUID(), prompt: "  ok  " } });
+    expect(response.statusCode).toBe(202);
+    expect(provider.start).toHaveBeenCalledWith(expect.any(String), expect.any(String), "ok", expect.any(Object));
+  });
   it("authenticates both mutations and rejects unsafe input before spawning", async () => {
     const { config, service, provider } = setup();
     const app = buildServer({ config, adapters: [], analyst: {} as never, launches: service });

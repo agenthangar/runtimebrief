@@ -213,7 +213,7 @@ later under a trusted root.
    harness. Native default uses the Mac's configured model and reasoning.
 3. Choose permissions and, where supported, reasoning. Manual is the default;
    the explanation describes the selected mode. Remote Control starts on.
-4. Enter a task of 10–8,000 characters and tap **Start in** the selected agent.
+4. Enter any non-empty task of up to 8,000 characters and tap **Start in** the selected agent.
    The button remains visible above the keyboard. The receipt shows status
    and the original model/permission choices under **Started with**.
 5. Use **Continue in Claude** when its verified Remote Control link is ready.

@@ -147,7 +147,7 @@ private struct ClaudeTaskComposer: View {
 
     private var taskPrompt: String { prompt.trimmingCharacters(in: .whitespacesAndNewlines) }
     private var isValid: Bool {
-        (10...8_000).contains(taskPrompt.utf16.count) && !taskPrompt.hasPrefix("/")
+        SessionTaskPrompt.isValid(taskPrompt)
     }
 
     private var capability: AgentCapability? { loadedCapabilities[provider] ?? providers.first { $0.id == provider } }
@@ -176,7 +176,7 @@ private struct ClaudeTaskComposer: View {
                         .disabled(sending)
                         .accessibilityIdentifier("claude-task-prompt")
                     if !taskPrompt.isEmpty && !isValid {
-                        Text("Use 10–8,000 characters and describe a task instead of a slash command.")
+                        Text(SessionTaskPrompt.validationMessage)
                             .font(.caption).foregroundStyle(.secondary)
                     }
                 }

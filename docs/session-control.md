@@ -88,6 +88,9 @@ and replies retain the separate 30-request limit.
 - `POST /v1/projects/:id/sessions/:launchId/reply`: stable response UUID plus one message or one explicit decision.
 
 All continuation writes enforce project scope and the project's launch opt-out.
+New tasks accept any non-empty prompt, including a single character. Whitespace
+is trimmed; the 8,000-character maximum, slash-command guard, and control-character
+guard apply in the app, Siri, and both daemon launch endpoints.
 Native socket ownership is checked using the exact execution folder and a private
 per-task token. Approval choices are tied to the current native request.
 Replies are durably reserved before dispatch; retries with identical request

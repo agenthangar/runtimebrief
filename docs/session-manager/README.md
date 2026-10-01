@@ -225,7 +225,7 @@ workspace ownership using Git metadata, since a worktree can be outside the root
 `t` remains a local executable with the OS user's permissions.
 RuntimeBrief enforces registered project access and `claude_launch_enabled: false`
 before a launch request reaches `t`. Global provider availability is not a project
-authorization grant. RuntimeBrief retains its product prompt limit of 10–8,000
+authorization grant. RuntimeBrief accepts non-empty prompts of up to 8,000
 characters after trimming; the wire limit is not the iOS composer limit. Perform
 product normalization before saving the request body and ID for retries. Expose
 model/permission choices allowed by both the product and the provider adapter.
