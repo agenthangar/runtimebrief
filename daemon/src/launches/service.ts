@@ -3,7 +3,7 @@ import fs from "node:fs";
 import type { RuntimeBriefConfig } from "../config.js";
 import { projectsForConfig } from "../projectRegistry.js";
 import { LaunchStore } from "./store.js";
-import { DEFAULT_LAUNCH_OPTIONS, MODEL_ID, REASONING_EFFORTS, permissionModes, LaunchError, type ClaudeLaunchOptions, type ClaudeLaunch, type ClaudeProvider, type NativeClaudeSession, type ClaudeSessionBackend, type SessionProvider } from "./types.js";
+import { DEFAULT_LAUNCH_OPTIONS, MODEL_ID, REASONING_EFFORTS, permissionModes, LaunchError, type ClaudeLaunchOptions, type ClaudeLaunch, type ClaudeProvider, type NativeClaudeSession, type ClaudeSessionBackend, type SessionProvider, type LaunchCapability, type SessionReply } from "./types.js";
 import { promptHash } from "./tLegacy.js";
 
 export const CLAUDE_LAUNCH_ACTION = "launch-claude";
@@ -12,6 +12,10 @@ export class LaunchService {
   private readonly pending = new Map<string, Promise<ClaudeLaunch>>();
   private readonly inputPending = new Set<string>();
   private readonly opening = new Map<string, Promise<ClaudeLaunch>>();
+  private readonly observations = new Map<string, Promise<void>>();
+  private readonly providerHealth = new Map<SessionProvider, LaunchCapability & { checking?: boolean }>();
+  private healthPending: Promise<void> | undefined;
+  private healthAt = 0;
   private readonly backends: Map<string, ClaudeSessionBackend>;
 
   constructor(
@@ -34,35 +38,43 @@ export class LaunchService {
     return project;
   }
 
+  private launcher(id: SessionProvider) {
+    return id === "claude" ? this.backend ?? this.provider : [...this.backends.values()].find(value => value.provider === id);
+  }
+  private refreshProviders() {
+    if (this.healthPending || (this.healthAt && Date.now() - this.healthAt < ([...this.providerHealth.values()].some(value => !value.available) ? 30000 : 300000))) return;
+    this.healthPending = Promise.all((["claude", "codex", "cursor"] as const).map(async id => {
+      const previous = this.providerHealth.get(id);
+      this.providerHealth.set(id, previous ? { ...previous, checking: true } : { available: false, checking: true, message: "Checking your Mac…" });
+      try { this.providerHealth.set(id, { ...(await this.launcher(id)?.capability() ?? { available: false, message: `Install ${id} on your Mac.` }), checking: false }); }
+      catch { this.providerHealth.set(id, { available: false, checking: false, message: `Check ${id} setup on your Mac.` }); }
+    })).then(() => { this.healthAt = Date.now(); }).finally(() => { this.healthPending = undefined; });
+  }
+  providers() {
+    this.refreshProviders();
+    return { providers: (["claude", "codex", "cursor"] as const).map(id => ({ id, ...this.providerHealth.get(id)! })) };
+  }
+  async models(projectId: string, id: SessionProvider) {
+    const project = this.project(projectId, true);
+    const launcher = this.launcher(id);
+    if (!launcher) throw new LaunchError(409, "unsupported", "Install this agent on your Mac.");
+    let cwd: string;
+    try { cwd = fs.realpathSync(project.path); } catch { throw new LaunchError(409, "project_unavailable", "The project folder is unavailable on your Mac."); }
+    return { id, ...await launcher.capability(cwd) };
+  }
   async list(projectId: string) {
-    this.project(projectId, false);
-    let capability;
-    try {
-      this.project(projectId, true);
-      capability = this.backend ? await this.backend.capability(this.project(projectId, true).path) : await this.provider.capability();
-    } catch (error) {
-      if (!(error instanceof LaunchError)) throw error;
-      capability = { available: false, message: error.message };
+    const project = this.project(projectId, false);
+    const providers = this.providers().providers.map(value => project.claude_launch_enabled === false ? { ...value, available: false, message: "Starting tasks is disabled for this project." } : value);
+    const launches = this.store.list(projectId).filter(receipt => !receipt.backend?.startsWith("t-"));
+    if (!this.observations.has(projectId)) {
+      const task = (async () => {
+        let native: NativeClaudeSession[] | null = null;
+        if (launches.some(receipt => !receipt.backend)) { try { native = await this.provider.sessions(); } catch {} }
+        await Promise.all(launches.map(receipt => receipt.backend ? this.observeBackend(receipt) : this.reconcile(receipt, native)));
+      })().catch(() => {}).finally(() => { this.observations.delete(projectId); });
+      this.observations.set(projectId, task);
     }
-    const receipts = this.store.list(projectId);
-    let native: NativeClaudeSession[] | null = null;
-    if (receipts.some(receipt => !receipt.backend)) {
-      try { native = await this.provider.sessions(); } catch { /* preserve old receipts */ }
-    }
-    const launches = await Promise.all(receipts.map(receipt => receipt.backend ? this.observeBackend(receipt) : this.reconcile(receipt, native)));
-    const providers = await Promise.all((["claude", "codex", "cursor"] as const).map(async id => {
-      if (id === "claude") return { id, ...capability };
-      const backend = [...this.backends.values()].find(value => value.provider === id);
-      let available = { available: false, message: `Install the ${id} session launcher on your Mac.` };
-      try {
-        this.project(projectId, true);
-        if (backend) available = await backend.capability(this.project(projectId, true).path);
-      } catch (error) {
-        if (error instanceof LaunchError) available.message = error.message;
-      }
-      return { id, ...available };
-    }));
-    return { capability, providers, launches };
+    return { capability: providers[0]!, providers, launches };
   }
 
   async start(projectId: string, requestId: string, prompt: string, options: ClaudeLaunchOptions = DEFAULT_LAUNCH_OPTIONS): Promise<ClaudeLaunch> {
@@ -85,7 +97,7 @@ export class LaunchService {
     const previous = this.store.byRequest(requestId, fingerprint);
     if (previous) return this.pending.get(requestId) ?? previous;
     if (!backend && options.remoteControl === true) {
-      throw new LaunchError(409, "unsupported", "The legacy background launcher does not support Remote Control. Select local-only or install the t launcher.");
+      throw new LaunchError(409, "unsupported", "The legacy background launcher does not support Remote Control. Update RuntimeBrief on your Mac.");
     }
     // The synchronous reservation prevents two in-flight requests from dispatching twice.
     let cwd: string;
@@ -97,6 +109,7 @@ export class LaunchService {
     }
     if (backend) {
       const capability = await backend.capability(cwd);
+      if (capability.permissionModes && !capability.permissionModes.includes(options.permissionMode)) throw new LaunchError(400, "unsupported_settings", "This permission mode is unavailable in the native integration.");
       if (!capability.available) throw new LaunchError(409, "requires_setup", capability.message);
       if (options.model !== "default" && capability.models?.length && !capability.models.some(model => model.id === options.model || (provider === "claude" && model.id.replace(/\[1m\]$/, "") === options.model))) throw new LaunchError(400, "unsupported_settings", "This model is not available in the native harness. Refresh the model list.");
       if (options.reasoningEffort && options.reasoningEffort !== "default" && capability.models?.length) {
@@ -114,7 +127,7 @@ export class LaunchService {
     if (alreadyReserved) return this.pending.get(requestId) ?? alreadyReserved;
     const id = randomUUID();
     const receipt: ClaudeLaunch = {
-      provider, id, projectId, name: `RuntimeBrief ${project.name} ${id}`,
+      provider, id, projectId, name: `RuntimeBrief ${project.name} ${id.slice(0, 8)}`,
       createdAt: new Date().toISOString(), cwd, nativeId: null, sessionId: null, openedAt: null,
       state: "starting", message: `Checking ${provider} on your Mac…`,
       model: options.model, permissionMode: options.permissionMode,
@@ -141,7 +154,7 @@ export class LaunchService {
       } catch {
         receipt.state = "unknown";
         receipt.launchState = "unknown";
-        receipt.message = "The t launch result is uncertain. Refresh this receipt before starting another task.";
+        receipt.message = "The native launch result is uncertain. Refresh this receipt before starting another task.";
         this.store.save(receipt);
         return receipt;
       }
@@ -263,7 +276,8 @@ export class LaunchService {
     if (receipt.requestedRemoteControl === false || !backend?.terminal || !backend.input) {
       throw new LaunchError(409, "remote_disabled", "Remote terminal control is unavailable for this session.");
     }
-    if (receipt.remoteControl?.state !== "ready") throw new LaunchError(409, "terminal_unavailable", receipt.message);
+    const setup = receipt.backend === "native-claude" && receipt.state === "needs_input" && receipt.remoteControl?.state !== "ready";
+    if (!setup && receipt.remoteControl?.state !== "ready") throw new LaunchError(409, "terminal_unavailable", receipt.message);
     return { receipt, backend };
   }
 
@@ -294,5 +308,21 @@ export class LaunchService {
     } finally { this.inputPending.delete(id); }
   }
 
+  async conversation(projectId: string, id: string) {
+    this.project(projectId, false);
+    const receipt = this.store.get(id, projectId);
+    if (!receipt) throw new LaunchError(404, "not_found", "This task could not be found.");
+    const backend = this.backends.get(receipt.backend!);
+    if (!backend?.conversation) throw new LaunchError(409, "unsupported", "Continue this conversation in its native app.");
+    return backend.conversation(receipt);
+  }
+  async reply(projectId: string, id: string, body: SessionReply) {
+    this.project(projectId, true);
+    const receipt = this.store.get(id, projectId);
+    if (!receipt) throw new LaunchError(404, "not_found", "This task could not be found.");
+    const backend = this.backends.get(receipt.backend!);
+    if (!backend?.reply || receipt.requestedRemoteControl === false) throw new LaunchError(409, "remote_disabled", "Continuation is disabled for this task.");
+    return backend.reply(receipt, body);
+  }
   close(): void { this.store.close(); }
 }

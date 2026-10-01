@@ -105,6 +105,11 @@ struct RuntimeBriefClient: Sendable {
         try await launchRequest(path: "/v1/projects/\(escape(projectID))/claude-launches", body: JSONEncoder().encode(request))
     }
 
+    func agentProviders() async throws -> AgentProviderList { try await getJSON("/v1/providers") }
+    func agentModels(projectID: String, provider: AgentProvider) async throws -> AgentCapability { try await getJSON("/v1/projects/\(escape(projectID))/providers/\(provider.rawValue)") }
+    func conversation(projectID: String, launchID: String) async throws -> ConversationSnapshot { try await getJSON("/v1/projects/\(escape(projectID))/sessions/\(escape(launchID))/conversation") }
+    func reply(projectID: String, launchID: String, reply: SessionReply) async throws -> SessionReplyResult { try await launchRequest(path: "/v1/projects/\(escape(projectID))/sessions/\(escape(launchID))/reply", body: JSONEncoder().encode(reply)) }
+
     func sessions(projectID: String) async throws -> ClaudeLaunchList {
         do { return try await getJSON("/v1/projects/\(escape(projectID))/sessions") }
         catch RuntimeBriefError.notFound { return try await claudeLaunches(projectID: projectID) }

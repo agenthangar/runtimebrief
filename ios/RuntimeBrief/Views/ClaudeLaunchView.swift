@@ -4,8 +4,14 @@ import CryptoKit
 /// One launch surface; the conversation and all tool approvals stay in the native agent.
 struct ClaudeLaunchView: View {
     let project: ProjectSummary
-    @State private var list: ClaudeLaunchList?
+    @State private var store = AgentSessionsStore.shared
+    private var list: ClaudeLaunchList? { store.lists[project.id] }
+    private var capabilities: [AgentCapability] {
+        if let values = list?.providers, values.contains(where: { $0.message == "Starting tasks is disabled for this project." }) { return values }
+        return store.providers.isEmpty ? (list?.providers ?? []) : store.providers
+    }
     @State private var showingComposer = false
+    @State private var conversationLaunch: ClaudeLaunch?
     @State private var terminalLaunch: ClaudeLaunch?
     @State private var errorMessage: String?
     @State private var openingID: String?
@@ -22,47 +28,45 @@ struct ClaudeLaunchView: View {
                 Button { Task { await refresh() } } label: { Image(systemName: "arrow.clockwise") }
                     .accessibilityLabel("Refresh agent tasks")
             }
-            if let capability = list?.capability {
-                Text("Start a task on your Mac and continue its native conversation.")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                Button { showingComposer = true } label: {
-                    Label("New task", systemImage: "plus")
-                }
+            Text("Start a task on your Mac and continue its conversation.")
+                .font(.subheadline).foregroundStyle(.secondary)
+            Button { showingComposer = true } label: { Label("New task", systemImage: "plus") }
                 .buttonStyle(.borderedProminent)
-                .disabled(!(list?.providers?.contains(where: { $0.available }) ?? capability.available))
+                .disabled(capabilities.contains(where: { $0.message == "Starting tasks is disabled for this project." }))
                 .accessibilityIdentifier("new-claude-task")
-            } else if errorMessage == nil {
-                ProgressView("Checking your Mac…")
+            if capabilities.contains(where: { $0.checking == true }) {
+                Label("Checking available agents…", systemImage: "arrow.triangle.2.circlepath")
+                    .font(.caption).foregroundStyle(.secondary)
             }
+            if store.savedProjects.contains(project.id) { Text("Showing saved tasks while refreshing.").font(.caption).foregroundStyle(.secondary) }
             if let errorMessage { ErrorBanner(message: errorMessage) }
             if let openMessage { Text(openMessage).font(.caption).foregroundStyle(.secondary) }
             ForEach(list?.launches.prefix(5) ?? Array<ClaudeLaunch>().prefix(5)) { launch in
                 VStack(alignment: .leading, spacing: 8) {
                     HStack {
-                        Text(launch.stateLabel).font(.subheadline.weight(.semibold))
+                        Text(launch.agent.label).font(.subheadline.weight(.semibold))
                         Spacer()
-                        RelativeTimeText(date: launch.createdAt)
+                        Text(launch.stateLabel).font(.subheadline.weight(.medium))
                     }
+                    RelativeTimeText(date: launch.createdAt).font(.caption).foregroundStyle(.secondary)
                     Text(launch.message).font(.caption).foregroundStyle(.secondary)
                     Text("Started with \(launch.settingsLabel)").font(.caption.weight(.medium))
                     if let remote = launch.remoteControl {
-                        Text(launch.agent == .claude ? remote.label : remote.terminalLabel).font(.caption).foregroundStyle(.secondary)
+                        Text(launch.agent == .claude ? remote.label : (remote.state == "ready" ? "Conversation connected" : remote.state == "disabled" ? "Continuation off" : "Conversation offline")).font(.caption).foregroundStyle(.secondary)
                         if launch.agent == .claude, remote.state == "ready", RuntimeBriefModeStore.isDemoEnabled {
-                            Button("Open Remote Control") { openMessage = "Demo only. No session was opened." }
+                            Button("Continue in Claude") { openMessage = "Demo only. No session was opened." }
                                 .accessibilityIdentifier("remote-control-\(launch.id)")
                         } else if remote.state == "ready", let url = remote.nativeURL {
-                            Link("Open Remote Control", destination: url)
+                            Link("Continue in Claude", destination: url)
                                 .accessibilityIdentifier("remote-control-\(launch.id)")
                         }
                     }
-                    if launch.agent != .claude, launch.remoteControl?.state == "ready" {
-                        Button { terminalLaunch = launch } label: { Label("Open \(launch.agent.label) terminal", systemImage: "terminal") }
-                            .accessibilityIdentifier("open-session-terminal")
+                    if launch.agent != .claude, launch.backend?.hasPrefix("native-") == true, launch.nativeId != nil {
+                        Button { conversationLaunch = launch } label: { Label("Open conversation", systemImage: "bubble.left.and.bubble.right") }
+                            .accessibilityIdentifier("open-session-conversation")
                     }
-                    if let target = launch.tmuxTarget {
-                        Text("On your Mac: tmux attach -t \(target)")
-                            .font(.caption.monospaced()).textSelection(.enabled)
+                    if launch.agent == .claude, launch.backend == "native-claude", launch.state == "needs_input", launch.remoteControl?.state != "ready", launch.requestedRemoteControl != false {
+                        Button { terminalLaunch = launch } label: { Label("Finish Claude setup", systemImage: "checkmark.shield") }
                     }
                     if let nativeID = launch.nativeId, launch.backend == nil {
                         Text("Session \(nativeID)").font(.caption.monospaced()).foregroundStyle(.secondary)
@@ -89,29 +93,24 @@ struct ClaudeLaunchView: View {
         .padding()
         .background(.orange.opacity(0.08), in: RoundedRectangle(cornerRadius: 14))
         .sheet(isPresented: $showingComposer, onDismiss: { Task { await refresh() } }) {
-            ClaudeTaskComposer(project: project, source: source, providers: list?.providers ?? [AgentCapability(id: .claude, available: list?.capability.available ?? false, message: list?.capability.message ?? "Check your Mac.")])
+            ClaudeTaskComposer(project: project, source: source, providers: capabilities)
         }
         .sheet(item: $terminalLaunch) { launch in SessionTerminalView(project: project, launch: launch, source: source) }
+        .sheet(item: $conversationLaunch) { launch in SessionConversationView(project: project, launch: launch, source: source) }
         .task {
+            _ = store.cached(projectID: project.id)
+            Task { await store.warm() }
             await refresh()
             while !Task.isCancelled {
-                do { try await Task.sleep(for: .seconds(15)) } catch { return }
+                do { try await Task.sleep(for: .seconds(3)) } catch { return }
                 await refresh()
             }
         }
     }
 
     private func refresh() async {
-        do {
-            list = try await source.sessions(projectID: project.id)
-            errorMessage = nil
-        } catch {
-            if error as? RuntimeBriefError == .notFound {
-                errorMessage = "Update the daemon on your Mac to enable agent tasks."
-            } else {
-                errorMessage = error.localizedDescription
-            }
-        }
+        await store.refresh(projectID: project.id)
+        errorMessage = store.errors[project.id]
     }
 
     private func open(_ launch: ClaudeLaunch) async {
@@ -132,6 +131,8 @@ private struct ClaudeTaskComposer: View {
     let source: any RuntimeBriefDataSource
     let providers: [AgentCapability]
     @Environment(\.dismiss) private var dismiss
+    @State private var loadedCapabilities: [AgentProvider: AgentCapability] = [:]
+    @State private var modelsLoading = false
     @State private var provider: AgentProvider = .claude
     @State private var nativeModel = "default"
     @State private var nativeMode = "manual"
@@ -148,7 +149,7 @@ private struct ClaudeTaskComposer: View {
         (10...8_000).contains(taskPrompt.utf16.count) && !taskPrompt.hasPrefix("/")
     }
 
-    private var capability: AgentCapability? { providers.first { $0.id == provider } }
+    private var capability: AgentCapability? { loadedCapabilities[provider] ?? providers.first { $0.id == provider } }
     private var selectedModel: String { nativeModel }
     private var modelChoices: [AgentModel] {
         capability?.models ?? (provider == .claude ? ClaudeModel.allCases.filter { $0 != .default }.map { AgentModel(id: $0.rawValue, label: $0.label) } : [])
@@ -198,7 +199,7 @@ private struct ClaudeTaskComposer: View {
                     if let message = capability?.modelsMessage {
                         Text(message).font(.caption).foregroundStyle(.secondary)
                     } else if capability?.models == nil && provider != .claude {
-                        Text("Update RuntimeBrief on your Mac to load available models.").font(.caption).foregroundStyle(.secondary)
+                        Text(modelsLoading ? "Loading models…" : "Using your Mac’s default model.").font(.caption).foregroundStyle(.secondary)
                     }
                     if !reasoningChoices.isEmpty {
                         Picker("Reasoning", selection: $reasoningEffort) {
@@ -231,7 +232,7 @@ private struct ClaudeTaskComposer: View {
                     }
                     Toggle("Remote Control", isOn: $remoteControl)
                         .accessibilityIdentifier("claude-remote-control-toggle")
-                    Text(provider == .claude ? "Connect through your Claude account from another device. Availability depends on Claude setup on your Mac." : "Continue this live CLI through your authenticated RuntimeBrief connection. The agent handles sign-in, trust, and permissions.")
+                    Text(provider == .claude ? "Connect through your Claude account from another device. Availability depends on Claude setup on your Mac." : "Continue this conversation and answer approval requests through your authenticated RuntimeBrief connection.")
                         .font(.caption).foregroundStyle(.secondary)
                 } footer: {
                     Text("Uses your Mac’s agent installation and account.")
@@ -265,6 +266,17 @@ private struct ClaudeTaskComposer: View {
             .navigationTitle("New task")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() }.disabled(sending) } }
+            .task(id: provider) {
+                let selected = provider
+                modelsLoading = true
+                defer { if selected == provider { modelsLoading = false } }
+                do {
+                    let value = try await source.agentModels(projectID: project.id, provider: selected)
+                    if !Task.isCancelled { loadedCapabilities[selected] = value }
+                } catch RuntimeBriefError.notFound {
+                    loadedCapabilities[selected] = AgentCapability(id: selected, available: false, message: "Update RuntimeBrief on your Mac to use native sessions.")
+                } catch { /* Keep the native default usable if catalog discovery fails. */ }
+            }
             .interactiveDismissDisabled(sending)
         }
     }
@@ -277,8 +289,10 @@ private struct ClaudeTaskComposer: View {
         let prompt = taskPrompt
         let scope = RuntimeBriefModeStore.isDemoEnabled ? "demo" : (ServerSettings.load().baseURL?.absoluteString ?? "unconfigured")
         let request = SessionLaunchDraft.request(projectID: project.id, scope: scope, prompt: prompt, provider: provider, model: selectedModel, permissionMode: selectedMode, reasoningEffort: reasoningEffort, remoteControl: remoteControl)
+        let expectedConnection = AgentSessionsStore.shared.connectionScope()
         do {
             let receipt = try await source.startSession(projectID: project.id, request: request)
+            AgentSessionsStore.shared.remember(receipt, expectedScope: expectedConnection)
             if receipt.state == "failed" {
                 SessionLaunchDraft.clear(projectID: project.id, scope: scope, prompt: prompt, provider: provider, model: selectedModel, permissionMode: selectedMode, reasoningEffort: reasoningEffort, remoteControl: remoteControl)
                 errorMessage = receipt.message

@@ -53,12 +53,12 @@ ChatGPT workspace selected during sign-in.
 
 ## Native Claude tasks
 
-Claude tasks use a separate execution path from the isolated analyst. Install
-Claude Code and tmux on the Mac, sign in to Claude, and complete its native
-workspace-trust setup. `install-service` installs RuntimeBrief's private,
-checksum-verified copy of current `t`; `runtimebriefd install-t` can install it
-separately. Neither command changes your dotfiles or installed `t`. Projects
-need `origin/main`; each task starts in a separate worktree from that ref.
+Coding tasks use direct native adapters: Claude Code with Remote Control,
+Codex App Server over local stdio, and Cursor ACP. Install and sign in to the
+providers you want on your Mac. New tasks do not require `t` or tmux.
+Each task gets an isolated worktree based on local `HEAD`; no fetch or
+`origin/main` is required. A detached local runner survives daemon restarts.
+Claude may require workspace trust or Remote Control setup in its native UI.
 
 Registered projects, including new repositories discovered under trusted
 roots, allow launches by default. Every authenticated client paired with the
@@ -87,13 +87,12 @@ The iOS composer offers Fable, Opus,
 Sonnet, Haiku, Auto, Bypass, and the other supported choices. Claude controls
 model availability, tools, account policy, and workspace trust.
 
-Delivery receipts record launch settings, backend identity, terminal target,
-and independently observed Remote Control state without storing the prompt.
-A link appears only after Claude reports a native connection. Existing native
-background receipts retain Desktop takeover; the explicit
-`claude_session_backend: native` setting retains that older launcher, which
-cannot accept requests requiring Remote Control. See the
-[request contract and handoff limits](../docs/session-control.md#claude-launch-api).
+Delivery receipts record settings and confirmed native identities. Claude links
+appear only after native Remote Control readiness is confirmed. Codex and
+Cursor expose conversations and approval requests through authenticated,
+project-scoped endpoints. Existing config values for `claude_session_backend`
+are accepted for upgrade compatibility; new launches always use native adapters.
+See [session control](../docs/session-control.md).
 
 ## Brief freshness
 

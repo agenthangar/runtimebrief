@@ -15,6 +15,7 @@ import { LaunchError, type ClaudeLaunch, type ClaudeSessionBackend, type LaunchC
 const exec = promisify(execFile);
 const scripts = fileURLToPath(new URL("../../scripts/", import.meta.url));
 const uuid = /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/;
+const sleep = (milliseconds: number) => new Promise(resolve => setTimeout(resolve, milliseconds));
 export const promptHash = (prompt: string) => createHash("sha256").update(prompt).digest("hex");
 export const tSlot = (id: string) => {
   if (!uuid.test(id)) throw new Error("Invalid launch identity");
@@ -123,11 +124,18 @@ export class TLegacyBackend implements ClaudeSessionBackend {
         SHELL_SESSIONS_DISABLE: "1",
       },
     });
+    // t's attach shim can return before tmux has started the private Claude runner.
+    // Give that runner a short window to publish its native identity before the first status read.
+    const deadline = Date.now() + 3_000;
+    while (Date.now() < deadline) {
+      if (fs.existsSync(path.join(directory, "native.json")) || fs.existsSync(path.join(directory, "exit.json"))) return;
+      await sleep(100);
+    }
   }
 
   async get(launch: ClaudeLaunch): Promise<ClaudeLaunch> {
     const directory = this.directory(launch);
-    launch.tmuxTarget = tTarget(launch.id);
+    const target = tTarget(launch.id);
     const remote = { state: launch.requestedRemoteControl === false ? "disabled" : "unknown", url: null, observedAt: new Date().toISOString() } as NonNullable<ClaudeLaunch["remoteControl"]>;
     launch.remoteControl = remote;
     let native: { sessionId: string; cwd: string } | null = null;
@@ -144,17 +152,19 @@ export class TLegacyBackend implements ClaudeSessionBackend {
       exited = typeof exit.code === "number" || exit.code === null || spawnFailed;
     } catch { /* Still running or uncertain. */ }
     let pane = "";
-    try { pane = await this.tmuxCommand(["capture-pane", "-p", "-S", "-80", "-t", `=${launch.tmuxTarget}:`]); } catch { /* No terminal is not proof of no dispatch. */ }
+    try { pane = await this.tmuxCommand(["capture-pane", "-p", "-S", "-80", "-t", `=${target}:`]); } catch { /* No terminal is not proof of no dispatch. */ }
     // A shell can remain in t's pane after Claude exits. It cannot keep a link ready.
     let live = pane.length > 0 && !exited;
     let ownerChanged = false;
     if (live && native) {
       try {
-        const identity = await this.tmuxCommand(["show-environment", "-t", `=${launch.tmuxTarget}`, "CLAUDE_RESUME_ID"]);
+        const identity = await this.tmuxCommand(["show-environment", "-t", `=${target}`, "CLAUDE_RESUME_ID"]);
         ownerChanged = identity.trim() !== `CLAUDE_RESUME_ID=${native.sessionId}`;
         live = !ownerChanged;
       } catch { live = false; }
     }
+    if (live) launch.tmuxTarget = target;
+    else delete launch.tmuxTarget;
     let acknowledged = launch.launchState === "started";
     let state = "unknown";
     if (native) {
@@ -180,11 +190,13 @@ export class TLegacyBackend implements ClaudeSessionBackend {
     const needsSetup = /trust this folder|Enable Remote Control|sign in|log in/i.test(pane);
     launch.launchState = acknowledged ? "started" : spawnFailed ? "failed" : live ? "starting" : "unknown";
     launch.activity = !live ? "stopped" : needsSetup || state === "waiting" ? "needs_input" : state === "active" ? "working" : state === "completed" ? "idle" : "unknown";
-    launch.state = spawnFailed ? "failed" : needsSetup || state === "waiting" ? "needs_input" : !live ? "unknown" : state === "completed" ? "completed" : acknowledged ? "running" : "starting";
+    launch.state = spawnFailed ? "failed" : needsSetup || state === "waiting" ? "needs_input" : !live ? acknowledged ? "stopped" : "unknown" : state === "completed" ? "completed" : acknowledged ? "running" : "starting";
     launch.message = spawnFailed ? "Claude could not start. Check its installation on your Mac."
       : ownerChanged ? "This terminal now contains a different conversation. Check your Mac; the original task will not be replayed."
       : needsSetup ? "Claude needs workspace trust or setup on your Mac. Attach to this t session to continue."
-      : !live ? "The t session is no longer live. Its saved conversation and worktree are preserved; this task will not be replayed."
+      : !live && !native ? "Claude has not confirmed a native session, so this task is not available in Claude. Check your Mac before retrying; RuntimeBrief will not replay it automatically."
+      : !live && acknowledged ? "Claude accepted the task, but its t session ended. The saved conversation is on your Mac; this task will not be replayed automatically."
+      : !live ? "Claude session setup ended before the task was confirmed. Check Claude on your Mac; RuntimeBrief will not replay it automatically."
       : !acknowledged ? "The t session is starting. Claude has not yet acknowledged the task."
       : state === "completed" ? "Claude finished this turn. Review it in Remote Control or attach to its terminal."
       : state === "waiting" ? "Claude needs your attention. Continue in its native session."

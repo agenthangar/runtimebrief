@@ -10,6 +10,10 @@ protocol RuntimeBriefDataSource: Sendable {
     func ask(projectID: String, question: String) async throws -> AnalystAnswer
     func claudeLaunches(projectID: String) async throws -> ClaudeLaunchList
     func startClaude(projectID: String, request: ClaudeLaunchRequest) async throws -> ClaudeLaunch
+    func agentProviders() async throws -> AgentProviderList
+    func agentModels(projectID: String, provider: AgentProvider) async throws -> AgentCapability
+    func conversation(projectID: String, launchID: String) async throws -> ConversationSnapshot
+    func reply(projectID: String, launchID: String, reply: SessionReply) async throws -> SessionReplyResult
     func sessions(projectID: String) async throws -> ClaudeLaunchList
     func startSession(projectID: String, request: SessionLaunchRequest) async throws -> ClaudeLaunch
     func terminal(projectID: String, launchID: String) async throws -> TerminalSnapshot
@@ -49,6 +53,10 @@ struct LiveRuntimeBriefDataSource: RuntimeBriefDataSource {
         try await client.openClaude(projectID: projectID, launchID: launchID)
     }
 
+    func agentProviders() async throws -> AgentProviderList { try await client.agentProviders() }
+    func agentModels(projectID: String, provider: AgentProvider) async throws -> AgentCapability { try await client.agentModels(projectID: projectID, provider: provider) }
+    func conversation(projectID: String, launchID: String) async throws -> ConversationSnapshot { try await client.conversation(projectID: projectID, launchID: launchID) }
+    func reply(projectID: String, launchID: String, reply: SessionReply) async throws -> SessionReplyResult { try await client.reply(projectID: projectID, launchID: launchID, reply: reply) }
     func sessions(projectID: String) async throws -> ClaudeLaunchList { try await client.sessions(projectID: projectID) }
     func startSession(projectID: String, request: SessionLaunchRequest) async throws -> ClaudeLaunch { try await client.startSession(projectID: projectID, request: request) }
     func terminal(projectID: String, launchID: String) async throws -> TerminalSnapshot { try await client.terminal(projectID: projectID, launchID: launchID) }
@@ -114,4 +122,11 @@ enum RuntimeBriefDataSourceFactory {
         }
         return LiveRuntimeBriefDataSource(timeout: timeout)
     }
+}
+
+extension RuntimeBriefDataSource {
+    func agentProviders() async throws -> AgentProviderList { throw RuntimeBriefError.notFound }
+    func agentModels(projectID: String, provider: AgentProvider) async throws -> AgentCapability { throw RuntimeBriefError.notFound }
+    func conversation(projectID: String, launchID: String) async throws -> ConversationSnapshot { throw RuntimeBriefError.notFound }
+    func reply(projectID: String, launchID: String, reply: SessionReply) async throws -> SessionReplyResult { throw RuntimeBriefError.notFound }
 }

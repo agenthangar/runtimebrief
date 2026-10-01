@@ -1,6 +1,6 @@
 import Foundation
 
-struct ClaudeLaunch: Decodable, Identifiable, Sendable, Equatable {
+struct ClaudeLaunch: Codable, Identifiable, Sendable, Equatable {
     let id: String
     let projectId: String
     let name: String
@@ -18,6 +18,7 @@ struct ClaudeLaunch: Decodable, Identifiable, Sendable, Equatable {
     var backend: String? = nil
     var tmuxTarget: String? = nil
     var launchState: String? = nil
+    var activity: String? = nil
     var requestedRemoteControl: Bool? = nil
     var remoteControl: ClaudeRemoteControl? = nil
     var provider: AgentProvider? = nil
@@ -33,18 +34,18 @@ struct ClaudeLaunch: Decodable, Identifiable, Sendable, Equatable {
     var stateLabel: String {
         switch state {
         case "starting": "Starting"
-        case "running": "Working"
-        case "needs_input": "Needs you"
+        case "running": "Running"
+        case "needs_input": message.lowercased().contains("question") ? "Needs a reply" : "Needs approval"
         case "completed": "Ready to review"
-        case "failed": "Needs attention"
+        case "failed": "Failed"
         case "stopped": "Stopped"
         case "in_desktop": "In Claude Desktop"
-        default: "Check your Mac"
+        default: "Status unavailable"
         }
     }
 }
 
-struct ClaudeRemoteControl: Decodable, Sendable, Equatable {
+struct ClaudeRemoteControl: Codable, Sendable, Equatable {
     let state: String
     let url: String?
 
@@ -75,12 +76,12 @@ struct ClaudeRemoteControl: Decodable, Sendable, Equatable {
     }
 }
 
-struct ClaudeLaunchCapability: Decodable, Sendable, Equatable {
+struct ClaudeLaunchCapability: Codable, Sendable, Equatable {
     let available: Bool
     let message: String
 }
 
-struct ClaudeLaunchList: Decodable, Sendable, Equatable {
+struct ClaudeLaunchList: Codable, Sendable, Equatable {
     let capability: ClaudeLaunchCapability
     let launches: [ClaudeLaunch]
     var providers: [AgentCapability]? = nil
@@ -93,10 +94,11 @@ enum AgentProvider: String, Codable, CaseIterable, Identifiable, Sendable {
     var modes: [String] { self == .claude ? ClaudePermissionMode.allCases.map(\.rawValue) : self == .cursor ? ["manual", "plan", "ask"] : ["manual", "plan"] }
 }
 
-struct AgentCapability: Decodable, Equatable, Sendable, Identifiable {
+struct AgentCapability: Codable, Equatable, Sendable, Identifiable {
     let id: AgentProvider
     let available: Bool
     let message: String
+    var checking: Bool? = nil
     let models: [AgentModel]?
     let modelsMessage: String?
     let permissionModes: [String]?
@@ -110,7 +112,7 @@ struct AgentCapability: Decodable, Equatable, Sendable, Identifiable {
     }
 }
 
-struct AgentModel: Decodable, Equatable, Identifiable, Sendable {
+struct AgentModel: Codable, Equatable, Identifiable, Sendable {
     let id: String
     let label: String
     let reasoningEfforts: [String]?
@@ -146,7 +148,7 @@ struct SessionLaunchRequest: Encodable, Sendable {
     var remoteControl: Bool = true
 }
 
-struct TerminalSnapshot: Decodable, Sendable {
+struct TerminalSnapshot: Codable, Sendable {
     let screen: String
     let cols: Int
     let rows: Int
@@ -159,7 +161,7 @@ struct TerminalInput: Encodable, Sendable {
     let data: String
 }
 
-struct TerminalInputResult: Decodable, Sendable { let state: String }
+struct TerminalInputResult: Codable, Sendable { let state: String }
 
 struct ClaudeLaunchRequest: Encodable, Sendable {
     let requestId: String
@@ -207,3 +209,19 @@ enum ClaudePermissionMode: String, Codable, CaseIterable, Identifiable, Sendable
         }
     }
 }
+
+struct AgentProviderList: Decodable, Sendable { let providers: [AgentCapability] }
+struct ConversationSnapshot: Decodable, Sendable {
+    let state: String; let message: String; let writable: Bool?
+    let messages: [ConversationMessage]; let requests: [AgentRequest]
+}
+struct ConversationMessage: Decodable, Sendable, Identifiable { let id: String; let role: String; let text: String }
+struct AgentRequest: Decodable, Sendable, Identifiable {
+    let id: String; let title: String; let body: String; let options: [AgentOption]; let questions: [AgentQuestion]
+}
+struct AgentOption: Decodable, Sendable, Identifiable { let id: String; let label: String }
+struct AgentQuestion: Decodable, Sendable, Identifiable { let id: String; let prompt: String; let options: [AgentOption] }
+struct SessionReply: Encodable, Sendable {
+    let requestId: String; var text: String? = nil; var approvalId: String? = nil; var optionId: String? = nil; var answers: [String: [String]]? = nil
+}
+struct SessionReplyResult: Decodable, Sendable { let accepted: Bool; let unknown: Bool? }

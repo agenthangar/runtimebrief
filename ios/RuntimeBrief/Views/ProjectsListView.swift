@@ -108,6 +108,7 @@ struct ProjectsListView: View {
     }
 
     private func refresh() async {
+        Task { await AgentSessionsStore.shared.warm() }
         guard !isLoading else { return }
         isLoading = true
         defer { isLoading = false }
@@ -115,6 +116,7 @@ struct ProjectsListView: View {
             // A user refresh always asks the daemon for current deterministic
             // briefs. The store persists them for offline launch and Siri.
             projects = try await ProjectsStore.shared.refresh()
+            Task { await AgentSessionsStore.shared.prefetch(projects) }
             errorMessage = nil
             showingSavedBrief = false
             lastSavedAt = Date()
@@ -128,7 +130,9 @@ struct ProjectsListView: View {
     }
 
     private func loadSavedThenRefresh() async {
+        Task { await AgentSessionsStore.shared.warm() }
         let snapshot = await ProjectsStore.shared.cachedSnapshot()
+        Task { await AgentSessionsStore.shared.prefetch(snapshot.projects) }
         // Honor a disabled preference or demo mode even when the Mac is offline.
         await ProjectDiscovery.shared.synchronize(projects: snapshot.projects)
         if projects.isEmpty {

@@ -103,6 +103,16 @@ describe("current t observation", () => {
     expect((await f.backend.get(f.receipt)).launchState).toBe("failed");
   });
 
+  it("does not claim a saved conversation or offer a dead attach target without a native session", async () => {
+    const f = fixture();
+    fs.unlinkSync(path.join(f.directory, "native.json"));
+    f.terminal.mockRejectedValue(new Error("no server"));
+    const result = await f.backend.get(f.receipt);
+    expect(result).toMatchObject({ launchState: "unknown", state: "unknown", activity: "stopped", tmuxTarget: undefined });
+    expect(result.message).toContain("not available in Claude");
+    expect(result.message).not.toContain("saved conversation");
+  });
+
   it("honors local-only requests despite an old Remote Control record", async () => {
     const f = fixture();
     f.receipt.requestedRemoteControl = false;

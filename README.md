@@ -276,7 +276,7 @@ server:
   port: 8484
 auth:
   token_hash: scrypt:…
-# claude_session_backend: t  # default; native retains the old background launcher
+# New tasks use direct native Claude Code, Codex App Server, and Cursor ACP.
 project_roots:
   - /Users/developer/dev
 projects:

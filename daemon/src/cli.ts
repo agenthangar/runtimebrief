@@ -24,8 +24,7 @@ import { runRuntimeBriefMcpStdio } from "./mcp/server.js";
 import { LaunchService, CLAUDE_LAUNCH_ACTION } from "./launches/service.js";
 import { LaunchStore } from "./launches/store.js";
 import { NativeClaudeProvider } from "./launches/claude.js";
-import { TNativeBackend } from "./launches/tNative.js";
-import { TLegacyBackend } from "./launches/tLegacy.js";
+import { NativeSessionBackend } from "./launches/native.js";
 import { installPinnedT } from "./launches/tDependency.js";
 
 const commandNames = [
@@ -244,12 +243,13 @@ async function cmdStart(allowAll: boolean): Promise<void> {
   const analyst = createAnalystService(config, adapters, { iosReleases });
   const decisions = new DecisionStore();
   const launches = new LaunchService(config, new NativeClaudeProvider(), new LaunchStore(),
-    config.claude_session_backend === "t" ? new TLegacyBackend() : undefined,
-    [new TNativeBackend("codex"), new TNativeBackend("cursor")]);
+    new NativeSessionBackend("claude"),
+    [new NativeSessionBackend("codex"), new NativeSessionBackend("cursor")]);
   const app = await startServer(
     { config, adapters, analyst, iosReleases, decisions, launches },
     { allowAllInterfaces: allowAll },
   );
+  launches.providers();
   analyst.startBackgroundRefresh();
   console.log(
     `runtimebriefd ${VERSION} listening on http://${config.server.host}:${config.server.port} ` +
@@ -347,7 +347,6 @@ async function cmdInstallService(): Promise<void> {
     process.exit(1);
   }
   const config = loadConfig(); // fail early if not initialized
-  if (config.claude_session_backend === "t") await installPinnedT();
   const here = path.dirname(fileURLToPath(import.meta.url));
   const templatePath = path.join(here, "..", "templates", "com.runtimebrief.daemon.plist");
   const template = fs.readFileSync(templatePath, "utf8");

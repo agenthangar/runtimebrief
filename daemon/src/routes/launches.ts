@@ -25,6 +25,12 @@ const sessionSchema = startSchema.extend({
 });
 const inputSchema = z.object({ requestId: z.uuid().transform(value => value.toLowerCase()), data: z.string().refine(value => parseTerminalInput(value) !== null) }).strict();
 
+const replySchema = z.object({
+  requestId: z.uuid().transform(value => value.toLowerCase()), text: z.string().trim().min(1).max(8000).optional(),
+  approvalId: z.string().min(1).max(128).optional(), optionId: z.string().min(1).max(128).optional(),
+  answers: z.record(z.string().max(128), z.array(z.string().max(2000)).min(1).max(20)).optional(),
+}).strict().refine(body => (!!body.text !== !!body.approvalId) && (!body.text || (!body.optionId && !body.answers)), "Send one message or one decision.");
+
 export function registerLaunchRoutes(app: FastifyInstance, deps: ServerDeps): void {
   app.register(async routes => {
     routes.setErrorHandler((error, _req, reply) => {
@@ -35,8 +41,32 @@ export function registerLaunchRoutes(app: FastifyInstance, deps: ServerDeps): vo
       }
       return reply.code(503).send({ error: "launch_unavailable", message: "Session control is unavailable. Check your Mac." });
     });
+    routes.get("/v1/providers", async (_req, reply) => {
+      if (!deps.launches) return reply.code(503).send({ error: "launch_unavailable" });
+      reply.header("Cache-Control", "no-store");
+      return deps.launches.providers();
+    });
+    routes.get<{ Params: { id: string; provider: string } }>("/v1/projects/:id/providers/:provider", async (req, reply) => {
+      if (!deps.launches) return reply.code(503).send({ error: "launch_unavailable" });
+      const provider = z.enum(SESSION_PROVIDERS).safeParse(req.params.provider);
+      if (!provider.success) return reply.code(400).send({ error: "invalid_request" });
+      reply.header("Cache-Control", "no-store");
+      return deps.launches.models(req.params.id, provider.data);
+    });
+    routes.get<{ Params: { id: string; launchId: string } }>("/v1/projects/:id/sessions/:launchId/conversation", async (req, reply) => {
+      if (!deps.launches) return reply.code(503).send({ error: "launch_unavailable" });
+      reply.header("Cache-Control", "no-store");
+      return deps.launches.conversation(req.params.id, req.params.launchId);
+    });
+    routes.post<{ Params: { id: string; launchId: string } }>("/v1/projects/:id/sessions/:launchId/reply", { bodyLimit: 40000 }, async (req, reply) => {
+      if (!deps.launches) return reply.code(503).send({ error: "launch_unavailable" });
+      const body = replySchema.safeParse(req.body);
+      if (!body.success) return reply.code(400).send({ error: "invalid_request", message: "Check the message or decision." });
+      return reply.code(202).send(await deps.launches.reply(req.params.id, req.params.launchId, body.data));
+    });
     routes.get<{ Params: { id: string } }>("/v1/projects/:id/sessions", async (req, reply) => {
       if (!deps.launches) return reply.code(503).send({ error: "launch_unavailable" });
+      reply.header("Cache-Control", "no-store");
       return deps.launches.list(req.params.id);
     });
     routes.post<{ Params: { id: string } }>("/v1/projects/:id/sessions", { bodyLimit: 40000 }, async (req, reply) => {
@@ -58,6 +88,7 @@ export function registerLaunchRoutes(app: FastifyInstance, deps: ServerDeps): vo
     });
     routes.get<{ Params: { id: string } }>("/v1/projects/:id/claude-launches", async (req, reply) => {
       if (!deps.launches) return reply.code(503).send({ error: "launch_unavailable" });
+      reply.header("Cache-Control", "no-store");
       return deps.launches.list(req.params.id);
     });
     routes.post<{ Params: { id: string } }>("/v1/projects/:id/claude-launches", { bodyLimit: 40_000 }, async (req, reply) => {
