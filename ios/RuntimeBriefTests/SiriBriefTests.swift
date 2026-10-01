@@ -207,6 +207,10 @@ struct SiriBriefTests {
         let statusResult = try await status.perform()
         #expect(statusResult.value?.contains("export work is complete") == true)
         #expect(statusResult.value?.hasPrefix("Fictional demo.") == true)
+        var analysis = GetProjectAnalysisIntent()
+        analysis.project = project
+        let analysisResult = try await analysis.perform()
+        #expect(analysisResult.value == statusResult.value)
         status.project = nil
         let overviewResult = try await status.perform()
         #expect(overviewResult.value?.contains("You have 3 projects") == true)

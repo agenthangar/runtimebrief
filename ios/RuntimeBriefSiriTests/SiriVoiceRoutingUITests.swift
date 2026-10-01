@@ -5,6 +5,30 @@ import XCTest
 /// still a separate physical-device check.
 final class SiriVoiceRoutingUITests: XCTestCase {
     @MainActor
+    func testRecognizedAnalysisRequestReachesApp() async throws {
+        try requireRoutingTest()
+        let app = XCUIApplication()
+        app.launchEnvironment["RUNTIMEBRIEF_E2E_CLEAR_STATE"] = "1"
+        app.launchEnvironment["RUNTIMEBRIEF_E2E_DEMO"] = "1"
+        app.launch()
+        XCTAssertTrue(app.staticTexts["demo-data-banner"].waitForExistence(timeout: 10))
+        try await Task.sleep(for: .seconds(10))
+
+        let request = "Get me the analysis of the project Sample Tracker from RuntimeBrief"
+        XCUIDevice.shared.siriService.activate(voiceRecognitionText: request)
+        let answer = XCUIDevice.shared.siriService.staticTexts.matching(
+            NSPredicate(format: "label CONTAINS[c] %@", "24 demo checks pass")
+        ).firstMatch
+        let matched = answer.waitForExistence(timeout: 30)
+        let screenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        screenshot.name = "Siri project analysis routing"
+        screenshot.lifetime = .keepAlways
+        add(screenshot)
+        XCTAssertTrue(matched,
+                      "Siri did not route the recognized analysis phrase. \(XCUIDevice.shared.siriService.debugDescription)")
+    }
+
+    @MainActor
     func testRecognizedAttentionRequestReachesIntent() async throws {
         try requireRoutingTest()
         let app = XCUIApplication()
@@ -49,6 +73,9 @@ final class SiriVoiceRoutingUITests: XCTestCase {
             "Show Runtime Brief status",
             "What's the status of Sample Tracker in RuntimeBrief",
             "Can you tell me the status of the Sample Tracker app from RuntimeBrief",
+            "Get me the analysis of the project Sample Tracker from RuntimeBrief",
+            "Give me the latest analysis of the project Sample Tracker from RuntimeBrief",
+            "RuntimeBrief analysis for Sample Tracker",
         ] {
             XCUIDevice.shared.siriService.activate(voiceRecognitionText: request)
             let initial = XCTAttachment(screenshot: XCUIScreen.main.screenshot())

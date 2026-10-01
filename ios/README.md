@@ -66,7 +66,7 @@ personal signing change local; do not commit it or change the production
    Tap an iOS project to also see its local Xcode version/build, latest
    TestFlight build, and newest App Store version/state. The analyst runs only
    after you tap **Generate analyst update** or ask a question.
-5. Say: *"Hey Siri, what's the state of \<project\> in RuntimeBrief"*. App
+5. Say: *"Hey Siri, RuntimeBrief analysis for \<project\>"*. App
    Shortcuts register after the first launch; a successful refresh supplies
    project names for personalized phrases.
 
@@ -75,6 +75,7 @@ personal signing change local; do not commit it or change the production
 | Action | Example phrase | Shortcuts output |
 | --- | --- | --- |
 | Project status | Show Runtime Brief status; or What's the status of Sample Tracker in RuntimeBrief? | Brief text |
+| Project analysis | RuntimeBrief analysis for Sample Tracker; or RuntimeBrief project analysis, then name the project | Cached analysis text |
 | Needs attention | What needs attention in RuntimeBrief? | Project entities |
 | List projects | List my RuntimeBrief projects | Project entities |
 | Open project | Open Sample Tracker in RuntimeBrief | Opens project detail |
@@ -97,7 +98,9 @@ including retries from the app. After a confirmed receipt, repeating the task
 creates a new session. Demo launches remain fictional and never contact a Mac.
 
 Status without a project reads brief headlines for up to four configured
-projects immediately; a named project reads its own evidence-backed brief.
+projects immediately; a named status or analysis request reads the project's
+latest completed evidence-backed analysis. The analysis refreshes on the Mac
+in the background so Siri can answer without waiting for a model run.
 The project must appear in RuntimeBrief before Siri can resolve its name.
 Status, attention, and list actions read `/v1/projects` with a five-second
 network timeout. They never start an analyst. Spotlight maintenance runs
@@ -123,6 +126,13 @@ from RuntimeBrief." Background entity
 suggestions return no names on connection/setup errors so a vocabulary failure
 does not abort registration of every shortcut. Explicit reads still report
 connection errors and authenticate normally.
+
+For a hands-free project report, say "RuntimeBrief analysis for Sample
+Tracker." "RuntimeBrief project analysis" asks which project, so the reply
+can be a second spoken turn. Phrases such as "Get me the analysis of the
+project Sample Tracker from RuntimeBrief" are also registered. Include
+RuntimeBrief in the request so Siri can route it to this app; a request with
+only the project name can fall back to a web search.
 
 **Settings → Siri & Search → Make Projects Discoverable** controls Spotlight
 indexing, on-screen entity annotations, and opening
@@ -182,8 +192,8 @@ xcodebuild test -project ios/RuntimeBrief.xcodeproj -scheme RuntimeBriefSiri \
   RUNTIMEBRIEF_E2E_SIRI_ROUTING=1
 ```
 
-This test checks the parameter-free chooser, a named project, and a conversational
-status request through `XCUISiriService`. A failed routing test must remain a
+This test checks the parameter-free chooser, named status and analysis requests,
+and conversational requests through `XCUISiriService`. A failed routing test must remain a
 failure even when direct App Intents or Shortcuts checks pass. App Shortcuts
 Preview can check the phrase template using the `Project` entity placeholder;
 it does not load the connected daemon's project names or verify speech.

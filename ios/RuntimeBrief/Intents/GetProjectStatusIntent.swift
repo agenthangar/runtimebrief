@@ -23,22 +23,9 @@ struct GetProjectStatusIntent: AppIntent {
             let dataSource = RuntimeBriefDataSourceFactory.current(timeout: 4)
             let snapshot = try await ProjectsStore.shared.briefSnapshot(dataSource: dataSource)
             if let project {
-                guard let current = snapshot.projects.first(where: { $0.id == project.id }) else {
-                    throw RuntimeBriefError.notFound
-                }
-                let text: String
-                if snapshot.isSaved {
-                    text = SiriBrief.project(current, snapshot: snapshot)
-                } else {
-                    do {
-                        let status = try await dataSource.voiceStatus(projectID: current.id)
-                        text = SiriBrief.prefix(snapshot) + SiriBrief.analyzedProject(current, status: status)
-                    } catch {
-                        text = "The analysis is unavailable right now. " + SiriBrief.project(current, snapshot: snapshot)
-                    }
-                }
-                return .result(value: text, dialog: IntentDialog(stringLiteral: text),
-                               view: StatusSnippetView(projectName: current.name, branch: current.branch, answer: text))
+                let answer = try await ProjectStatusReader.read(project, snapshot: snapshot, dataSource: dataSource)
+                return .result(value: answer.text, dialog: IntentDialog(stringLiteral: answer.text),
+                               view: StatusSnippetView(projectName: answer.name, branch: answer.branch, answer: answer.text))
             }
             // A spoken shortcut without a project should answer immediately.
             // The system may not offer an entity picker from Siri on every OS.
@@ -48,6 +35,37 @@ struct GetProjectStatusIntent: AppIntent {
         } catch {
             throw SiriIntentFailure(message: unreachableMessage(for: error))
         }
+    }
+}
+
+struct ProjectStatusAnswer {
+    let name: String
+    let branch: String?
+    let text: String
+}
+
+/// Both the status and analysis shortcuts read the same cached answer.
+enum ProjectStatusReader {
+    static func read(
+        _ project: ProjectEntity,
+        snapshot: ProjectsStore.BriefSnapshot,
+        dataSource: any RuntimeBriefDataSource
+    ) async throws -> ProjectStatusAnswer {
+        guard let current = snapshot.projects.first(where: { $0.id == project.id }) else {
+            throw RuntimeBriefError.notFound
+        }
+        let text: String
+        if snapshot.isSaved {
+            text = SiriBrief.project(current, snapshot: snapshot)
+        } else {
+            do {
+                let status = try await dataSource.voiceStatus(projectID: current.id)
+                text = SiriBrief.prefix(snapshot) + SiriBrief.analyzedProject(current, status: status)
+            } catch {
+                text = "The analysis is unavailable right now. " + SiriBrief.project(current, snapshot: snapshot)
+            }
+        }
+        return ProjectStatusAnswer(name: current.name, branch: current.branch, text: text)
     }
 }
 

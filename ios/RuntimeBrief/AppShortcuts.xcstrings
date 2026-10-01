@@ -1,12 +1,42 @@
 {
   "sourceLanguage": "en",
   "strings": {
+    "${applicationName} analysis for ${project}": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "${applicationName} analysis for ${project}"
+          }
+        }
+      }
+    },
+    "${applicationName} project analysis": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "${applicationName} project analysis"
+          }
+        }
+      }
+    },
     "${applicationName} status for ${project}": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
             "value": "${applicationName} status for ${project}"
+          }
+        }
+      }
+    },
+    "Analyze ${project} with ${applicationName}": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Analyze ${project} with ${applicationName}"
           }
         }
       }
@@ -51,6 +81,16 @@
         }
       }
     },
+    "Get a project analysis from ${applicationName}": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Get a project analysis from ${applicationName}"
+          }
+        }
+      }
+    },
     "Get a project status in ${applicationName}": {
       "localizations": {
         "en": {
@@ -67,6 +107,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Get me status from ${applicationName}"
+          }
+        }
+      }
+    },
+    "Get me the analysis of the project ${project} from ${applicationName}": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Get me the analysis of the project ${project} from ${applicationName}"
           }
         }
       }
@@ -91,12 +141,42 @@
         }
       }
     },
+    "Get the analysis of ${project} from ${applicationName}": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Get the analysis of ${project} from ${applicationName}"
+          }
+        }
+      }
+    },
     "Get the status of ${project} using ${applicationName}": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
             "value": "Get the status of ${project} using ${applicationName}"
+          }
+        }
+      }
+    },
+    "Give me the latest analysis of ${project} from ${applicationName}": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Give me the latest analysis of ${project} from ${applicationName}"
+          }
+        }
+      }
+    },
+    "Give me the latest analysis of the project ${project} from ${applicationName}": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Give me the latest analysis of the project ${project} from ${applicationName}"
           }
         }
       }

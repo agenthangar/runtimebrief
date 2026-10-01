@@ -33,6 +33,22 @@ struct RuntimeBriefShortcuts: AppShortcutsProvider {
             systemImageName: "shippingbox"
         )
         AppShortcut(
+            intent: GetProjectAnalysisIntent(),
+            phrases: [
+                // This short form asks for a project aloud when none was named.
+                "\(.applicationName) project analysis",
+                "Get a project analysis from \(.applicationName)",
+                "Get me the analysis of the project \(\.$project) from \(.applicationName)",
+                "Get the analysis of \(\.$project) from \(.applicationName)",
+                "Give me the latest analysis of the project \(\.$project) from \(.applicationName)",
+                "Give me the latest analysis of \(\.$project) from \(.applicationName)",
+                "Analyze \(\.$project) with \(.applicationName)",
+                "\(.applicationName) analysis for \(\.$project)",
+            ],
+            shortTitle: "Project Analysis",
+            systemImageName: "waveform"
+        )
+        AppShortcut(
             intent: GetProjectStatusIntent(),
             phrases: [
                 // Keep at least one phrase without \(\.$project): shortcuts whose
