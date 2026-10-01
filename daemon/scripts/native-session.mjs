@@ -14,7 +14,7 @@ const payloadFile = path.join(directory, 'payload.json');
 const payload = JSON.parse(fs.readFileSync(payloadFile, 'utf8'));
 fs.writeFileSync(path.join(directory, 'claimed'), '', { flag: 'wx', mode: 0o600 });
 fs.unlinkSync(payloadFile);
-const state = { cwd: payload.cwd, provider: payload.provider, sessionId: null, state: 'starting', message: 'Starting the native agent…', accepted: false, messages: [], requests: [], remoteURL: null, updatedAt: new Date().toISOString() };
+const state = { cwd: payload.cwd, projectRoot: payload.projectRoot, workspaceKind: payload.workspaceKind, provider: payload.provider, sessionId: null, state: 'starting', message: 'Starting the native agent…', accepted: false, messages: [], requests: [], remoteURL: null, updatedAt: new Date().toISOString() };
 const stateFile = path.join(directory, 'state.json');
 const owner = { token: payload.token, socket: `/tmp/rb-native-${payload.id}.sock`, pid: process.pid, cwd: payload.cwd };
 let child, codex, terminal, server, busy = false, sequence = 0, screen = '', ending = false;
@@ -43,7 +43,7 @@ function finish(code) {
   if (ending) return; ending = true;
   for (const value of pending.values()) { clearTimeout(value.timer); value.reject(Error('Native process ended')); }
   pending.clear(); nativeRequests.clear(); state.requests = [];
-  if (state.state !== 'failed') {
+  if (state.state !== 'failed' && !(code === 0 && state.state === 'completed')) {
     state.state = code === 0 || code === null ? 'stopped' : 'failed';
     state.message = state.accepted ? 'The agent stopped. Its conversation is saved on your Mac.' : 'The agent stopped before accepting the task. Check its setup on your Mac.';
   }
@@ -217,7 +217,7 @@ try {
     save(); void turn(payload.prompt);
   }
 } catch {
-  failed('The native session could not start. Check agent sign-in, workspace trust, and Git setup on your Mac.');
+  failed('The native session could not start. Check agent sign-in and workspace trust on your Mac.');
   try { codex?.stop(); child?.kill(); terminal?.kill(); } catch {} finish(1);
 }
 process.on('SIGTERM', () => { try { codex?.stop(); child?.kill(); terminal?.kill(); } catch {} finish(null); });

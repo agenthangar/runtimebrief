@@ -15,22 +15,25 @@ are retained privately but omitted from the new task list; they are not replayed
 
 Cursor ACP conversations also feed portfolio evidence and analyst context from
 their private native snapshots when no desktop transcript exists. The reader
-checks the exact worktree and native session identity, deduplicates matching
+checks the exact project folder or legacy worktree and native session identity, deduplicates matching
 desktop history, and verifies the owner before showing an active or waiting
 state. A stopped owner cannot leave an actionable approval in the portfolio.
 
-New Codex tasks use the selected project checkout, including its current branch
-and uncommitted files. This matches native Codex CLI project grouping and shares
+New Claude, Codex, and Cursor tasks use the selected project checkout, including
+its current branch, uncommitted files, rules, and provider settings. This matches
+the native project's execution directory and shares
 edits with other work in that checkout. Merely setting the App Server project ID
 does not establish the native phone sidebar's grouping: the execution folder
-must also be the selected project folder. Existing Codex worktree receipts keep
+must also be the selected project folder. Existing worktree receipts keep
 their original folder and are not relocated or replayed.
 
-Claude and Cursor tasks get a Git worktree under private RuntimeBrief storage,
-based on local HEAD, without copying uncommitted changes or fetching from the
-network. Each provider runs in its verified workspace. The detached owner survives
-HTTP disconnects and daemon restarts. If it exits, RuntimeBrief reports Stopped
-or Failed; it does not redispatch an uncertain task.
+Each provider runs in its verified project folder without fetching or creating
+a branch or worktree. A project need not have an initial Git commit. The detached
+owner survives HTTP disconnects and daemon restarts. Confirmed completed turns
+remain Ready to review if the connection goes offline, with replies disabled.
+Unfinished tasks report Stopped or Failed when the owner exits; an uncertain task
+is never redispatched. Claude's prompt acceptance, state, and Remote Control link
+are accepted only from the exact native session and execution folder.
 
 Before the worker creates its control socket, an unaccepted Starting state
 stays Starting for up to a minute. An explicit failure is shown immediately;

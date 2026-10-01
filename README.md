@@ -154,12 +154,11 @@ Then try:
 
 Install and sign in to the provider CLIs you want to use: Claude Code, Codex,
 and Cursor. Update the daemon and run `runtimebriefd install-service`.
-Registered and discovered projects allow tasks by default. Codex tasks run in
-the selected project folder, using its current branch and files, so native
-Codex groups the conversation with that project. These tasks share the checkout
-with other work there. Claude and Cursor tasks use an isolated worktree based
-on local Git HEAD; they need an initial commit and do not copy uncommitted
-checkout changes.
+Registered and discovered projects allow tasks by default. New Claude, Codex,
+and Cursor tasks run in the selected project folder, using its current branch,
+files, and provider settings. These tasks share the checkout with other work
+there and do not require an initial Git commit. Native sessions keep the
+project's execution directory instead of creating a UUID project folder.
 
 In a project, tap **New task**, select the provider, model, permissions, and
 optional reasoning level, then describe the work. Native default uses the Mac's

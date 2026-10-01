@@ -61,10 +61,6 @@ export class NativeSessionBackend implements ClaudeSessionBackend {
     if (!health.available) return health;
     // Account health is shared; catalogs/defaults are loaded only for the selected workspace.
     if (!cwd) return health;
-    if (this.provider !== "codex") {
-      try { await exec("/usr/bin/git", ["-C", cwd, "rev-parse", "--verify", "HEAD"], { timeout: 2000 }); }
-      catch { return { available: false, message: "This project needs a Git repository with an initial commit before starting an isolated task." }; }
-    }
     const key = this.provider === "claude" ? cwd : "global";
     if (!this.catalogs.has(key)) this.catalogs.set(key, new NativeModelCatalog(() => this.provider === "claude" ? discoverClaudeModels(this.binary, cwd) : discoverNativeModels(this.provider, this.binary)));
     const catalog = await this.catalogs.get(key)!.get();
@@ -83,17 +79,15 @@ export class NativeSessionBackend implements ClaudeSessionBackend {
   }
   private workspace(launch: ClaudeLaunch) {
     if (launch.workspaceKind === "project") {
-      if (this.provider !== "codex" || !launch.projectRoot) throw Error("Invalid native project workspace");
+      if (!launch.projectRoot) throw Error("Invalid native project workspace");
       return launch.projectRoot;
     }
     return path.join(this.root, "native-worktrees", launch.id);
   }
   async create(launch: ClaudeLaunch, prompt: string): Promise<void> {
     const directory = this.directory(launch);
-    if (this.provider === "codex") { launch.workspaceKind = "project"; launch.projectRoot ??= launch.cwd; }
-    else launch.workspaceKind = "worktree";
+    launch.workspaceKind = "project"; launch.projectRoot ??= launch.cwd;
     ensurePrivateDirectory(path.dirname(directory));
-    if (launch.workspaceKind === "worktree") ensurePrivateDirectory(path.dirname(this.workspace(launch)));
     fs.mkdirSync(directory, { mode: 0o700 });
     fs.writeFileSync(path.join(directory, "payload.json"), JSON.stringify({ id: launch.id, token: randomUUID(), provider: this.provider, binary: this.binary, projectRoot: launch.projectRoot ?? launch.cwd, projectName: launch.projectName, cwd: this.workspace(launch), workspaceKind: launch.workspaceKind, name: launch.name, prompt, model: launch.effectiveModel ?? launch.model ?? "default", mode: launch.permissionMode ?? "manual", effort: launch.effectiveReasoningEffort ?? launch.reasoningEffort ?? "default", remoteControl: launch.requestedRemoteControl !== false }), { flag: "wx", mode: 0o600 });
     const child = spawn(process.execPath, [runnerScript, directory], { detached: true, stdio: "ignore" });
@@ -142,12 +136,16 @@ export class NativeSessionBackend implements ClaudeSessionBackend {
       return launch;
     }
     if (!live) launch.remoteControl.state = launch.requestedRemoteControl === false ? "disabled" : "unavailable";
-    if (!live && state.state !== "failed") { launch.state = "stopped"; launch.message = state.sessionId ? "The agent stopped. Its conversation is saved on your Mac." : "The agent stopped before confirming a conversation. Check its setup on your Mac."; }
+    if (!live && state.state === "completed") launch.activity = "idle";
+    else if (!live && state.state !== "failed") { launch.state = "stopped"; launch.message = state.sessionId ? "The agent stopped. Its conversation is saved on your Mac." : "The agent stopped before confirming a conversation. Check its setup on your Mac."; }
     if (this.provider === "claude" && state.sessionId) {
       const file = path.join(os.homedir(), ".claude/projects", state.cwd.replace(/[^A-Za-z0-9]/g, "-"), `${state.sessionId}.jsonl`);
       const parsed = await parseClaudeSessionFile(file);
-      launch.nativeId = parsed.sessionId === state.sessionId ? state.sessionId : null;
-      const acknowledged = parsed.sessionId === state.sessionId && parsed.userPrompts.some(value => promptHash(value) === launch.promptHash);
+      let matchesWorkspace = false;
+      try { matchesWorkspace = !!parsed.cwd && fs.realpathSync(parsed.cwd) === fs.realpathSync(state.cwd); } catch {}
+      const confirmed = parsed.sessionId === state.sessionId && matchesWorkspace;
+      launch.nativeId = confirmed ? state.sessionId : null;
+      const acknowledged = confirmed && parsed.userPrompts.some(value => promptHash(value) === launch.promptHash);
       if (acknowledged) {
         launch.launchState = "started";
         if (!live && state.state !== "failed") launch.message = "Claude stopped. Its conversation is saved on your Mac.";
@@ -155,21 +153,26 @@ export class NativeSessionBackend implements ClaudeSessionBackend {
       let screen = ""; try { screen = fs.readFileSync(path.join(this.directory(launch), "screen.txt"), "utf8"); } catch {}
       if (live) {
         const normalized = screen.slice(-16000).replace(/\u001b\[[0-?]*[ -/]*[@-~]/g, "").replace(/\s/g, "").toLowerCase();
-        const bridgeReady = parsed.remoteControlStatus?.content.includes("/remote-control is active") === true;
+        const bridgeReady = confirmed && parsed.remoteControlStatus?.content.includes("/remote-control is active") === true;
         const needsSetup = (!acknowledged && /trustthisfolder|accessingworkspace|quicksafetycheck|signin|login/.test(normalized)) || (!bridgeReady && /enableremotecontrol/.test(normalized));
-        launch.state = needsSetup || parsed.state === "waiting" ? "needs_input" : parsed.state === "completed" ? "completed" : acknowledged ? "running" : "starting";
-        launch.activity = launch.state === "needs_input" ? "needs_input" : launch.state === "completed" ? "idle" : acknowledged ? "working" : "unknown";
-        launch.message = needsSetup ? (launch.requestedRemoteControl === false ? "Finish Claude setup on your Mac." : "Finish Claude setup on your Mac or here.") : launch.state === "completed" ? "Ready to review in Claude." : acknowledged ? "Claude is working on your Mac." : "Waiting for Claude to accept the task.";
+        launch.state = needsSetup || (acknowledged && parsed.state === "waiting") ? "needs_input" : acknowledged && parsed.state === "interrupted" ? "failed" : acknowledged && parsed.state === "completed" ? "completed" : acknowledged ? "running" : "starting";
+        launch.activity = launch.state === "needs_input" ? "needs_input" : launch.state === "completed" ? "idle" : launch.state === "running" ? "working" : "unknown";
+        launch.message = needsSetup ? (launch.requestedRemoteControl === false ? "Finish Claude setup on your Mac." : "Finish Claude setup on your Mac or here.") : launch.state === "failed" ? "Claude reported an error. Review its conversation before continuing." : launch.state === "completed" ? "Ready to review in Claude." : acknowledged ? "Claude is working on your Mac." : "Waiting for Claude to accept the task.";
+      }
+      if (!live && state.state !== "failed" && acknowledged && parsed.state === "completed") {
+        launch.state = "completed"; launch.activity = "idle";
+        launch.message = "Ready to review. Claude's conversation is saved on your Mac.";
       }
       const url = nativeRemoteURL(parsed.remoteControlStatus?.url);
-      if (live && url && parsed.remoteControlStatus?.content.includes("/remote-control is active") && launch.requestedRemoteControl !== false) { launch.remoteControl.state = "ready"; launch.remoteControl.url = url; }
-      else if (live && parsed.remoteControlStatus && launch.requestedRemoteControl !== false) launch.remoteControl.state = "unavailable";
+      if (live && confirmed && url && parsed.remoteControlStatus?.content.includes("/remote-control is active") && launch.requestedRemoteControl !== false) { launch.remoteControl.state = "ready"; launch.remoteControl.url = url; }
+      else if (live && confirmed && parsed.remoteControlStatus && launch.requestedRemoteControl !== false) launch.remoteControl.state = "unavailable";
     }
     return launch;
   }
   async conversation(launch: ClaudeLaunch): Promise<ConversationSnapshot> {
     const observed = await this.get(launch); const state = this.read(launch);
-    return { state: observed.state, message: observed.message, messages: state.messages, requests: observed.activity === "stopped" ? [] : state.requests, writable: launch.requestedRemoteControl !== false && observed.activity !== "stopped" && this.provider !== "claude" };
+    const writable = launch.requestedRemoteControl !== false && observed.remoteControl?.state === "ready" && this.provider !== "claude";
+    return { state: observed.state, message: observed.message, messages: state.messages, requests: writable ? state.requests : [], writable };
   }
   async reply(launch: ClaudeLaunch, body: SessionReply) { return this.bridge(launch, { op: "reply", ...body }); }
   async terminal(launch: ClaudeLaunch) { return this.bridge(launch, { op: "screen" }); }
