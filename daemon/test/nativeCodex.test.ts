@@ -44,7 +44,7 @@ function fixture() {
   return { root, cwd, calls, children, projects, session, event, failed, complete, conflict: () => { resumeError = true; }, wrongCwd: () => { mismatch = true; }, wrongStartCwd: () => { startMismatch = true; }, deferAcknowledgment: () => { acknowledgment = () => {}; }, acknowledge: () => acknowledgment?.() };
 }
 
-it("assigns the real project before creating a thread in its isolated workspace", async () => {
+it("assigns the real project before creating a thread in its verified workspace", async () => {
   const f = fixture();
   expect(await f.session.start()).toEqual({ sessionId: "saved-thread", projectId: "meal-planner" });
   expect(f.calls.find(c => c.method === "initialize")?.params.capabilities.experimentalApi).toBe(true);

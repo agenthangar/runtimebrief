@@ -61,8 +61,10 @@ export class NativeSessionBackend implements ClaudeSessionBackend {
     if (!health.available) return health;
     // Account health is shared; catalogs/defaults are loaded only for the selected workspace.
     if (!cwd) return health;
-    try { await exec("/usr/bin/git", ["-C", cwd, "rev-parse", "--verify", "HEAD"], { timeout: 2000 }); }
-    catch { return { available: false, message: "This project needs a Git repository with an initial commit before starting an isolated task." }; }
+    if (this.provider !== "codex") {
+      try { await exec("/usr/bin/git", ["-C", cwd, "rev-parse", "--verify", "HEAD"], { timeout: 2000 }); }
+      catch { return { available: false, message: "This project needs a Git repository with an initial commit before starting an isolated task." }; }
+    }
     const key = this.provider === "claude" ? cwd : "global";
     if (!this.catalogs.has(key)) this.catalogs.set(key, new NativeModelCatalog(() => this.provider === "claude" ? discoverClaudeModels(this.binary, cwd) : discoverNativeModels(this.provider, this.binary)));
     const catalog = await this.catalogs.get(key)!.get();
@@ -79,12 +81,21 @@ export class NativeSessionBackend implements ClaudeSessionBackend {
     if (!uuid.test(launch.id)) throw Error("Invalid identity");
     return path.join(this.root, "native-launches", launch.id);
   }
-  private workspace(launch: ClaudeLaunch) { return path.join(this.root, "native-worktrees", launch.id); }
+  private workspace(launch: ClaudeLaunch) {
+    if (launch.workspaceKind === "project") {
+      if (this.provider !== "codex" || !launch.projectRoot) throw Error("Invalid native project workspace");
+      return launch.projectRoot;
+    }
+    return path.join(this.root, "native-worktrees", launch.id);
+  }
   async create(launch: ClaudeLaunch, prompt: string): Promise<void> {
     const directory = this.directory(launch);
-    ensurePrivateDirectory(path.dirname(directory)); ensurePrivateDirectory(path.dirname(this.workspace(launch)));
+    if (this.provider === "codex") { launch.workspaceKind = "project"; launch.projectRoot ??= launch.cwd; }
+    else launch.workspaceKind = "worktree";
+    ensurePrivateDirectory(path.dirname(directory));
+    if (launch.workspaceKind === "worktree") ensurePrivateDirectory(path.dirname(this.workspace(launch)));
     fs.mkdirSync(directory, { mode: 0o700 });
-    fs.writeFileSync(path.join(directory, "payload.json"), JSON.stringify({ id: launch.id, token: randomUUID(), provider: this.provider, binary: this.binary, projectRoot: launch.projectRoot ?? launch.cwd, projectName: launch.projectName, cwd: this.workspace(launch), name: launch.name, prompt, model: launch.effectiveModel ?? launch.model ?? "default", mode: launch.permissionMode ?? "manual", effort: launch.effectiveReasoningEffort ?? launch.reasoningEffort ?? "default", remoteControl: launch.requestedRemoteControl !== false }), { flag: "wx", mode: 0o600 });
+    fs.writeFileSync(path.join(directory, "payload.json"), JSON.stringify({ id: launch.id, token: randomUUID(), provider: this.provider, binary: this.binary, projectRoot: launch.projectRoot ?? launch.cwd, projectName: launch.projectName, cwd: this.workspace(launch), workspaceKind: launch.workspaceKind, name: launch.name, prompt, model: launch.effectiveModel ?? launch.model ?? "default", mode: launch.permissionMode ?? "manual", effort: launch.effectiveReasoningEffort ?? launch.reasoningEffort ?? "default", remoteControl: launch.requestedRemoteControl !== false }), { flag: "wx", mode: 0o600 });
     const child = spawn(process.execPath, [runnerScript, directory], { detached: true, stdio: "ignore" });
     await new Promise<void>((resolve, reject) => { child.once("spawn", resolve); child.once("error", reject); }); child.unref();
   }
@@ -123,6 +134,13 @@ export class NativeSessionBackend implements ClaudeSessionBackend {
     launch.launchState = state.accepted ? "started" : state.state === "failed" ? "failed" : "starting";
     launch.activity = live ? state.state === "needs_input" ? "needs_input" : state.state === "running" ? "working" : state.state === "completed" ? "idle" : "unknown" : "stopped";
     launch.remoteControl = { state: launch.requestedRemoteControl === false ? "disabled" : live && this.provider !== "claude" && !!state.sessionId ? "ready" : "starting", url: null, observedAt: state.updatedAt };
+    // The worker saves Starting before workspace setup and its control socket exist.
+    // A missing socket during that interval is not evidence that the task stopped.
+    if (!live && state.state === "starting" && !state.accepted && Date.now() - Date.parse(launch.createdAt) < 60000) {
+      launch.state = "starting"; launch.activity = "unknown";
+      launch.message = "Starting the native agent…";
+      return launch;
+    }
     if (!live) launch.remoteControl.state = launch.requestedRemoteControl === false ? "disabled" : "unavailable";
     if (!live && state.state !== "failed") { launch.state = "stopped"; launch.message = state.sessionId ? "The agent stopped. Its conversation is saved on your Mac." : "The agent stopped before confirming a conversation. Check its setup on your Mac."; }
     if (this.provider === "claude" && state.sessionId) {

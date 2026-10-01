@@ -46,6 +46,8 @@ export interface ClaudeLaunch {
   projectRoot?: string;
   projectName?: string;
   nativeProjectId?: string;
+  /** New Codex tasks use the native project checkout; old receipts retain their worktree. */
+  workspaceKind?: "project" | "worktree";
   tmuxTarget?: string;
   promptHash?: string;
   launchState?: "starting" | "started" | "failed" | "unknown";

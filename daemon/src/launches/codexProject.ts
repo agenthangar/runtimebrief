@@ -19,7 +19,7 @@ export async function bindCodexProject(binary: string, launch: ClaudeLaunch): Pr
   });
 }
 
-/** Resolve before thread/start so the worktree never becomes the native project. */
+/** Resolve the repository's native metadata before thread/start. Sidebar grouping also needs the selected project cwd. */
 export async function findCodexProject(request: CodexRequest, projectRoot: string, name?: string): Promise<string> {
   const root = canonical(projectRoot);
   let project: NativeProject | undefined, cursor: string | null = null;

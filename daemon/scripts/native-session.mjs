@@ -3,10 +3,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import net from 'node:net';
 import readline from 'node:readline';
-import { spawn, execFileSync } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import { randomUUID, createHash } from 'node:crypto';
 import * as pty from 'node-pty';
 import { NativeCodexSession } from '../dist/launches/nativeCodex.js';
+import { prepareNativeWorkspace } from '../dist/launches/nativeWorkspace.js';
 
 const directory = process.argv[2];
 const payloadFile = path.join(directory, 'payload.json');
@@ -181,9 +182,7 @@ async function control(body) {
 }
 try {
   save();
-  // HEAD is local and deterministic: no network fetch and no shared-checkout edits.
-  execFileSync('/usr/bin/git', ['-C', payload.projectRoot, 'worktree', 'add', '-b', `runtimebrief/${payload.id}`, payload.cwd, 'HEAD'], { timeout: 30000, stdio: 'ignore' });
-  owner.cwd = state.cwd = fs.realpathSync(payload.cwd);
+  owner.cwd = state.cwd = prepareNativeWorkspace(payload);
   fs.writeFileSync(path.join(directory, 'owner.json'), JSON.stringify(owner), { flag: 'wx', mode: 0o600 });
   server = net.createServer({ allowHalfOpen: true }, connection => {
     let input = ''; connection.setTimeout(5000, () => connection.destroy());

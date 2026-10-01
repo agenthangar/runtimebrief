@@ -22,7 +22,7 @@ from source; maintainers distribute internal TestFlight builds. See the
   plus on-demand questions about locally collected evidence.
 - Read-only summaries of Git, Claude Code, Codex, and Cursor activity.
 - Native Claude Code, Codex, and Cursor tasks, with model and permission
-  choices, isolated native worktrees, and phone continuation.
+  choices, native project sessions, and phone continuation.
 - Local Xcode metadata plus optional read-only App Store Connect status.
 - Siri access through the iOS app and local MCP tools for ChatGPT and Codex.
 - No RuntimeBrief account, hosted relay, or analytics SDK.
@@ -154,9 +154,12 @@ Then try:
 
 Install and sign in to the provider CLIs you want to use: Claude Code, Codex,
 and Cursor. Update the daemon and run `runtimebriefd install-service`.
-Registered and discovered projects allow tasks by default. Each task uses an
-isolated worktree based on the project's local Git HEAD; the repository needs
-an initial commit. Uncommitted checkout changes are not copied.
+Registered and discovered projects allow tasks by default. Codex tasks run in
+the selected project folder, using its current branch and files, so native
+Codex groups the conversation with that project. These tasks share the checkout
+with other work there. Claude and Cursor tasks use an isolated worktree based
+on local Git HEAD; they need an initial commit and do not copy uncommitted
+checkout changes.
 
 In a project, tap **New task**, select the provider, model, permissions, and
 optional reasoning level, then describe the work. Native default uses the Mac's
@@ -170,8 +173,8 @@ the selected provider in the composer.
 
 Continuation is on by default. Claude uses its verified Remote Control link;
 Codex and Cursor offer **Open conversation** in RuntimeBrief, including explicit
-approval and question controls. Codex tasks belong to the repository's native
-project while executing in their isolated worktree. RuntimeBrief releases its
+approval and question controls. Codex tasks use the repository's native
+project and its actual folder. RuntimeBrief releases its
 Codex connection after each turn, so the saved task can be opened in Codex.
 A reply here resumes the same conversation; if another Codex app owns it,
 continue there or close it first. The Mac and RuntimeBrief owner must stay

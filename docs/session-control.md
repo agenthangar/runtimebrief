@@ -10,7 +10,7 @@ are retained privately but omitted from the new task list; they are not replayed
 | Provider | Execution and continuation |
 | --- | --- |
 | Claude Code | Detached PTY owner starts the native CLI with a fixed session UUID and Remote Control. Native history confirms prompt acceptance and the exact connection URL. Claude owns setup, trust, tools, and permission prompts. |
-| Codex | App Server resolves the repository's native project before creating a durable thread in the isolated worktree. Native notifications drive messages and approvals. Its process closes after each turn to release ownership to native Codex. A RuntimeBrief follow-up verifies and resumes the same thread. |
+| Codex | App Server resolves the repository's native project before creating a durable thread in the selected project folder. Native notifications drive messages and approvals. Its process closes after each turn to release ownership to native Codex. A RuntimeBrief follow-up verifies and resumes the same thread. |
 | Cursor | A persistent local ACP connection uses the existing Cursor login, creates a session, and handles prompts, updates, questions, plans, and permission requests. |
 
 Cursor ACP conversations also feed portfolio evidence and analyst context from
@@ -19,17 +19,28 @@ checks the exact worktree and native session identity, deduplicates matching
 desktop history, and verifies the owner before showing an active or waiting
 state. A stopped owner cannot leave an actionable approval in the portfolio.
 
-Every task gets a Git worktree under private RuntimeBrief storage, based on
-local HEAD. This does not copy uncommitted changes or fetch from the network.
-The selected provider runs in that exact worktree. The detached owner survives
+New Codex tasks use the selected project checkout, including its current branch
+and uncommitted files. This matches native Codex CLI project grouping and shares
+edits with other work in that checkout. Merely setting the App Server project ID
+does not establish the native phone sidebar's grouping: the execution folder
+must also be the selected project folder. Existing Codex worktree receipts keep
+their original folder and are not relocated or replayed.
+
+Claude and Cursor tasks get a Git worktree under private RuntimeBrief storage,
+based on local HEAD, without copying uncommitted changes or fetching from the
+network. Each provider runs in its verified workspace. The detached owner survives
 HTTP disconnects and daemon restarts. If it exits, RuntimeBrief reports Stopped
 or Failed; it does not redispatch an uncertain task.
+
+Before the worker creates its control socket, an unaccepted Starting state
+stays Starting for up to a minute. An explicit failure is shown immediately;
+a missing socket during startup is not reported as a stopped session.
 
 Native CLI/protocol identities do not by themselves prove desktop sidebar
 visibility. Claude continuation uses a verified Remote Control link. Codex is
 assigned to its existing repository project, or one stable named project is
-created using the repository root. The UUID worktree remains the execution
-directory, not the project identity. Cursor continuation is offered within
+created using the repository root. New Codex conversations also keep that root
+as their native execution directory. Cursor continuation is offered within
 RuntimeBrief for the live owned session.
 
 Codex owns a task exclusively while a turn or approval is pending. On turn
@@ -74,7 +85,7 @@ and replies retain the separate 30-request limit.
 - `POST /v1/projects/:id/sessions/:launchId/reply`: stable response UUID plus one message or one explicit decision.
 
 All continuation writes enforce project scope and the project's launch opt-out.
-Native socket ownership is checked using the exact worktree and a private
+Native socket ownership is checked using the exact execution folder and a private
 per-task token. Approval choices are tied to the current native request.
 Replies are durably reserved before dispatch; retries with identical request
 IDs never repeat a follow-up or decision, including uncertain acknowledgments.
