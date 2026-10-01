@@ -15,6 +15,7 @@ import { discoverClaudeModels } from "./claudeModels.js";
 import { resolveClaudeSettings, resolveCodexSettings, resolveCursorSettings } from "./nativeSettings.js";
 import { parseClaudeSessionFile } from "../adapters/claudeCodeSessions.js";
 import { nativeRemoteURL, promptHash } from "./identity.js";
+import { NativeProviderHealth } from "./providerHealth.js";
 import { LaunchError, permissionModes, type ClaudeSessionBackend, type ClaudeLaunch, type LaunchCapability, type ClaudeLaunchOptions, type ConversationSnapshot, type SessionReply } from "./types.js";
 
 const exec = promisify(execFile);
@@ -28,28 +29,33 @@ export class NativeSessionBackend implements ClaudeSessionBackend {
   private readonly binary: string;
   private readonly root: string;
   private readonly catalogs = new Map<string, NativeModelCatalog>();
+  private readonly health = new NativeProviderHealth(() => this.checkHealth());
   constructor(readonly provider: "claude" | "codex" | "cursor", root = configDir()) {
     this.root = path.resolve(root);
     this.id = `native-${provider}`;
     this.binary = provider === "claude" ? resolveClaudeBinary() : resolveAgentBinary(provider);
   }
   private modes() { return permissionModes(this.provider); }
-  async capability(cwd?: string): Promise<LaunchCapability> {
+  private async checkHealth(): Promise<LaunchCapability> {
     try {
       if (this.provider === "claude") {
-        const [{ stdout }, { stdout: help }] = await Promise.all([exec(this.binary, ["auth", "status"], { timeout: 4000 }), exec(this.binary, ["--help"], { timeout: 4000 })]);
+        const [{ stdout }, { stdout: help }] = await Promise.all([exec(this.binary, ["auth", "status"], { timeout: 10000 }), exec(this.binary, ["--help"], { timeout: 10000 })]);
         if (!help.includes("--remote-control")) throw Error();
         if (JSON.parse(stdout).loggedIn !== true) throw Error();
       } else if (this.provider === "codex") {
-        const [, { stdout: help }] = await Promise.all([exec(this.binary, ["login", "status"], { timeout: 4000 }), exec(this.binary, ["--help"], { timeout: 4000 })]);
+        const [, { stdout: help }] = await Promise.all([exec(this.binary, ["login", "status"], { timeout: 10000 }), exec(this.binary, ["--help"], { timeout: 10000 })]);
         if (!help.includes("app-server")) throw Error();
       } else {
-        const [{ stdout }, { stdout: help }] = await Promise.all([exec(this.binary, ["status"], { timeout: 4000, env: { ...process.env, NO_COLOR: "1" } }), exec(this.binary, ["acp", "--help"], { timeout: 4000 })]);
+        const [{ stdout }, { stdout: help }] = await Promise.all([exec(this.binary, ["status"], { timeout: 10000, env: { ...process.env, NO_COLOR: "1" } }), exec(this.binary, ["acp", "--help"], { timeout: 10000 })]);
         if (!help.includes("Agent Client Protocol")) throw Error();
         if (/not logged in|not authenticated|logged out/i.test(stdout)) throw Error();
       }
     } catch { return { available: false, message: `Install and sign in to ${this.provider === "claude" ? "Claude Code" : this.provider} on your Mac.` }; }
-    const health: LaunchCapability = { available: true, message: `Ready to start ${this.provider === "claude" ? "Claude Code" : this.provider} on your Mac.`, permissionModes: this.modes() };
+    return { available: true, message: `Ready to start ${this.provider === "claude" ? "Claude Code" : this.provider} on your Mac.`, permissionModes: this.modes() };
+  }
+  async capability(cwd?: string): Promise<LaunchCapability> {
+    const health = await this.health.get();
+    if (!health.available) return health;
     // Account health is shared; catalogs/defaults are loaded only for the selected workspace.
     if (!cwd) return health;
     try { await exec("/usr/bin/git", ["-C", cwd, "rev-parse", "--verify", "HEAD"], { timeout: 2000 }); }

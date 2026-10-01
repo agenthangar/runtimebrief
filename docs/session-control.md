@@ -36,7 +36,8 @@ is not performed automatically.
 The daemon starts provider checks independently in the background and shares
 account health across projects. Health is cached for five minutes, or thirty
 seconds when a provider is unavailable. The account endpoint never enumerates
-models or reconciles history. Each project list returns persisted receipts
+models or reconciles history. Model discovery and task creation reuse that
+same account check, including an in-progress check. Each project list returns persisted receipts
 immediately and schedules status reconciliation in the background.
 
 On app launch and foreground refresh, iOS starts provider discovery and

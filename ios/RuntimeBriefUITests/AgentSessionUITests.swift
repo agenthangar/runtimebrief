@@ -37,9 +37,21 @@ final class AgentSessionUITests: XCTestCase {
             XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == true"), object: modelPicker)], timeout: 30), .completed)
             let permissions = app.buttons["session-permissions-picker"]
             for _ in 0..<4 where !permissions.isHittable { app.swipeUp() }
-            permissions.tap(); app.buttons[provider == "Codex" ? "Plan" : "Ask"].tap()
+            let permissionLabel = provider == "Codex" ? "Plan" : "Ask"
+            let option = app.descendants(matching: .any).matching(NSPredicate(format: "label == %@", permissionLabel)).firstMatch
+            for _ in 0..<3 {
+                permissions.tap()
+                if option.waitForExistence(timeout: 2) { break }
+                app.swipeUp()
+            }
+            let permissionScreenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+            permissionScreenshot.name = "\(provider) native permission menu"; permissionScreenshot.lifetime = .keepAlways; add(permissionScreenshot)
+            XCTAssertTrue(option.exists); option.tap()
+            assertSelection(permissions, contains: permissionLabel)
             let prompt = app.textFields["claude-task-prompt"]
-            for _ in 0..<4 where !prompt.isHittable { app.swipeDown() }
+            // Older simulator accessibility reports a field under the sheet's
+            // navigation bar as hittable. Bring its frame below that bar first.
+            for _ in 0..<6 where prompt.frame.minY < 120 || !prompt.isHittable { app.swipeDown() }
             prompt.tap(); prompt.typeText("Do not run tools or change files. Reply IOS_NATIVE_BEGIN only. Fixture run \(UUID().uuidString).")
             let start = app.buttons["start-claude-task"]
             XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == true"), object: start)], timeout: 30), .completed)
@@ -67,7 +79,11 @@ final class AgentSessionUITests: XCTestCase {
                 send.tap()
                 let approval = app.buttons["session-decision-accept"]
                 XCTAssertTrue(approval.waitForExistence(timeout: 120))
-                app.swipeUp()
+                for _ in 0..<8 {
+                    if approval.frame.minY < 120 { app.swipeDown() }
+                    else if approval.frame.maxY > app.frame.maxY - 140 || !approval.isHittable { app.swipeUp() }
+                    else { break }
+                }
                 XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "printf")).firstMatch.exists)
                 approval.tap()
                 let completed = app.staticTexts.matching(identifier: "session-message-assistant")

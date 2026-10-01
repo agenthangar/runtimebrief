@@ -8,6 +8,7 @@ struct SessionConversationView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var snapshot: ConversationSnapshot?
     @State private var text = ""
+    @FocusState private var composing: Bool
     @State private var sending = false
     @State private var error: String?
     @State private var answers: [String: String] = [:]
@@ -59,8 +60,8 @@ struct SessionConversationView: View {
             .safeAreaInset(edge: .bottom) {
                 if snapshot?.writable == true {
                     HStack(alignment: .bottom) {
-                        TextField("Follow up", text: $text, axis: .vertical).lineLimit(1...5).accessibilityIdentifier("session-conversation-input")
-                        Button { Task { await send(SessionReply(requestId: UUID().uuidString.lowercased(), text: text)) } } label: { Image(systemName: "arrow.up.circle.fill").font(.title) }
+                        TextField("Follow up", text: $text, axis: .vertical).lineLimit(1...5).focused($composing).accessibilityIdentifier("session-conversation-input")
+                        Button { composing = false; Task { await send(SessionReply(requestId: UUID().uuidString.lowercased(), text: text)) } } label: { Image(systemName: "arrow.up.circle.fill").font(.title) }
                             .accessibilityIdentifier("session-conversation-send")
                             .disabled(sending || retry != nil || text.utf16.count > 8000 || text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || snapshot?.state == "running" || !(snapshot?.requests.isEmpty ?? true))
                     }.padding().background(.bar)
