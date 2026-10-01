@@ -5,6 +5,19 @@ import XCTest
 /// Spoken recognition still requires a physical Apple Intelligence device.
 final class SiriIntegrationUITests: XCTestCase {
     @MainActor
+    func testUnconfiguredLaunchCanRegisterShortcutsWithoutProjectNames() async throws {
+        guard #available(iOS 27.0, *) else { throw XCTSkip("AppIntentsTesting requires iOS 27.") }
+        let app = XCUIApplication()
+        app.launchEnvironment["RUNTIMEBRIEF_E2E_CLEAR_STATE"] = "1"
+        app.launch()
+        XCTAssertTrue(app.buttons["connect-your-mac"].waitForExistence(timeout: 10))
+        let definitions = IntentDefinitions(bundleIdentifier: "com.backbrief.app")
+        try await requireSystemTesting(definitions)
+        let projects = try await definitions.entities["ProjectEntity"].suggestedEntities()
+        XCTAssertTrue(projects.isEmpty, "Background registration must finish without exposing saved names.")
+    }
+
+    @MainActor
     private func launchDemo() -> XCUIApplication {
         let app = XCUIApplication()
         app.launchEnvironment["RUNTIMEBRIEF_E2E_CLEAR_STATE"] = "1"
@@ -30,8 +43,18 @@ final class SiriIntegrationUITests: XCTestCase {
         let statusResult = try await status.run()
         let text: String = try statusResult.value
         XCTAssertTrue(text.contains("Fictional demo"))
-        XCTAssertTrue(text.contains("Export validation is ready to review"))
-        XCTAssertTrue(text.contains("Evidence updated"))
+        XCTAssertTrue(text.contains("Sample Tracker, analyzed"))
+        XCTAssertTrue(text.contains("24 demo checks pass"))
+        XCTAssertFalse(text.contains("[demo-evidence-"))
+
+        let analysisResult = try await definitions.intents["GetProjectAnalysisIntent"]
+            .makeIntent(project: project).run()
+        let analysis: String = try analysisResult.value
+        XCTAssertEqual(analysis, text)
+
+        let overviewResult = try await definitions.intents["GetProjectStatusIntent"].makeIntent().run()
+        let overview: String = try overviewResult.value
+        XCTAssertTrue(overview.contains("You have 3 projects"))
 
         let attentionResult = try await definitions.intents["GetAttentionIntent"].makeIntent().run()
         let attention: [AnyAppEntity] = try attentionResult.value

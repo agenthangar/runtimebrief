@@ -23,10 +23,13 @@ struct ProjectEntity: AppEntity, IndexedEntity {
     }
 
     var displayRepresentation: DisplayRepresentation {
+        // Siri's phrase expansion uses display names, rather than the string
+        // query's normalization. Register common spoken forms of the name.
+        let synonyms: [LocalizedStringResource] = ["\(name) app", "\(name) project"]
         if let branch {
-            DisplayRepresentation(title: "\(name)", subtitle: "\(branch)")
+            return DisplayRepresentation(title: "\(name)", subtitle: "\(branch)", synonyms: synonyms)
         } else {
-            DisplayRepresentation(title: "\(name)")
+            return DisplayRepresentation(title: "\(name)", synonyms: synonyms)
         }
     }
 
@@ -90,7 +93,15 @@ struct ProjectQuery: EntityStringQuery, EnumerableEntityQuery {
     func suggestedEntities() async throws -> [ProjectEntity] {
         // Shortcuts also uses this query for its explicit project chooser.
         // Discovery opt-out controls indexing and donations, not that chooser.
-        return try await allEntities()
+        do {
+            return try await allEntities()
+        } catch is RuntimeBriefError {
+            // A failed background vocabulary refresh otherwise aborts the
+            // registration of every shortcut, including parameter-free reads.
+            // Publish no names when setup/auth/network fails; explicit queries
+            // and intent execution still report the connection error.
+            return []
+        }
     }
 
     func allEntities() async throws -> [ProjectEntity] {
@@ -259,17 +270,22 @@ enum ProjectFuzzyMatcher {
             let name = normalize(candidate.name)
             let idNorm = normalize(candidate.id)
             let cTokens = Set(tokens(candidate.name)).union(tokens(candidate.id))
+            let overlap = qTokens.intersection(cTokens).count
             var score = 0
             if name == q || idNorm == q {
                 score = 100
             } else if name.hasPrefix(q) || idNorm.hasPrefix(q) {
                 score = 80
-            } else if name.contains(q) || idNorm.contains(q) || q.contains(name) {
+            } else if name.contains(q) || idNorm.contains(q) {
                 score = 60
+            } else if q.contains(name) || q.contains(idNorm) {
+                // Siri sometimes includes the app name in the entity text:
+                // "Meal Planner from RuntimeBrief" must prefer Meal Planner
+                // over the RuntimeBrief project even if both names occur.
+                score = 60 + min(overlap, 4) * 5
             } else if !qTokens.isEmpty && qTokens.isSubset(of: cTokens) {
                 score = 50
             } else {
-                let overlap = qTokens.intersection(cTokens).count
                 if overlap > 0, overlap * 2 >= qTokens.count {
                     score = 20 + overlap
                 }
@@ -286,7 +302,7 @@ enum ProjectFuzzyMatcher {
     }
 
     static func tokens(_ input: String) -> [String] {
-        let stopWords: Set<String> = ["the", "a", "an", "app", "project", "my"]
+        let stopWords: Set<String> = ["the", "a", "an", "app", "project", "my", "from", "in", "using"]
         return input
             .lowercased()
             .components(separatedBy: CharacterSet.alphanumerics.inverted)

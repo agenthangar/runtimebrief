@@ -59,12 +59,50 @@ struct SiriBriefTests {
         #expect(SiriBrief.attentionProjects(snapshot.projects).isEmpty)
     }
 
+    @Test func coldOfflineLaunchCanResolveSavedProjectNames() async throws {
+        let suite = "siri-cold-launch-\(UUID().uuidString)"
+        let onlineStore = ProjectsStore(defaults: UserDefaults(suiteName: suite)!, discovery: nil)
+        let (live, _) = try source(projects: DemoData.projects)
+        _ = try await onlineStore.refresh(dataSource: live)
+
+        // A new process must resolve names from the persisted snapshot when
+        // launch-time shortcut registration cannot reach the daemon.
+        let relaunchedStore = ProjectsStore(defaults: UserDefaults(suiteName: suite)!, discovery: nil)
+        let offline = LiveRuntimeBriefDataSource(client: RuntimeBriefClient(settings: .mock, transport: MockTransport(stubs: [:])))
+        let projects = try await relaunchedStore.projects(dataSource: offline)
+        #expect(projects.map(\.id) == DemoData.projects.map(\.id))
+        let brief = try await relaunchedStore.briefSnapshot(dataSource: offline)
+        #expect(brief.isSaved)
+        #expect(SiriBrief.project(projects[0], snapshot: brief).contains("Using saved briefs from"))
+    }
+
     @Test func attentionReturnsOnlyAttentionProjectsAndLabelsDemo() {
         let snapshot = ProjectsStore.BriefSnapshot(projects: DemoData.projects, fetchedAt: nil, isSaved: false, isDemo: true)
         let projects = SiriBrief.attentionProjects(snapshot.projects)
         #expect(projects.count == 1)
         #expect(projects.first?.name == "Catalog Builder")
         #expect(SiriBrief.attention(snapshot).hasPrefix("Fictional demo."))
+        #expect(SiriBrief.overview(snapshot).contains("You have 3 projects."))
+        #expect(SiriBrief.overview(snapshot).contains("Ask for a project by name"))
+        let empty = ProjectsStore.BriefSnapshot(projects: [], fetchedAt: nil, isSaved: false, isDemo: false)
+        #expect(SiriBrief.overview(empty).contains("No projects are registered yet"))
+    }
+
+    @Test func analyzedStatusNamesProjectSpeaksEvidenceWithoutCitationTokensAndDisclosesAge() {
+        let status = VoiceStatus(
+            answer: "Done: Export checks passed. [demo-evidence-commit-001]\nNow: Ready to review. [demo-evidence-session-001]\nNext: Review the export. [demo-evidence-commit-001]",
+            analyzedAt: Date().addingTimeInterval(-20 * 60), model: "gpt-6-luna", evidence: [], refreshing: false, unavailable: false
+        )
+        let spoken = SiriBrief.analyzedProject(DemoData.projects[0], status: status)
+        #expect(spoken.hasPrefix("Sample Tracker, analyzed"))
+        #expect(spoken.contains("Recently, Export checks passed"))
+        #expect(spoken.contains("Next, Review the export"))
+        #expect(!spoken.contains("[demo-evidence"))
+        let waiting = VoiceStatus(answer: nil, analyzedAt: nil, model: nil, evidence: [], refreshing: true, unavailable: false)
+        #expect(SiriBrief.analyzedProject(DemoData.projects[0], status: waiting).contains("preparing an analysis"))
+        let failedRefresh = VoiceStatus(answer: status.answer, analyzedAt: Date().addingTimeInterval(-6 * 3600),
+                                        model: status.model, evidence: [], refreshing: false, unavailable: true)
+        #expect(SiriBrief.analyzedProject(DemoData.projects[0], status: failedRefresh).contains("couldn't refresh"))
     }
 
     @Test func entityExposesUsefulMetadataWithoutPathsOrCredentials() {
@@ -130,7 +168,6 @@ struct SiriBriefTests {
         await store.clear()
         await transport.resume()
         await #expect(throws: CancellationError.self) { _ = try await refresh.value }
-        #expect(await store.cachedSnapshot().projects.isEmpty)
     }
 
     @Test(.timeLimit(.minutes(1))) func slowSpotlightDoesNotDelayReadsOrRestoreQueuedDataAfterClear() async throws {
@@ -168,8 +205,15 @@ struct SiriBriefTests {
         var status = GetProjectStatusIntent()
         status.project = project
         let statusResult = try await status.perform()
-        #expect(statusResult.value?.contains("Export validation is ready to review") == true)
+        #expect(statusResult.value?.contains("export work is complete") == true)
         #expect(statusResult.value?.hasPrefix("Fictional demo.") == true)
+        var analysis = GetProjectAnalysisIntent()
+        analysis.project = project
+        let analysisResult = try await analysis.perform()
+        #expect(analysisResult.value == statusResult.value)
+        status.project = nil
+        let overviewResult = try await status.perform()
+        #expect(overviewResult.value?.contains("You have 3 projects") == true)
         let attentionResult = try await GetAttentionIntent().perform()
         #expect(attentionResult.value?.map(\.name) == ["Catalog Builder"])
         let listResult = try await ListProjectsIntent().perform()

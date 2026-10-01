@@ -184,6 +184,15 @@ struct AnalystAnswer: Codable, Sendable, Equatable {
     }
 }
 
+struct VoiceStatus: Codable, Sendable, Equatable {
+    let answer: String?
+    let analyzedAt: Date?
+    let model: String?
+    let evidence: [EvidenceRef]
+    let refreshing: Bool
+    let unavailable: Bool
+}
+
 struct HealthInfo: Codable, Sendable {
     let version: String
     let uptime: Int

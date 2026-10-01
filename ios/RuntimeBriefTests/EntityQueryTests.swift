@@ -7,6 +7,7 @@ struct EntityQueryTests {
         ("sampletracker", "Sample Tracker App"),
         ("exampleproject", "ExampleProject"),
         ("runtimebrief", "RuntimeBrief"),
+        ("meal-planner", "Meal Planner"),
     ]
 
     @Test func exactNameAndIdMatch() {
@@ -25,6 +26,11 @@ struct EntityQueryTests {
     @Test func partialAndPrefixMatch() {
         #expect(ProjectFuzzyMatcher.rank(query: "exam", candidates: candidates).first == "exampleproject")
         #expect(ProjectFuzzyMatcher.rank(query: "brief", candidates: candidates).first == "runtimebrief")
+    }
+
+    @Test func spokenProjectNameBeatsTheAppNameInsideOneUtterance() {
+        #expect(ProjectFuzzyMatcher.rank(query: "Meal Planner from RuntimeBrief", candidates: candidates).first == "meal-planner")
+        #expect(ProjectFuzzyMatcher.rank(query: "RuntimeBrief", candidates: candidates).first == "runtimebrief")
     }
 
     @Test func noMatchReturnsEmpty() {

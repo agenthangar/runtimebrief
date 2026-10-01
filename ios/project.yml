@@ -11,7 +11,7 @@ settings:
     SWIFT_VERSION: "6.0"
     SWIFT_STRICT_CONCURRENCY: complete
     CODE_SIGN_STYLE: Automatic
-    CURRENT_PROJECT_VERSION: 21
+    CURRENT_PROJECT_VERSION: 27
     MARKETING_VERSION: "1.0.2"
 packages:
   SwiftTerm:
@@ -33,6 +33,7 @@ targets:
         # product name and source targets use RuntimeBrief.
         PRODUCT_BUNDLE_IDENTIFIER: com.backbrief.app
         TARGETED_DEVICE_FAMILY: "1"
+        SWIFT_EMIT_LOC_STRINGS: YES
         INFOPLIST_KEY_UILaunchScreen_Generation: true
         INFOPLIST_KEY_NSAppTransportSecurity_NSAllowsLocalNetworking: true
         # Local-network HTTP remains available for trusted LAN development.
@@ -40,6 +41,12 @@ targets:
     info:
       path: RuntimeBrief/Info.plist
       properties:
+        CFBundleDisplayName: RuntimeBrief
+        # Match Siri's observed one-word transcription of the visible app name.
+        CFBundleSpokenName: RuntimeBrief
+        INAlternativeAppNames:
+          - INAlternativeAppName: Runtime Brief
+            INAlternativeAppNamePronunciationHint: Runtime Brief
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         UILaunchScreen: {}
@@ -97,6 +104,7 @@ targets:
         RUNTIMEBRIEF_E2E_TOKEN: $(RUNTIMEBRIEF_E2E_TOKEN)
         RUNTIMEBRIEF_E2E_PROJECT_ID: $(RUNTIMEBRIEF_E2E_PROJECT_ID)
         RUNTIMEBRIEF_E2E_SIRI_LIVE: $(RUNTIMEBRIEF_E2E_SIRI_LIVE)
+        RUNTIMEBRIEF_E2E_SIRI_ROUTING: $(RUNTIMEBRIEF_E2E_SIRI_ROUTING)
 schemes:
   RuntimeBrief:
     build:

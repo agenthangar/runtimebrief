@@ -66,7 +66,7 @@ personal signing change local; do not commit it or change the production
    Tap an iOS project to also see its local Xcode version/build, latest
    TestFlight build, and newest App Store version/state. The analyst runs only
    after you tap **Generate analyst update** or ask a question.
-5. Say: *"Hey Siri, what's the state of \<project\> in RuntimeBrief"*. App
+5. Say: *"Hey Siri, RuntimeBrief analysis for \<project\>"*. App
    Shortcuts register after the first launch; a successful refresh supplies
    project names for personalized phrases.
 
@@ -74,7 +74,8 @@ personal signing change local; do not commit it or change the production
 
 | Action | Example phrase | Shortcuts output |
 | --- | --- | --- |
-| Project status | What's the status of Sample Tracker in RuntimeBrief? | Brief text |
+| Project status | Show Runtime Brief status; or What's the status of Sample Tracker in RuntimeBrief? | Brief text |
+| Project analysis | RuntimeBrief analysis for Sample Tracker; or RuntimeBrief project analysis, then name the project | Cached analysis text |
 | Needs attention | What needs attention in RuntimeBrief? | Project entities |
 | List projects | List my RuntimeBrief projects | Project entities |
 | Open project | Open Sample Tracker in RuntimeBrief | Opens project detail |
@@ -96,6 +97,11 @@ or uncertain receipt retains the same durable request ID across retries,
 including retries from the app. After a confirmed receipt, repeating the task
 creates a new session. Demo launches remain fictional and never contact a Mac.
 
+Status without a project reads brief headlines for up to four configured
+projects immediately; a named status or analysis request reads the project's
+latest completed evidence-backed analysis. The analysis refreshes on the Mac
+in the background so Siri can answer without waiting for a model run.
+The project must appear in RuntimeBrief before Siri can resolve its name.
 Status, attention, and list actions read `/v1/projects` with a five-second
 network timeout. They never start an analyst. Spotlight maintenance runs
 separately so a slow index cannot delay the answer. Status includes the evidence
@@ -108,6 +114,25 @@ Answers include a Siri card and reusable Shortcuts values. Asking a question
 remains an explicit analyst action. Existing custom actions work on iOS 26;
 iOS 27 also exposes the system opening schema. Project rows and detail views
 provide entity context for requests about visible content.
+
+Shortcut vocabulary refreshes at launch and after a successful project refresh.
+The English `AppShortcuts.xcstrings` catalog contains the spoken phrases.
+The visible and spoken name are both RuntimeBrief to match Siri's observed
+one-word transcription. "Runtime Brief" remains an alternative app name.
+The short, parameter-free "Get me status from RuntimeBrief" and
+"Show Runtime Brief status" phrases avoid needing Siri to choose an entity.
+Status also supports "Can you tell me the status of the Sample Tracker app
+from RuntimeBrief." Background entity
+suggestions return no names on connection/setup errors so a vocabulary failure
+does not abort registration of every shortcut. Explicit reads still report
+connection errors and authenticate normally.
+
+For a hands-free project report, say "RuntimeBrief analysis for Sample
+Tracker." "RuntimeBrief project analysis" asks which project, so the reply
+can be a second spoken turn. Phrases such as "Get me the analysis of the
+project Sample Tracker from RuntimeBrief" are also registered. Include
+RuntimeBrief in the request so Siri can route it to this app; a request with
+only the project name can fall back to a web search.
 
 **Settings → Siri & Search → Make Projects Discoverable** controls Spotlight
 indexing, on-screen entity annotations, and opening
@@ -156,6 +181,22 @@ Before release, test spoken requests and the Siri card on a physical iOS 27
 device with Siri configured, including ambiguous names, an offline Mac, and
 discovery opt-out. A simulator test does not verify speech recognition or
 Apple Intelligence routing.
+
+To test Siri's matching of recognized text (rather than calling an intent by
+name), enable the separate opt-in test on a Siri-enabled device:
+
+```sh
+xcodebuild test -project ios/RuntimeBrief.xcodeproj -scheme RuntimeBriefSiri \
+  -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=27.0' \
+  -only-testing:RuntimeBriefSiriTests/SiriVoiceRoutingUITests \
+  RUNTIMEBRIEF_E2E_SIRI_ROUTING=1
+```
+
+This test checks the parameter-free chooser, named status and analysis requests,
+and conversational requests through `XCUISiriService`. A failed routing test must remain a
+failure even when direct App Intents or Shortcuts checks pass. App Shortcuts
+Preview can check the phrase template using the `Project` entity placeholder;
+it does not load the connected daemon's project names or verify speech.
 
 ## Start a coding task
 

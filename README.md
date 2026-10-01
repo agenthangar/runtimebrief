@@ -42,7 +42,7 @@ ChatGPT / Codex ──── local MCP over stdio ─────▶ runtimebrie
 ```
 
 RuntimeBrief owns evidence collection. On macOS, each analyst query launches
-the separately installed, exact Codex CLI 0.144.1 as a new `codex app-server
+the separately installed, exact Codex CLI 0.156.1 as a new `codex app-server
 --stdio --strict-config` process with private temporary workspace, user-home,
 and Codex-home directories. It uses the ChatGPT OAuth login created by `codex
 login`; RuntimeBrief has no direct OpenAI or Anthropic API integration and no
@@ -71,7 +71,7 @@ by default. Each provider owns the conversation, execution, and tool permissions
 ## Set it up
 
 You need macOS and Node 22 or newer. Optional on-demand analyst answers require
-exactly [Codex CLI](https://learn.chatgpt.com/docs/codex/cli) 0.144.1, installed
+exactly [Codex CLI](https://learn.chatgpt.com/docs/codex/cli) 0.156.1, installed
 separately and signed in to ChatGPT with `codex login`. RuntimeBrief rejects
 other CLI versions until their capability surface has been reviewed;
 deterministic portfolio and MCP read tools work without Codex. An iPhone and a
@@ -86,8 +86,8 @@ npm ci
 npm run build
 npm link
 
-npm install --global @openai/codex@0.144.1
-codex --version  # must print: codex-cli 0.144.1
+npm install --global @openai/codex@0.156.1
+codex --version  # must print: codex-cli 0.156.1
 codex login
 runtimebriefd init
 runtimebriefd add-project-root ~/dev
@@ -239,6 +239,7 @@ All endpoints require `Authorization: Bearer <token>` and are rate-limited to
 | `GET /v1/projects` | Deterministic portfolio entries and evidence |
 | `GET /v1/projects/:id` | Git, agent lifecycle, brief, and iOS release details |
 | `GET /v1/projects/:id/status` | On-demand analyst status answer |
+| `GET /v1/projects/:id/voice-status` | Latest completed analysis, returned immediately; queues a refresh when missing or old |
 | `POST /v1/projects/:id/ask` | Analyst answer for `{ question }` |
 | `POST /v1/projects/:id/actions` | Propose an allowlisted decision; never executes it |
 | `GET /v1/actions` | Unexpired pending decisions |
@@ -288,10 +289,21 @@ projects:
     #   - type: codex
     #     root: /custom/codex/home
 analyst:
-  model: gpt-5.6-luna
+  model: gpt-6-luna
+  # codex_cli_path: /absolute/path/to/reviewed/codex-0.156.1
   cache_ttl_minutes: 10
+  background_refresh_hours: 3
   max_transcripts: 5
 ```
+
+The daemon precomputes a cited Done/Now/Next analysis for each registered
+project every three hours, with at most two refreshes active at once. Siri
+reads the last completed analysis immediately, states its age, and requests a
+background refresh when needed. If no analysis exists yet, Siri identifies the
+current deterministic brief as a temporary fallback. Set `codex_cli_path` when
+the system Codex CLI is newer than RuntimeBrief's reviewed version; the
+analyst rejects an unreviewed binary. These runs use the signed-in Codex plan,
+which does not report a per-request dollar cost.
 
 Trusted roots are shallow. RuntimeBrief discovers only non-hidden direct child
 directories containing a `.git` directory or file. Explicit `projects` entries
@@ -306,7 +318,7 @@ daemon token share the same project scope.
 
 - The daemon defaults to loopback and authenticates every API route with a
   random bearer token stored only as a scrypt hash.
-- The analyst is Codex CLI-only: one pinned 0.144.1 `codex app-server --stdio
+- The analyst is Codex CLI-only: one pinned 0.156.1 `codex app-server --stdio
   --strict-config` process per request on macOS. RuntimeBrief sends filtered
   evidence only after same-process auth, config, requirements, thread,
   feature, hook, MCP, dynamic-tool, provider, and permission attestation

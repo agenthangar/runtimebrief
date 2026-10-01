@@ -33,15 +33,46 @@ struct RuntimeBriefShortcuts: AppShortcutsProvider {
             systemImageName: "shippingbox"
         )
         AppShortcut(
+            intent: GetProjectAnalysisIntent(),
+            phrases: [
+                // This short form asks for a project aloud when none was named.
+                "\(.applicationName) project analysis",
+                "Get a project analysis from \(.applicationName)",
+                "Get me the analysis of the project \(\.$project) from \(.applicationName)",
+                "Get the analysis of \(\.$project) from \(.applicationName)",
+                "Give me the latest analysis of the project \(\.$project) from \(.applicationName)",
+                "Give me the latest analysis of \(\.$project) from \(.applicationName)",
+                "Analyze \(\.$project) with \(.applicationName)",
+                "\(.applicationName) analysis for \(\.$project)",
+            ],
+            shortTitle: "Project Analysis",
+            systemImageName: "waveform"
+        )
+        AppShortcut(
             intent: GetProjectStatusIntent(),
             phrases: [
                 // Keep at least one phrase without \(\.$project): shortcuts whose
                 // every phrase embeds a parameter stay hidden until parameter
                 // values have been donated via updateAppShortcutParameters().
+                "Get me status from \(.applicationName)",
+                "Get my project status from \(.applicationName)",
+                "Get status from \(.applicationName)",
                 "Get a project status in \(.applicationName)",
+                "Show project status in \(.applicationName)",
+                "Run \(.applicationName) project status",
+                "Show \(.applicationName) status",
                 "What's the state of my project in \(.applicationName)",
                 "What's the state of \(\.$project) in \(.applicationName)",
                 "What's the status of \(\.$project) in \(.applicationName)",
+                "Get the status of \(\.$project) from \(.applicationName)",
+                "Get me the status of the \(\.$project) project from \(.applicationName)",
+                "Tell me the latest status of \(\.$project) in \(.applicationName)",
+                "What's the status of my \(\.$project) app in \(.applicationName)",
+                "Show the status of \(\.$project) in \(.applicationName)",
+                "Tell me the status of \(\.$project) from \(.applicationName)",
+                "Can you tell me the status of the \(\.$project) app from \(.applicationName)",
+                "Get the status of \(\.$project) using \(.applicationName)",
+                "Tell me a project's status from \(.applicationName)",
                 "Ask \(.applicationName) about \(\.$project)",
                 "\(.applicationName) status for \(\.$project)",
             ],

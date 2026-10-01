@@ -48,7 +48,7 @@ struct StartSessionIntent: AppIntent {
     static let authenticationPolicy: IntentAuthenticationPolicy = .requiresLocalDeviceAuthentication
 
     @Parameter(title: "Project") var project: ProjectEntity
-    @Parameter(title: "Agent", requestValueDialog: "Which coding agent?") var provider: AgentProvider
+    @Parameter(title: "Agent", default: .codex, requestValueDialog: "Which coding agent?") var provider: AgentProvider
     @Parameter(title: "Task", requestValueDialog: "What should the agent work on?") var task: String
     @Parameter(title: "Model", default: "default", optionsProvider: SessionModelOptions()) var model: String
     @Parameter(title: "Permissions", default: .manual) var permissions: SiriSessionPermission
@@ -75,9 +75,10 @@ struct StartSessionIntent: AppIntent {
             permissions: permissions, reasoning: reasoning, remoteControl: remoteControl,
             source: source, scope: scope, isDemo: isDemo
         ) { name, prompt in
-            let mode = provider.permissionLabel(permissions.rawValue)
-            let detail = provider.permissionExplanation(permissions.rawValue)
-            let text = "\(isDemo ? "Create a fictional demo" : "Start a") \(provider.label) session for \(name)? Task: \(prompt). Model: \(model). Permissions: \(mode). \(detail) Reasoning: \(reasoning.rawValue). Remote Control: \(remoteControl ? "on" : "off")."
+            var text = "\(isDemo ? "Create a fictional demo" : "Start") \(provider.label) session for \(name) to \(prompt)?"
+            if permissions != .manual { text += " Permissions: \(provider.permissionLabel(permissions.rawValue))." }
+            if model != "default" { text += " Model: \(model)." }
+            if !remoteControl { text += " Remote control off." }
             try await requestConfirmation(result: .result(dialog: IntentDialog(stringLiteral: text)))
             guard RuntimeBriefModeStore.isDemoEnabled == isDemo,
                   isDemo || ServerSettings.load() == settings else {
@@ -110,6 +111,10 @@ enum SiriSessionLauncher {
         guard (10...8_000).contains(prompt.utf16.count), !prompt.hasPrefix("/"),
               !prompt.unicodeScalars.contains(where: { (0...8).contains($0.value) || (11...12).contains($0.value) || (14...31).contains($0.value) || $0.value == 127 }) else {
             throw SiriIntentFailure(message: "Describe a task in 10 to 8,000 characters, without slash commands or control characters.")
+        }
+        let statusQuestion = #"^(?:what(?:'s| is)|tell me|give me|get me|show me|check|find out|summarize)\b.*\b(?:status|progress|update)\b"#
+        if prompt.range(of: statusQuestion, options: [.regularExpression, .caseInsensitive]) != nil {
+            throw SiriIntentFailure(message: "That sounds like a status question. Ask 'What's the status of \(project.name) in RuntimeBrief?' No coding session was started.")
         }
         // Never use the saved offline project snapshot to authorize a write.
         let current: ProjectSummary
@@ -168,7 +173,7 @@ enum SiriSessionLauncher {
         let prefix = isDemo ? "Fictional demo. No work was sent to a Mac. " : ""
         let status: String
         if receipt.state == "unknown" || receipt.launchState == "unknown" {
-            status = "The launch result is uncertain. Refresh agent tasks in the app before starting another task."
+            status = "I can't confirm whether it started. Check agent tasks before trying again."
         } else {
             switch receipt.state {
             case "failed": status = "The session could not start. \(receipt.message)"

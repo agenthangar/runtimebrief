@@ -10,6 +10,7 @@ import {
   buildCodexCliEnvironment,
   createCodexCliRunner,
   EXPECTED_CODEX_FEATURES,
+  SUPPORTED_CODEX_CLI_VERSION,
   RUNTIMEBRIEF_ANALYST_JSON_SCHEMA,
   type AnalystBackendEvent,
   type AnalystBackendRunner,
@@ -22,10 +23,13 @@ const PERMISSION_PROFILE = "runtimebrief-analyst-fixture";
 const CHATGPT_CODEX_BASE_URL = "https://chatgpt.com/backend-api/codex";
 const CHATGPT_BASE_URL = "https://chatgpt.com/backend-api/";
 const ALLOWED_ENABLED_FEATURES = new Set([
+  "item_ids",
   "resize_all_images",
   "terminal_resize_reflow",
   "tool_search_always_defer_mcp_tools",
   "tui_app_server",
+  "unified_exec_zsh_fork",
+  "unified_exec",
 ]);
 const CRITICAL_FALSE_FEATURES = [
   "apps",
@@ -33,23 +37,34 @@ const CRITICAL_FALSE_FEATURES = [
   "browser_use",
   "browser_use_external",
   "code_mode_host",
+  "content_item_kinds",
   "computer_use",
   "goals",
   "hooks",
   "image_generation",
   "in_app_browser",
+  "in_app_chat",
+  "in_app_dictation",
+  "in_app_local_automation",
+  "in_app_updates",
   "memories",
   "multi_agent",
   "network_proxy",
   "plugins",
+  "realtime_conversation",
   "remote_control",
   "remote_plugin",
   "respect_system_proxy",
   "shell_tool",
+  "skill_search",
+  "sleep_tool",
   "skill_mcp_dependency_install",
   "tool_call_mcp_elicitation",
   "tool_suggest",
   "unified_exec",
+  "unified_exec_tty",
+  "view_image",
+  "worktrees",
   "workspace_dependencies",
 ] as const;
 
@@ -287,7 +302,8 @@ function safeConfigResult(
     `permissions.${PERMISSION_PROFILE}.filesystem.:workspace_roots.codex-home`,
     `permissions.${PERMISSION_PROFILE}.filesystem.:workspace_roots.user-home`,
     `permissions.${PERMISSION_PROFILE}.network.enabled`,
-    ...CRITICAL_FALSE_FEATURES.map((feature) => `features.${feature}`),
+    ...CRITICAL_FALSE_FEATURES.map((feature) =>
+      feature === "sleep_tool" ? "features.sleep_tool.enabled" : `features.${feature}`),
   ]) {
     origins[key] = sessionFlagOrigin();
   }
@@ -395,14 +411,14 @@ function safeThreadResult(workspace: string, model: string): ThreadResultFixture
       ephemeral: true,
       path: null,
       cwd: workspace,
-      cliVersion: "0.144.1",
+      cliVersion: SUPPORTED_CODEX_CLI_VERSION,
       modelProvider: "openai",
       turns: [],
     },
     model,
     modelProvider: "openai",
     cwd: workspace,
-    runtimeWorkspaceRoots: [workspace],
+    runtimeWorkspaceRoots: [],
     instructionSources: [],
     approvalPolicy: "never",
     approvalsReviewer: "user",
@@ -412,13 +428,31 @@ function safeThreadResult(workspace: string, model: string): ThreadResultFixture
   };
 }
 
+function safeRequirementsResult(): Record<string, unknown> {
+  const keys = [
+    "modelProvider", "modelProviders", "cliAuthCredentialsStore",
+    "chatgptBaseUrl", "additionalDeveloperInstructions",
+    "allowedApprovalPolicies", "allowedApprovalsReviewers",
+    "allowedSandboxModes", "allowedWindowsSandboxImplementations",
+    "allowedPermissionProfiles", "defaultPermissions", "allowedWebSearchModes",
+    "allowManagedHooksOnly", "allowBrowserAndComputerUse", "allowAppshots",
+    "allowRemoteControl", "computerUse", "browserUse", "inAppBrowser",
+    "featureRequirements", "hooks", "enforceResidency", "network",
+    "application", "autoReview", "models", "sqliteHome", "logDir",
+    "modelCatalogJson", "checkForUpdateOnStartup", "allowLoginShell",
+    "feedback",
+  ];
+  return { ...Object.fromEntries(keys.map((key) => [key, null])),
+    allowedLoginMethods: ["chatgpt"] };
+}
+
 function safeFeatureResult(): FeatureResultFixture {
   return {
     data: EXPECTED_CODEX_FEATURES.map((name) => {
       const enabled = ALLOWED_ENABLED_FEATURES.has(name);
       return {
         name,
-        stage: enabled ? "removed" : "stable",
+        stage: enabled && name !== "unified_exec" ? "removed" : "stable",
         displayName: null,
         description: null,
         announcement: null,
@@ -443,6 +477,7 @@ interface ProtocolOptions {
   toolItemType?: string;
   orphanCompletedItem?: boolean;
   unknownNotification?: string;
+  warningMessage?: string;
   finalText?: string;
   tokenUsages?: TokenUsageFixture[];
   pauseBeforeCompletion?: (release: () => void) => void;
@@ -482,7 +517,7 @@ function wireSuccessfulProtocol(
             id: 0,
             result: {
               userAgent:
-                `runtimebrief/0.144.1 (macos; arm64) (runtimebrief; ${VERSION})`,
+                `runtimebrief/${SUPPORTED_CODEX_CLI_VERSION} (macos; arm64) (runtimebrief; ${VERSION})`,
               codexHome,
               platformFamily: "unix",
               platformOs: "macos",
@@ -519,7 +554,7 @@ function wireSuccessfulProtocol(
         } else if (id === 4) {
           writeServer(child, {
             id: 4,
-            result: { requirements: options.requirements ?? null },
+            result: { requirements: options.requirements ?? safeRequirementsResult() },
           });
         } else if (id === 5) {
           const result = safeThreadResult(workspace, model);
@@ -551,6 +586,13 @@ function wireSuccessfulProtocol(
             respond();
           }
         } else if (id === 9) {
+          writeServer(child, {
+            method: "warning",
+            params: {
+              threadId,
+              message: options.warningMessage ?? "Code Mode is unavailable because code-mode host is disabled. Code mode will fail closed; enable `features.code_mode_host` and install `codex-code-mode-host`.",
+            },
+          });
           writeServer(child, {
             id: 9,
             result: { turn: { id: turnId, status: "inProgress" } },
@@ -860,7 +902,7 @@ describe("Codex CLI same-process analyst boundary", () => {
         isError: false,
       },
     ]);
-    expect(EXPECTED_CODEX_FEATURES).toHaveLength(92);
+    expect(EXPECTED_CODEX_FEATURES).toHaveLength(149);
     expect(fs.readdirSync(root)).toEqual([]);
   });
 
@@ -1202,6 +1244,9 @@ describe("Codex CLI same-process analyst boundary", () => {
     ["cwd", (result: ThreadResultFixture) => {
       result.cwd = "/private/project";
     }],
+    ["extra workspace root", (result: ThreadResultFixture) => {
+      result.runtimeWorkspaceRoots = ["/private/project"];
+    }],
   ])("rejects an unsafe effective thread %s before evidence", async (_label, mutateThread) => {
     const root = testRoot();
     const child = new FakeCodexChild();
@@ -1354,6 +1399,20 @@ describe("Codex CLI same-process analyst boundary", () => {
     await expect(drain(runner)).rejects.toThrow("invalid app-server response");
   });
 
+  it("fails closed on an unexpected CLI warning", async () => {
+    const root = testRoot();
+    const child = new FakeCodexChild();
+    const runner = createTestCodexCliRunner(root, {
+      spawnImpl: (_command, _args, options) => {
+        wireSuccessfulProtocol(child, options.cwd, options.env.CODEX_HOME!, [], {
+          warningMessage: "A tool was enabled.",
+        });
+        return child;
+      },
+    });
+    await expect(drain(runner)).rejects.toThrow("invalid app-server response");
+  });
+
   it.each([
     ["plain text", "not-json"],
     ["extra field", JSON.stringify({ answer: "Done.", tool: "shell" })],
@@ -1497,13 +1556,13 @@ describe("Codex CLI same-process analyst boundary", () => {
 describe("Codex CLI version gate", () => {
   it("accepts only the capability-reviewed exact release", () => {
     expect(() =>
-      assertSupportedCodexCliVersion("codex-cli 0.144.1\n"),
+      assertSupportedCodexCliVersion("codex-cli 0.156.1\n"),
     ).not.toThrow();
     expect(() =>
-      assertSupportedCodexCliVersion("codex-cli 0.145.0\n"),
+      assertSupportedCodexCliVersion("codex-cli 0.155.1\n"),
     ).toThrow(/other versions have not passed/);
     expect(() => assertSupportedCodexCliVersion("unexpected output\n")).toThrow(
-      /requires Codex CLI 0\.144\.1/,
+      /requires Codex CLI 0\.156\.1/,
     );
   });
 });

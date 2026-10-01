@@ -55,7 +55,7 @@ describe("cli", () => {
     const config = loadConfig();
     expect(config.server.host).toBe("127.0.0.1");
     expect(config.claude_session_backend).toBe("t");
-    expect(config.analyst.model).toBe("gpt-5.6-luna");
+    expect(config.analyst.model).toBe("gpt-6-luna");
   });
 
   it("init refuses to overwrite an existing config", async () => {

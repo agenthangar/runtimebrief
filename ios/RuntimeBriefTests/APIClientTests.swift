@@ -39,6 +39,19 @@ struct APIClientTests {
         #expect(auth == "Bearer test-token")
     }
 
+    @Test func voiceStatusIsAFastReadOfTheLastCompletedAnalysis() async throws {
+        let json = """
+        {"answer":"Done: Export checks passed. [git-working-tree]", "analyzedAt":"2026-09-30T12:00:00.000Z",
+         "model":"gpt-6-luna","evidence":[],"refreshing":true,"unavailable":false}
+        """
+        let (client, transport) = client(["/v1/projects/sample/voice-status": .init(body: Data(json.utf8))])
+        let status = try await client.voiceStatus(projectID: "sample")
+        #expect(status.answer?.contains("Export checks passed") == true)
+        #expect(status.model == "gpt-6-luna")
+        #expect(status.refreshing)
+        #expect(transport.recorder.requests.first?.httpMethod == "GET")
+    }
+
     @Test func projectCardCarriesBriefAndAgentLifecycleWithoutAnalystRequest() async throws {
         let json = """
         {"id":"meal","name":"Sample Tracker App","path":"/dev/meal",

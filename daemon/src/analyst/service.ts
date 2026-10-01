@@ -11,7 +11,7 @@ import {
   parseCursorProjectTranscript,
   parseCursorSessionDir,
 } from "../adapters/cursorSessions.js";
-import { AnswerCache } from "./cache.js";
+import { AnswerCache, type LatestStatus } from "./cache.js";
 import {
   ANALYST_SYSTEM_PROMPT,
   buildAnalystEvidence,
@@ -20,7 +20,7 @@ import {
   type TranscriptDigestInput,
 } from "./prompts.js";
 import {
-  liveAnalystRunner,
+  createCodexCliRunner,
   type AnalystBackendRunner,
 } from "./codexCli.js";
 import type { EvidenceRef } from "../types.js";
@@ -44,6 +44,9 @@ export interface AnalystService {
     callerSignal?: AbortSignal,
   ): AsyncGenerator<AnalystChunk>;
   statusQuestion: string;
+  voiceStatus(projectId: string): { status: LatestStatus | null; refreshing: boolean; unavailable: boolean };
+  startBackgroundRefresh(): void;
+  close(): void;
 }
 
 export class ProjectNotFoundError extends Error {
@@ -88,7 +91,7 @@ export interface AnalystServiceOptions {
 
 export const DEFAULT_ANALYST_REQUEST_TIMEOUT_MS = 60_000;
 export const ANALYST_CACHE_BACKEND = "codex-cli";
-export const ANALYST_CACHE_PROMPT_VERSION = "runtimebrief-analyst-v1";
+export const ANALYST_CACHE_PROMPT_VERSION = "runtimebrief-analyst-v2";
 
 /**
  * Do not surface uncited model assertions as project facts. A line with no
@@ -124,9 +127,18 @@ export function createAnalystService(
   adapters: RuntimeAdapter[],
   options: AnalystServiceOptions = {},
 ): AnalystService {
-  const runner = options.runner ?? liveAnalystRunner;
+  const runner = options.runner ?? createCodexCliRunner(
+    config.analyst.codex_cli_path ? { codexPath: config.analyst.codex_cli_path } : {},
+  );
   const cache = options.cache ?? new AnswerCache();
   const analystConfig = config.analyst;
+  const projectIds = new Set(projectsForConfig(config).map((project) => project.id));
+  const refreshIntervalMs = analystConfig.background_refresh_hours * 60 * 60_000;
+  const refreshQueue: string[] = [];
+  const running = new Set<string>();
+  const lastFailedAt = new Map<string, number>();
+  const shutdown = new AbortController();
+  let refreshTimer: NodeJS.Timeout | undefined;
 
   async function gatherGit(project: ProjectConfig): Promise<GitSummary | null> {
     const gitAdapter = adapters.find(
@@ -252,6 +264,10 @@ export function createAnalystService(
       analystConfig.cache_ttl_minutes,
     );
     if (cached) {
+      if (question === DEFAULT_STATUS_QUESTION) {
+        cache.setLatestStatus(project.id, analystConfig.model, ANALYST_CACHE_PROMPT_VERSION,
+          cached.answer, cached.evidence, cached.createdAt);
+      }
       yield { type: "text", text: cached.answer };
       yield {
         type: "done",
@@ -306,7 +322,12 @@ export function createAnalystService(
     const answer = enforceEvidenceCitations((finalText ?? "").trim(), evidence);
 
     if (answer.length > 0) {
-      cache.set(project.id, question, cacheIdentity, answer, evidence);
+      const analyzedAt = Date.now();
+      cache.set(project.id, question, cacheIdentity, answer, evidence, analyzedAt);
+      if (question === DEFAULT_STATUS_QUESTION) {
+        cache.setLatestStatus(project.id, analystConfig.model, ANALYST_CACHE_PROMPT_VERSION,
+          answer, evidence, analyzedAt);
+      }
     }
     if (answer.length > 0) {
       yield { type: "text", text: answer };
@@ -316,5 +337,66 @@ export function createAnalystService(
     yield { type: "done", answer, costUsd: 0, cached: false, truncated: false, evidence };
   }
 
-  return { ask, statusQuestion: DEFAULT_STATUS_QUESTION };
+  function latest(projectId: string): LatestStatus | null {
+    return cache.getLatestStatus(projectId, analystConfig.model, ANALYST_CACHE_PROMPT_VERSION);
+  }
+
+  function queueStatusRefresh(projectId: string): void {
+    if (shutdown.signal.aborted || !projectIds.has(projectId)) return;
+    if (Date.now() - (lastFailedAt.get(projectId) ?? 0) < 5 * 60_000) return;
+    const status = latest(projectId);
+    if (status && Date.now() - status.createdAt < refreshIntervalMs) return;
+    if (running.has(projectId) || refreshQueue.includes(projectId)) return;
+    refreshQueue.push(projectId);
+    pump();
+  }
+
+  function pump(): void {
+    while (!shutdown.signal.aborted && running.size < 2 && refreshQueue.length > 0) {
+      const projectId = refreshQueue.shift()!;
+      running.add(projectId);
+      void (async () => {
+        try {
+          for await (const _chunk of ask(projectId, DEFAULT_STATUS_QUESTION, shutdown.signal)) {
+            // The answer is persisted when the final analyst result arrives.
+          }
+          lastFailedAt.delete(projectId);
+        } catch {
+          // Keep the previous status. The next scheduled pass can retry.
+          lastFailedAt.set(projectId, Date.now());
+        } finally {
+          running.delete(projectId);
+          pump();
+        }
+      })();
+    }
+  }
+
+  function voiceStatus(projectId: string): { status: LatestStatus | null; refreshing: boolean; unavailable: boolean } {
+    if (!projectIds.has(projectId)) throw new ProjectNotFoundError(projectId);
+    queueStatusRefresh(projectId);
+    return {
+      status: latest(projectId),
+      refreshing: running.has(projectId) || refreshQueue.includes(projectId),
+      unavailable: lastFailedAt.has(projectId),
+    };
+  }
+
+  function startBackgroundRefresh(): void {
+    if (refreshTimer || shutdown.signal.aborted) return;
+    // Start after the server is listening. Capped concurrency leaves headroom for UI reads.
+    setImmediate(() => { for (const id of projectIds) queueStatusRefresh(id); });
+    refreshTimer = setInterval(() => {
+      for (const id of projectIds) queueStatusRefresh(id);
+    }, refreshIntervalMs);
+    refreshTimer.unref();
+  }
+
+  function close(): void {
+    if (refreshTimer) clearInterval(refreshTimer);
+    shutdown.abort();
+    refreshQueue.length = 0;
+  }
+
+  return { ask, statusQuestion: DEFAULT_STATUS_QUESTION, voiceStatus, startBackgroundRefresh, close };
 }

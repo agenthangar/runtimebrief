@@ -69,8 +69,9 @@ describe("config load/save", () => {
     expect(loaded.claude_session_backend).toBe("t");
     expect(loaded.projects[0]?.id).toBe("demo");
     expect(loaded.projects[0]?.allowed_actions).toEqual([]);
-    expect(loaded.analyst.model).toBe("gpt-5.6-luna");
+    expect(loaded.analyst.model).toBe("gpt-6-luna");
     expect(loaded.analyst.cache_ttl_minutes).toBe(10);
+    expect(loaded.analyst.background_refresh_hours).toBe(3);
   });
 
   it("rehardens restored config directory and file permissions", () => {

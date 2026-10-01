@@ -31,7 +31,9 @@ jobs:
     # macos-latest still selects Xcode 26. The Siri system schema and testing
     # framework require the iOS 27 SDK on GitHub's dedicated Xcode image.
     runs-on: xcode-27
-    timeout-minutes: 25
+    # The app and App Intents simulator suites can finish just beyond 25 minutes
+    # on the hosted Xcode 27 image, even when both report TEST SUCCEEDED.
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - run: brew install gitleaks xcodegen

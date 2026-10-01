@@ -1,0 +1,416 @@
+{
+  "sourceLanguage": "en",
+  "strings": {
+    "${applicationName} analysis for ${project}": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "${applicationName} analysis for ${project}"
+          }
+        }
+      }
+    },
+    "${applicationName} project analysis": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "${applicationName} project analysis"
+          }
+        }
+      }
+    },
+    "${applicationName} status for ${project}": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "${applicationName} status for ${project}"
+          }
+        }
+      }
+    },
+    "Analyze ${project} with ${applicationName}": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Analyze ${project} with ${applicationName}"
+          }
+        }
+      }
+    },
+    "Ask ${applicationName} a question": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ask ${applicationName} a question"
+          }
+        }
+      }
+    },
+    "Ask ${applicationName} a question about ${project}": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ask ${applicationName} a question about ${project}"
+          }
+        }
+      }
+    },
+    "Ask ${applicationName} about ${project}": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ask ${applicationName} about ${project}"
+          }
+        }
+      }
+    },
+    "Can you tell me the status of the ${project} app from ${applicationName}": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Can you tell me the status of the ${project} app from ${applicationName}"
+          }
+        }
+      }
+    },
+    "Get a project analysis from ${applicationName}": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Get a project analysis from ${applicationName}"
+          }
+        }
+      }
+    },
+    "Get a project status in ${applicationName}": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Get a project status in ${applicationName}"
+          }
+        }
+      }
+    },
+    "Get me status from ${applicationName}": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Get me status from ${applicationName}"
+          }
+        }
+      }
+    },
+    "Get me the analysis of the project ${project} from ${applicationName}": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Get me the analysis of the project ${project} from ${applicationName}"
+          }
+        }
+      }
+    },
+    "Get my project status from ${applicationName}": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Get my project status from ${applicationName}"
+          }
+        }
+      }
+    },
+    "Get status from ${applicationName}": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Get status from ${applicationName}"
+          }
+        }
+      }
+    },
+    "Get the analysis of ${project} from ${applicationName}": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Get the analysis of ${project} from ${applicationName}"
+          }
+        }
+      }
+    },
+    "Get the status of ${project} using ${applicationName}": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Get the status of ${project} using ${applicationName}"
+          }
+        }
+      }
+    },
+    "Give me the latest analysis of ${project} from ${applicationName}": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Give me the latest analysis of ${project} from ${applicationName}"
+          }
+        }
+      }
+    },
+    "Give me the latest analysis of the project ${project} from ${applicationName}": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Give me the latest analysis of the project ${project} from ${applicationName}"
+          }
+        }
+      }
+    },
+    "List my ${applicationName} projects": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "List my ${applicationName} projects"
+          }
+        }
+      }
+    },
+    "Open ${target} in ${applicationName}": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open ${target} in ${applicationName}"
+          }
+        }
+      }
+    },
+    "Open a project in ${applicationName}": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open a project in ${applicationName}"
+          }
+        }
+      }
+    },
+    "Question ${applicationName} about ${project}": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Question ${applicationName} about ${project}"
+          }
+        }
+      }
+    },
+    "Run ${applicationName} project status": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Run ${applicationName} project status"
+          }
+        }
+      }
+    },
+    "Show ${applicationName} status": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show ${applicationName} status"
+          }
+        }
+      }
+    },
+    "Show ${target} in ${applicationName}": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show ${target} in ${applicationName}"
+          }
+        }
+      }
+    },
+    "Show my blockers in ${applicationName}": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show my blockers in ${applicationName}"
+          }
+        }
+      }
+    },
+    "Show project status in ${applicationName}": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show project status in ${applicationName}"
+          }
+        }
+      }
+    },
+    "Show the status of ${project} in ${applicationName}": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show the status of ${project} in ${applicationName}"
+          }
+        }
+      }
+    },
+    "Start a ${provider} session in ${applicationName}": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start a ${provider} session in ${applicationName}"
+          }
+        }
+      }
+    },
+    "Start a coding session in ${applicationName}": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start a coding session in ${applicationName}"
+          }
+        }
+      }
+    },
+    "Start a task for ${project} in ${applicationName}": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start a task for ${project} in ${applicationName}"
+          }
+        }
+      }
+    },
+    "Tell me a project's status from ${applicationName}": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tell me a project's status from ${applicationName}"
+          }
+        }
+      }
+    },
+    "Tell me the status of ${project} from ${applicationName}": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tell me the status of ${project} from ${applicationName}"
+          }
+        }
+      }
+    },
+    "What are my projects up to in ${applicationName}": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "What are my projects up to in ${applicationName}"
+          }
+        }
+      }
+    },
+    "What have my agents been doing in ${applicationName}": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "What have my agents been doing in ${applicationName}"
+          }
+        }
+      }
+    },
+    "What needs attention in ${applicationName}": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "What needs attention in ${applicationName}"
+          }
+        }
+      }
+    },
+    "What's the state of ${project} in ${applicationName}": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "What's the state of ${project} in ${applicationName}"
+          }
+        }
+      }
+    },
+    "What's the state of my project in ${applicationName}": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "What's the state of my project in ${applicationName}"
+          }
+        }
+      }
+    },
+    "What's the status of ${project} in ${applicationName}": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "What's the status of ${project} in ${applicationName}"
+          }
+        }
+      }
+    },
+    "What's the status of my ${project} app in ${applicationName}": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "What's the status of my ${project} app in ${applicationName}"
+          }
+        }
+      }
+    },
+    "Which projects need attention in ${applicationName}": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Which projects need attention in ${applicationName}"
+          }
+        }
+      }
+    }
+  },
+  "version": "1.0"
+}
