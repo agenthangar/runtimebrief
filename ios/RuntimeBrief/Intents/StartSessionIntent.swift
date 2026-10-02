@@ -4,7 +4,9 @@ import Foundation
 extension AgentProvider: AppEnum {
     static let typeDisplayRepresentation: TypeDisplayRepresentation = "Coding Agent"
     static let caseDisplayRepresentations: [AgentProvider: DisplayRepresentation] = [
-        .claude: "Claude Code", .codex: "Codex", .cursor: "Cursor",
+        .claude: DisplayRepresentation(title: "Claude Code", synonyms: ["Claude", "Claude agent"]),
+        .codex: DisplayRepresentation(title: "Codex", synonyms: ["Codex agent"]),
+        .cursor: DisplayRepresentation(title: "Cursor", synonyms: ["Cursor agent"]),
     ]
 }
 
@@ -45,15 +47,22 @@ struct StartSessionIntent: AppIntent {
         categoryName: "Coding Agents"
     )
     static let openAppWhenRun = false
-    static let authenticationPolicy: IntentAuthenticationPolicy = .requiresLocalDeviceAuthentication
+    // Siri must be able to collect the task and confirm it while the phone is
+    // locked. The saved daemon token is accessible after the first unlock.
+    static let authenticationPolicy: IntentAuthenticationPolicy = .alwaysAllowed
 
-    @Parameter(title: "Project") var project: ProjectEntity
-    @Parameter(title: "Agent", default: .codex, requestValueDialog: "Which coding agent?") var provider: AgentProvider
+    @Parameter(title: "Project", requestValueDialog: "Which project should the agent work on?") var project: ProjectEntity
+    @Parameter(title: "Agent", requestValueDialog: "Which coding agent should I use: Claude, Codex or Cursor?") var provider: AgentProvider
     @Parameter(title: "Task", requestValueDialog: "What should the agent work on?") var task: String
     @Parameter(title: "Model", default: "default", optionsProvider: SessionModelOptions()) var model: String
     @Parameter(title: "Permissions", default: .manual) var permissions: SiriSessionPermission
     @Parameter(title: "Reasoning", default: .default) var reasoning: SiriReasoningEffort
     @Parameter(title: "Remote Control", default: true) var remoteControl: Bool
+
+    init() {}
+
+    // Named-agent intents delegate here with their provider fixed.
+    init(provider: AgentProvider) { self.provider = provider }
 
     static var parameterSummary: some ParameterSummary {
         Summary("Start \(\.$provider) for \(\.$project): \(\.$task)") {

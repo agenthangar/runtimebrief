@@ -10,7 +10,7 @@ struct AskProjectIntent: AppIntent {
     )
     static let openAppWhenRun = false
 
-    @Parameter(title: "Project")
+    @Parameter(title: "Project", requestValueDialog: "Which project is your question about?")
     var project: ProjectEntity
 
     @Parameter(title: "Question", requestValueDialog: "What do you want to know?")

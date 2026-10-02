@@ -25,7 +25,7 @@ struct ProjectEntity: AppEntity, IndexedEntity {
     var displayRepresentation: DisplayRepresentation {
         // Siri's phrase expansion uses display names, rather than the string
         // query's normalization. Register common spoken forms of the name.
-        let synonyms: [LocalizedStringResource] = ["\(name) app", "\(name) project"]
+        let synonyms: [LocalizedStringResource] = ["\(name) app", "\(name) project", "the \(name) app"]
         if let branch {
             return DisplayRepresentation(title: "\(name)", subtitle: "\(branch)", synonyms: synonyms)
         } else {

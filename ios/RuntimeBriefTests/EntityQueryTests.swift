@@ -30,7 +30,14 @@ struct EntityQueryTests {
 
     @Test func spokenProjectNameBeatsTheAppNameInsideOneUtterance() {
         #expect(ProjectFuzzyMatcher.rank(query: "Meal Planner from RuntimeBrief", candidates: candidates).first == "meal-planner")
+        #expect(ProjectFuzzyMatcher.rank(query: "The Meal Planner app from RuntimeBrief", candidates: candidates).first == "meal-planner")
         #expect(ProjectFuzzyMatcher.rank(query: "RuntimeBrief", candidates: candidates).first == "runtimebrief")
+    }
+
+    @Test func entityVocabularyIncludesTheArticleAndAppSuffix() {
+        let entity = ProjectEntity(id: "sampletracker", name: "Sample Tracker")
+        let spokenNames = entity.displayRepresentation.synonyms.map { String(localized: $0) }
+        #expect(spokenNames.contains("the Sample Tracker app"))
     }
 
     @Test func noMatchReturnsEmpty() {

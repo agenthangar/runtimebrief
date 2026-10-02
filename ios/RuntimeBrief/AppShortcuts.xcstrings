@@ -2,6 +2,7 @@
   "sourceLanguage": "en",
   "strings": {
     "${applicationName} analysis for ${project}": {
+      "extractionState": "stale",
       "localizations": {
         "en": {
           "stringUnit": {
@@ -21,7 +22,52 @@
         }
       }
     },
+    "${applicationName} start an agent": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "${applicationName} start an agent"
+          }
+        }
+      }
+    },
+    "${applicationName} start Claude": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "${applicationName} start Claude"
+          }
+        }
+      }
+    },
+    "${applicationName} start Codex": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "${applicationName} start Codex"
+          }
+        }
+      }
+    },
+    "${applicationName} start Cursor": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "${applicationName} start Cursor"
+          }
+        }
+      }
+    },
     "${applicationName} status for ${project}": {
+      "extractionState": "stale",
       "localizations": {
         "en": {
           "stringUnit": {
@@ -32,6 +78,7 @@
       }
     },
     "Analyze ${project} with ${applicationName}": {
+      "extractionState": "stale",
       "localizations": {
         "en": {
           "stringUnit": {
@@ -52,6 +99,7 @@
       }
     },
     "Ask ${applicationName} a question about ${project}": {
+      "extractionState": "stale",
       "localizations": {
         "en": {
           "stringUnit": {
@@ -62,6 +110,7 @@
       }
     },
     "Ask ${applicationName} about ${project}": {
+      "extractionState": "stale",
       "localizations": {
         "en": {
           "stringUnit": {
@@ -72,6 +121,7 @@
       }
     },
     "Can you tell me the status of the ${project} app from ${applicationName}": {
+      "extractionState": "stale",
       "localizations": {
         "en": {
           "stringUnit": {
@@ -81,7 +131,85 @@
         }
       }
     },
+    "Catch me up on ${project} using ${applicationName}": {
+      "extractionState": "stale",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Catch me up on ${project} using ${applicationName}"
+          }
+        }
+      }
+    },
+    "Create a Claude agent for ${project} with ${applicationName}": {
+      "extractionState": "stale",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Create a Claude agent for ${project} with ${applicationName}"
+          }
+        }
+      }
+    },
+    "Create a Codex agent for ${project} with ${applicationName}": {
+      "extractionState": "stale",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Create a Codex agent for ${project} with ${applicationName}"
+          }
+        }
+      }
+    },
+    "Create a coding agent with ${applicationName}": {
+      "extractionState": "stale",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Create a coding agent with ${applicationName}"
+          }
+        }
+      }
+    },
+    "Create a Cursor agent for ${project} with ${applicationName}": {
+      "extractionState": "stale",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Create a Cursor agent for ${project} with ${applicationName}"
+          }
+        }
+      }
+    },
+    "Create an agent for ${project} using ${applicationName}": {
+      "extractionState": "stale",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Create an agent for ${project} using ${applicationName}"
+          }
+        }
+      }
+    },
+    "Does anything need my attention in ${applicationName}": {
+      "extractionState": "stale",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Does anything need my attention in ${applicationName}"
+          }
+        }
+      }
+    },
     "Get a project analysis from ${applicationName}": {
+      "extractionState": "stale",
       "localizations": {
         "en": {
           "stringUnit": {
@@ -92,6 +220,7 @@
       }
     },
     "Get a project status in ${applicationName}": {
+      "extractionState": "stale",
       "localizations": {
         "en": {
           "stringUnit": {
@@ -112,6 +241,7 @@
       }
     },
     "Get me the analysis of the project ${project} from ${applicationName}": {
+      "extractionState": "stale",
       "localizations": {
         "en": {
           "stringUnit": {
@@ -121,7 +251,19 @@
         }
       }
     },
+    "Get me the status of the ${project} project from ${applicationName}": {
+      "extractionState": "stale",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Get me the status of the ${project} project from ${applicationName}"
+          }
+        }
+      }
+    },
     "Get my project status from ${applicationName}": {
+      "extractionState": "stale",
       "localizations": {
         "en": {
           "stringUnit": {
@@ -132,6 +274,7 @@
       }
     },
     "Get status from ${applicationName}": {
+      "extractionState": "stale",
       "localizations": {
         "en": {
           "stringUnit": {
@@ -142,6 +285,7 @@
       }
     },
     "Get the analysis of ${project} from ${applicationName}": {
+      "extractionState": "stale",
       "localizations": {
         "en": {
           "stringUnit": {
@@ -151,7 +295,19 @@
         }
       }
     },
+    "Get the status of ${project} from ${applicationName}": {
+      "extractionState": "stale",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Get the status of ${project} from ${applicationName}"
+          }
+        }
+      }
+    },
     "Get the status of ${project} using ${applicationName}": {
+      "extractionState": "stale",
       "localizations": {
         "en": {
           "stringUnit": {
@@ -161,7 +317,19 @@
         }
       }
     },
+    "Give me an overview in ${applicationName}": {
+      "extractionState": "stale",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Give me an overview in ${applicationName}"
+          }
+        }
+      }
+    },
     "Give me the latest analysis of ${project} from ${applicationName}": {
+      "extractionState": "stale",
       "localizations": {
         "en": {
           "stringUnit": {
@@ -172,6 +340,7 @@
       }
     },
     "Give me the latest analysis of the project ${project} from ${applicationName}": {
+      "extractionState": "stale",
       "localizations": {
         "en": {
           "stringUnit": {
@@ -181,7 +350,19 @@
         }
       }
     },
+    "How is ${project} doing in ${applicationName}": {
+      "extractionState": "stale",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "How is ${project} doing in ${applicationName}"
+          }
+        }
+      }
+    },
     "List my ${applicationName} projects": {
+      "extractionState": "stale",
       "localizations": {
         "en": {
           "stringUnit": {
@@ -192,6 +373,7 @@
       }
     },
     "Open ${target} in ${applicationName}": {
+      "extractionState": "stale",
       "localizations": {
         "en": {
           "stringUnit": {
@@ -212,6 +394,7 @@
       }
     },
     "Question ${applicationName} about ${project}": {
+      "extractionState": "stale",
       "localizations": {
         "en": {
           "stringUnit": {
@@ -222,6 +405,7 @@
       }
     },
     "Run ${applicationName} project status": {
+      "extractionState": "stale",
       "localizations": {
         "en": {
           "stringUnit": {
@@ -231,7 +415,19 @@
         }
       }
     },
+    "Run a coding agent using ${applicationName}": {
+      "extractionState": "stale",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Run a coding agent using ${applicationName}"
+          }
+        }
+      }
+    },
     "Show ${applicationName} status": {
+      "extractionState": "stale",
       "localizations": {
         "en": {
           "stringUnit": {
@@ -242,6 +438,7 @@
       }
     },
     "Show ${target} in ${applicationName}": {
+      "extractionState": "stale",
       "localizations": {
         "en": {
           "stringUnit": {
@@ -252,6 +449,7 @@
       }
     },
     "Show my blockers in ${applicationName}": {
+      "extractionState": "stale",
       "localizations": {
         "en": {
           "stringUnit": {
@@ -262,6 +460,7 @@
       }
     },
     "Show project status in ${applicationName}": {
+      "extractionState": "stale",
       "localizations": {
         "en": {
           "stringUnit": {
@@ -272,6 +471,7 @@
       }
     },
     "Show the status of ${project} in ${applicationName}": {
+      "extractionState": "stale",
       "localizations": {
         "en": {
           "stringUnit": {
@@ -281,17 +481,8 @@
         }
       }
     },
-    "Start a ${provider} session in ${applicationName}": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Start a ${provider} session in ${applicationName}"
-          }
-        }
-      }
-    },
     "Start a coding session in ${applicationName}": {
+      "extractionState": "stale",
       "localizations": {
         "en": {
           "stringUnit": {
@@ -301,7 +492,52 @@
         }
       }
     },
+    "Start a new Claude Code agent for the project ${project} from ${applicationName}": {
+      "extractionState": "stale",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start a new Claude Code agent for the project ${project} from ${applicationName}"
+          }
+        }
+      }
+    },
+    "Start a new Claude Code agent in ${applicationName}": {
+      "extractionState": "stale",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start a new Claude Code agent in ${applicationName}"
+          }
+        }
+      }
+    },
+    "Start a new coding agent for the project ${project} from ${applicationName}": {
+      "extractionState": "stale",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start a new coding agent for the project ${project} from ${applicationName}"
+          }
+        }
+      }
+    },
+    "Start a new coding agent in ${applicationName}": {
+      "extractionState": "stale",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start a new coding agent in ${applicationName}"
+          }
+        }
+      }
+    },
     "Start a task for ${project} in ${applicationName}": {
+      "extractionState": "stale",
       "localizations": {
         "en": {
           "stringUnit": {
@@ -311,7 +547,118 @@
         }
       }
     },
+    "Start an agent in ${applicationName}": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start an agent in ${applicationName}"
+          }
+        }
+      }
+    },
+    "Start Claude for ${project} from ${applicationName}": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start Claude for ${project} from ${applicationName}"
+          }
+        }
+      }
+    },
+    "Start Claude for ${project} using ${applicationName}": {
+      "extractionState": "stale",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start Claude for ${project} using ${applicationName}"
+          }
+        }
+      }
+    },
+    "Start Claude with ${applicationName}": {
+      "extractionState": "stale",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start Claude with ${applicationName}"
+          }
+        }
+      }
+    },
+    "Start Codex for ${project} from ${applicationName}": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start Codex for ${project} from ${applicationName}"
+          }
+        }
+      }
+    },
+    "Start Codex for ${project} using ${applicationName}": {
+      "extractionState": "stale",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start Codex for ${project} using ${applicationName}"
+          }
+        }
+      }
+    },
+    "Start Codex with ${applicationName}": {
+      "extractionState": "stale",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start Codex with ${applicationName}"
+          }
+        }
+      }
+    },
+    "Start Cursor for ${project} from ${applicationName}": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start Cursor for ${project} from ${applicationName}"
+          }
+        }
+      }
+    },
+    "Start Cursor for ${project} using ${applicationName}": {
+      "extractionState": "stale",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start Cursor for ${project} using ${applicationName}"
+          }
+        }
+      }
+    },
+    "Start Cursor with ${applicationName}": {
+      "extractionState": "stale",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start Cursor with ${applicationName}"
+          }
+        }
+      }
+    },
     "Tell me a project's status from ${applicationName}": {
+      "extractionState": "stale",
       "localizations": {
         "en": {
           "stringUnit": {
@@ -321,7 +668,19 @@
         }
       }
     },
+    "Tell me the latest status of ${project} in ${applicationName}": {
+      "extractionState": "stale",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tell me the latest status of ${project} in ${applicationName}"
+          }
+        }
+      }
+    },
     "Tell me the status of ${project} from ${applicationName}": {
+      "extractionState": "stale",
       "localizations": {
         "en": {
           "stringUnit": {
@@ -341,7 +700,19 @@
         }
       }
     },
+    "What happened with ${project} in ${applicationName}": {
+      "extractionState": "stale",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "What happened with ${project} in ${applicationName}"
+          }
+        }
+      }
+    },
     "What have my agents been doing in ${applicationName}": {
+      "extractionState": "stale",
       "localizations": {
         "en": {
           "stringUnit": {
@@ -361,7 +732,19 @@
         }
       }
     },
+    "What should I look at in ${applicationName}": {
+      "extractionState": "stale",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "What should I look at in ${applicationName}"
+          }
+        }
+      }
+    },
     "What's the state of ${project} in ${applicationName}": {
+      "extractionState": "stale",
       "localizations": {
         "en": {
           "stringUnit": {
@@ -372,6 +755,7 @@
       }
     },
     "What's the state of my project in ${applicationName}": {
+      "extractionState": "stale",
       "localizations": {
         "en": {
           "stringUnit": {
@@ -382,6 +766,7 @@
       }
     },
     "What's the status of ${project} in ${applicationName}": {
+      "extractionState": "stale",
       "localizations": {
         "en": {
           "stringUnit": {
@@ -392,6 +777,7 @@
       }
     },
     "What's the status of my ${project} app in ${applicationName}": {
+      "extractionState": "stale",
       "localizations": {
         "en": {
           "stringUnit": {
@@ -402,11 +788,67 @@
       }
     },
     "Which projects need attention in ${applicationName}": {
+      "extractionState": "stale",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
             "value": "Which projects need attention in ${applicationName}"
+          }
+        }
+      }
+    },
+    "${applicationName} start a Claude agent": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "${applicationName} start a Claude agent"
+          }
+        }
+      }
+    },
+    "${applicationName} start a Codex agent": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "${applicationName} start a Codex agent"
+          }
+        }
+      }
+    },
+    "Start a new Codex agent for the project ${project} from ${applicationName}": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start a new Codex agent for the project ${project} from ${applicationName}"
+          }
+        }
+      }
+    },
+    "${applicationName} start a Cursor agent": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "${applicationName} start a Cursor agent"
+          }
+        }
+      }
+    },
+    "Start a new Cursor agent for the project ${project} from ${applicationName}": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start a new Cursor agent for the project ${project} from ${applicationName}"
           }
         }
       }

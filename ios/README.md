@@ -85,12 +85,35 @@ personal signing change local; do not commit it or change the production
 | List projects | List my RuntimeBrief projects | Project entities |
 | Open project | Open Sample Tracker in RuntimeBrief | Opens project detail |
 | Ask the analyst | Ask RuntimeBrief a question about Sample Tracker | Answer text |
-| Start coding session | Start a Codex session in RuntimeBrief | Session receipt ID |
+| Start coding session | Start a new coding agent for Sample Tracker from RuntimeBrief | Session receipt ID |
+| Start a named agent | Start Codex for Sample Tracker from RuntimeBrief; also Claude or Cursor | Session receipt ID |
+| Start with spoken follow-ups | RuntimeBrief start Codex, then name the project and task | Session receipt ID |
 
 **Start Coding Session** supports Claude Code, Codex, and Cursor through the
-same native adapters and `/sessions` API as the app. Siri asks for the project,
-agent, and task, then confirms the destination and settings before writing.
-The device must be locally authenticated. Advanced Shortcuts parameters offer
+same native adapters and `/sessions` API as the app. Requests can use agent,
+session, start, create, or run wording. Provider-specific shortcuts preserve
+Claude Code, Codex, or Cursor when the same request names a project. Generic
+requests ask which agent to use. Siri asks for the missing project and task, then
+confirms the agent, destination, and task before writing. Non-default model or
+permission settings are included in that confirmation.
+
+App-first requests such as "RuntimeBrief start Codex", "RuntimeBrief start
+Claude", "RuntimeBrief start Cursor", and "RuntimeBrief start an agent" ask
+for the project in a second spoken turn. This gives Siri the app context before
+hearing a project name that may also name another installed app. One-turn
+requests also register "Start Codex for Sample Tracker from RuntimeBrief",
+including the article form "the Sample Tracker app". Siri's flexible matching
+can accept similar wording, but app selection happens before RuntimeBrief runs;
+registered templates and direct intent tests cannot guarantee every phrasing.
+Named-agent actions use native model defaults, Manual permissions and Remote
+Control on. Use Start Coding Session in Shortcuts to configure advanced options.
+
+The launch intent is allowed while the phone is locked and does not open the
+app. Enable **Allow Siri When Locked** in the phone's Siri settings. The phone
+must have been unlocked once after restarting so the saved Keychain credential
+is available. Confirmation still happens before dispatch; cancelling sends no
+task. The Mac must be reachable and the requested native agent available.
+Advanced Shortcuts parameters offer
 the Mac's current model choices, reasoning, permissions (Manual by default),
 and Remote Control (on by default). Unsupported or unavailable choices stop
 before a launch. The action validates the live project rather than trusting
@@ -173,7 +196,10 @@ explicitly skip; other errors fail. HTTP fixture tests require `RUNTIMEBRIEF_E2E
 Session tests exercise the real client encoding and `/sessions` endpoint for
 all three providers, confirmation cancellation, invalid settings, removed
 projects, authorization/setup failures, uncertain retries, and demo isolation.
-Cloud Shortcuts checks cover the actual parameter chooser and confirmation UI.
+Cloud Shortcuts checks should cover the actual parameter chooser and confirmation
+UI. Some iOS simulator runtimes reject all App Shortcuts with "Unable to run App
+Shortcut"; report that gap and verify on a physical phone rather than treating
+direct system intent execution as equivalent.
 Ordinary tests use demo data, mock transports, or an isolated HTTP mock fixture.
 They never launch installed coding agents. The old live XCTest launch flags have
 been removed so a full test run or retry cannot spend model quota.
@@ -184,6 +210,17 @@ Before release, test spoken requests and the Siri card on a physical iOS 27
 device with Siri configured, including ambiguous names, an offline Mac, and
 discovery opt-out. A simulator test does not verify speech recognition or
 Apple Intelligence routing.
+
+For hands-free launch verification, lock the already configured phone and use
+AirPods or speak to Siri without Face ID unlocking the phone. Say both
+"Start a new coding agent for the project Sample Tracker from RuntimeBrief"
+and "Start a new Claude Code agent for the project Sample Tracker from
+RuntimeBrief". Supply the task aloud and confirm aloud. Check that the receipt
+uses the named project and provider, with only one native session. Repeat with
+"Cancel" at confirmation and confirm that no session was created. Also check
+"Catch me up on Sample Tracker using RuntimeBrief" while locked. Do not treat
+system intent tests, simulator lock screens, or Shortcut taps as proof of this
+physical spoken flow.
 
 To test Siri's matching of recognized text (rather than calling an intent by
 name), enable the separate opt-in test on a Siri-enabled device:

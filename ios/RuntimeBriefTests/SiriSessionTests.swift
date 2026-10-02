@@ -15,10 +15,11 @@ struct SiriSessionTests {
 
     @Test func allProvidersUseSessionEndpointAndNativeOptionsAfterConfirmation() async throws {
         for provider in AgentProvider.allCases {
+            let configuredIntent = StartSessionIntent(provider: provider)
             let transport = SessionTransport(provider: provider)
             var confirmed = false
             let result = try await SiriSessionLauncher.run(
-                project: project, provider: provider, task: "  \(prompt)  ", model: "demo-model",
+                project: project, provider: configuredIntent.provider, task: "  \(prompt)  ", model: "demo-model",
                 permissions: .plan, reasoning: .high, remoteControl: false,
                 source: source(transport), scope: "fixture", isDemo: false, defaults: defaults()
             ) { name, task in

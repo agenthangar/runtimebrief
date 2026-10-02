@@ -5,6 +5,36 @@ import XCTest
 /// still a separate physical-device check.
 final class SiriVoiceRoutingUITests: XCTestCase {
     @MainActor
+    func testRecognizedLaunchRequestsAskForMissingInformation() async throws {
+        try requireRoutingTest()
+        let app = XCUIApplication()
+        app.launchEnvironment["RUNTIMEBRIEF_E2E_CLEAR_STATE"] = "1"
+        app.launchEnvironment["RUNTIMEBRIEF_E2E_DEMO"] = "1"
+        app.launch()
+        XCTAssertTrue(app.staticTexts["demo-data-banner"].waitForExistence(timeout: 10))
+        try await Task.sleep(for: .seconds(10))
+
+        for (request, expected) in [
+            ("RuntimeBrief start Codex", "Which project should Codex work on"),
+            ("Start Codex for Sample Tracker from RuntimeBrief", "What should Codex work on"),
+            ("Start Codex for the Sample Tracker app from RuntimeBrief", "What should Codex work on"),
+        ] {
+            XCUIDevice.shared.siriService.activate(voiceRecognitionText: request)
+            let dialog = XCUIDevice.shared.siriService.staticTexts.matching(
+                NSPredicate(format: "label CONTAINS[c] %@", expected)
+            ).firstMatch
+            let matched = dialog.waitForExistence(timeout: 30)
+            let screenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+            screenshot.name = request
+            screenshot.lifetime = .keepAlways
+            add(screenshot)
+            XCTAssertTrue(matched, "Siri did not ask for missing launch information: \(request). \(XCUIDevice.shared.siriService.debugDescription)")
+            guard matched else { return }
+            app.activate()
+        }
+    }
+
+    @MainActor
     func testRecognizedAnalysisRequestReachesApp() async throws {
         try requireRoutingTest()
         let app = XCUIApplication()

@@ -113,6 +113,23 @@ final class SiriIntegrationUITests: XCTestCase {
     }
 
     @MainActor
+    func testNamedAgentActionsThroughSystemStack() async throws {
+        guard #available(iOS 27.0, *) else { throw XCTSkip("AppIntentsTesting requires iOS 27.") }
+        _ = launchDemo()
+        let definitions = IntentDefinitions(bundleIdentifier: "com.backbrief.app")
+        try await requireSystemTesting(definitions)
+        let matches = try await definitions.entities["ProjectEntity"].entities(matching: "the Sample Tracker app")
+        let project = try XCTUnwrap(matches.first)
+        for name in ["StartClaudeSessionIntent", "StartCodexSessionIntent", "StartCursorSessionIntent"] {
+            let result = try await definitions.intents[name].makeIntent(
+                project: project, task: "Inspect the fictional export"
+            ).run()
+            let receiptID: String = try result.value
+            XCTAssertNotNil(UUID(uuidString: receiptID))
+        }
+    }
+
+    @MainActor
     func testDiscoveryOptOutHidesContextButKeepsExplicitShortcutsUsable() async throws {
         guard #available(iOS 27.0, *) else { throw XCTSkip("AppIntentsTesting requires iOS 27.") }
         let app = XCUIApplication()

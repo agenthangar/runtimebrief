@@ -12,7 +12,7 @@ struct GetProjectAnalysisIntent: AppIntent {
     )
     static let openAppWhenRun = false
 
-    @Parameter(title: "Project")
+    @Parameter(title: "Project", requestValueDialog: "Which project would you like an update on?")
     var project: ProjectEntity
 
     static var parameterSummary: some ParameterSummary {
