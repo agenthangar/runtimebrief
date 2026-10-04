@@ -50,8 +50,14 @@ export const configSchema = z.object({
       // NEVER default to 0.0.0.0 — loopback unless the user opts in explicitly.
       host: z.string().default("127.0.0.1"),
       port: z.number().int().min(1).max(65535).default(8484),
+      /**
+       * Serve the browser app from the daemon origin. `true` uses the sibling
+       * `web/dist` build when present; a path serves that directory; `false`
+       * keeps the daemon API-only.
+       */
+      web_app: z.union([z.boolean(), z.string().min(1)]).default(true),
     })
-    .default({ host: "127.0.0.1", port: 8484 }),
+    .default({ host: "127.0.0.1", port: 8484, web_app: true }),
   auth: z.object({
     // Only the scrypt hash is stored; the plaintext token is printed once at init.
     token_hash: z.string(),
