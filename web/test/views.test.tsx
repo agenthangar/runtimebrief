@@ -259,7 +259,7 @@ describe("live portfolio", () => {
     expect(screen.getByTestId("project-activity-ghost")).toHaveTextContent("no recent activity");
   });
 
-  it("keeps a saved brief after a network failure and stays empty on a first-run 401", async () => {
+  it("keeps a saved brief after a network failure", async () => {
     ServerSettingsStore.save("http://127.0.0.1:8484", "test-token");
     stubFetch({
       "/v1/projects": {
@@ -283,9 +283,9 @@ describe("live portfolio", () => {
       },
       "/v1/providers": { body: JSON.stringify({ providers: [] }) },
     });
-    const { unmount } = render(<App />);
+    const first = render(<App />);
     expect(await screen.findByTestId("brief-headline-meal")).toHaveTextContent("Recent work is ready to review");
-    unmount();
+    first.unmount();
 
     stubFetch({
       "/v1/projects": { throws: new TypeError("Failed to fetch") },
@@ -294,9 +294,9 @@ describe("live portfolio", () => {
     expect(await screen.findByTestId("saved-brief-banner")).toHaveTextContent("Showing the brief saved");
     expect(screen.getByTestId("brief-headline-meal")).toHaveTextContent("Recent work is ready to review");
     expect(screen.getByTestId("error-banner")).toHaveTextContent("Couldn't reach your Mac");
-    unmount();
+  });
 
-    resetSingletons();
+  it("stays empty on a first-run 401 so a previous connection is not revealed", async () => {
     ServerSettingsStore.save("http://127.0.0.1:8484", "wrong-token");
     stubFetch({
       "/v1/projects": { status: 401, body: "{}" },
