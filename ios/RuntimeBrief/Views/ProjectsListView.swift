@@ -15,7 +15,9 @@ struct ProjectsListView: View {
     var body: some View {
         NavigationStack(path: $navigation.path) {
             Group {
-                if projects.isEmpty && !isLoading {
+                // Keep the empty state up while a refresh is in flight so Exit
+                // Demo does not hide Explore Demo behind a blank loading list.
+                if projects.isEmpty {
                     emptyState
                 } else {
                     list
@@ -120,6 +122,8 @@ struct ProjectsListView: View {
             errorMessage = nil
             showingSavedBrief = false
             lastSavedAt = Date()
+        } catch is CancellationError {
+            return
         } catch {
             let snapshot = await ProjectsStore.shared.cachedSnapshot()
             if projects.isEmpty { projects = snapshot.projects }
