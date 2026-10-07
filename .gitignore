@@ -22,6 +22,11 @@ dist/
 .revyl/
 build/
 
+# Playwright
+playwright-report/
+test-results/
+blob-report/
+
 # Xcode / XcodeGen output
 ios/*.xcodeproj
 ios/RuntimeBrief/Info.plist

@@ -4,7 +4,7 @@ Describe the behavior changed and why.
 
 ## Validation
 
-List the daemon and iOS checks run.
+List the daemon, iOS, and web checks run.
 
 ## Security and privacy
 

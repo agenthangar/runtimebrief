@@ -37,6 +37,7 @@ body:
       options:
         - macOS daemon or CLI
         - iOS app or Siri
+        - Web app
         - MCP server or Codex plugin
         - Codex analyst integration
         - Documentation or setup

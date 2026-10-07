@@ -2,7 +2,9 @@
 
 `runtimebriefd` is the local macOS daemon for [RuntimeBrief](../README.md). It provides the
 authenticated REST, buffered SSE, and MCP interfaces used by the RuntimeBrief
-iOS app and Codex plugin.
+iOS app, [web app](../web/README.md), and Codex plugin. When `web/dist` is
+present, it also serves that build from the same origin (`server.web_app`,
+default `true`).
 
 The daemon reads explicitly configured local project evidence. Background
 project analysis and on-demand questions are macOS-only and start the

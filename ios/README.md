@@ -23,7 +23,9 @@ mocked transport; bundled demo and settings UI tests need no daemon.
 On an unconfigured install, **Explore Demo** opens a bundled, fully offline
 portfolio made only from hand-authored fictional data. Demo mode never reads
 the saved server URL or Keychain token, contacts a network service, or writes
-into the live project cache. Use **Exit Demo** before connecting a Mac.
+into the live project cache. Use **Exit Demo** before connecting a Mac. The
+[web app](../web/README.md) ships the same demo and live surfaces; Siri,
+Spotlight, and App Intents remain iOS-only. See [platforms](../docs/platforms.md).
 
 Maintainer TestFlight and App Store builds intentionally keep the existing
 `com.backbrief.app` bundle identifier so updates continue through the
