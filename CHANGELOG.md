@@ -1,6 +1,6 @@
 # Release notes
 
-## 1.0.2 (35) — 2026-10-10
+## 1.0.3 (35) — 2026-10-10
 
 - Ask RuntimeBrief anything through Siri in your own words: say "Ask
   RuntimeBrief", then the question. A question that names a project is
