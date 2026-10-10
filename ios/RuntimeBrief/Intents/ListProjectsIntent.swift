@@ -16,12 +16,12 @@ struct ListProjectsIntent: AppIntent {
             let projects = snapshot.projects
             let dayAgo = Date().addingTimeInterval(-24 * 60 * 60)
             let active = projects.filter { ($0.lastActivityAt ?? .distantPast) > dayAgo }
-            let names = projects.map(\.name).formatted(.list(type: .and))
+            // Siri says two lines; the snippet lists every project.
             var dialog = SiriBrief.prefix(snapshot) + (projects.isEmpty ? "No projects are registered yet. Add projects on your Mac." :
-                "You have \(projects.count) project\(projects.count == 1 ? "" : "s"): \(names).")
+                "You have \(projects.count) project\(projects.count == 1 ? "" : "s").")
             if !active.isEmpty {
-                let activeNames = active.map(\.name).formatted(.list(type: .and))
-                dialog += " Active in the last day: \(activeNames)."
+                let shown = active.prefix(3).map(\.name) + (active.count > 3 ? ["\(active.count - 3) more"] : [])
+                dialog += " Active in the last day: \(shown.formatted(.list(type: .and)))."
             }
             return .result(value: projects.map(ProjectEntity.init(summary:)), dialog: IntentDialog(stringLiteral: dialog),
                            view: ProjectListSnippetView(lines: [SiriBrief.prefix(snapshot)] + projects.map { "\($0.name): \($0.brief?.headline ?? "No brief available")" }))

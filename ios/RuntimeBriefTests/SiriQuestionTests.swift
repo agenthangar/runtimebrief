@@ -100,25 +100,29 @@ struct SiriQuestionTests {
 
     // MARK: Spoken replies
 
-    @Test func everyReplyIsSpeakableAndExplainsWhatHappened() {
-        let saved = AskResponse.Interim(answer: "Done: Export shipped. [git-commit-abc]\nNow: Waiting for review. [git-commit-abc]",
+    @Test func everyReplyIsTwoSpeakableLinesThatSayWhatHappened() {
+        let saved = AskResponse.Interim(answer: "Done: Export shipped. [git-commit-abc]\nNow: Waiting for review. [git-commit-abc]\nNext: Review it. [git-commit-abc]",
                                         evidence: [], analyzedAt: Date().addingTimeInterval(-3 * 3600))
+        let long = "Checks passed on the export branch. Build 35 is processing. Review is next. [git-commit-abc@demo-sample-tracker]"
         for status in [AskResponse.Status.answered, .pending, .failed] {
             for scope in [AskResponse.Scope.project, .portfolio] {
                 let reply = SiriQuestion.reply(for: response(
                     status, scope: scope,
-                    answer: status == .answered ? "Checks passed on the export branch. [git-commit-abc@demo-sample-tracker]" : nil,
+                    answer: status == .answered ? long : nil,
                     interim: status == .answered ? nil : saved
                 ))
                 let label = "\(status) \(scope): \(reply.text)"
+                #expect(SiriBrief.sentences(reply.text).count <= 2, "\(label)")
                 #expect(!reply.text.contains("["), "\(label)")
                 #expect(!reply.text.contains("Done:") && !reply.text.contains("Now:"), "\(label)")
                 #expect(reply.title == (scope == .project ? "Sample Tracker" : SiriQuestion.portfolioTitle), "\(label)")
-                #expect(reply.text.contains("Ask me again in a minute") == (status == .pending), "\(label)")
+                #expect(reply.text.contains("ask again in a minute") == (status == .pending), "\(label)")
                 if scope == .project { #expect(reply.text.contains("Sample Tracker"), "\(label)") }
-                if status != .answered {
-                    #expect(reply.text.contains("Recently, Export shipped."), "\(label)")
-                    #expect(reply.text.contains(scope == .project ? "Its analysis from 3 hours ago says:" : "Here's what I know so far:"), "\(label)")
+                if status == .answered {
+                    #expect(!reply.text.contains("Review is next"), "\(label)")
+                    #expect(reply.detail.contains("Review is next"), "Shortcuts still get the whole answer")
+                } else {
+                    #expect(reply.text.hasSuffix("Recently, Export shipped."), "\(label)")
                 }
             }
         }
@@ -162,7 +166,7 @@ struct SiriQuestionTests {
         let reply = try await SiriQuestion.answer(question: "Is anything blocked?", projectID: nil, dataSource: source, store: store())
         #expect(reply.title == SiriQuestion.portfolioTitle)
         #expect(reply.text.contains("You have 3 projects"))
-        #expect(reply.text.hasSuffix("update RuntimeBrief on your Mac."))
+        #expect(reply.text.hasSuffix("Update RuntimeBrief on your Mac to ask more."))
     }
 
     @Test func unreachableMacFallsBackToLabelledSavedBriefs() async throws {

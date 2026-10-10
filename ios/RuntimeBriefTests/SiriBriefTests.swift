@@ -83,7 +83,6 @@ struct SiriBriefTests {
         #expect(projects.first?.name == "Catalog Builder")
         #expect(SiriBrief.attention(snapshot).hasPrefix("Fictional demo."))
         #expect(SiriBrief.overview(snapshot).contains("You have 3 projects."))
-        #expect(SiriBrief.overview(snapshot).contains("Ask for a project by name"))
         let empty = ProjectsStore.BriefSnapshot(projects: [], fetchedAt: nil, isSaved: false, isDemo: false)
         #expect(SiriBrief.overview(empty).contains("No projects are registered yet"))
     }
@@ -94,15 +93,49 @@ struct SiriBriefTests {
             analyzedAt: Date().addingTimeInterval(-20 * 60), model: "gpt-6-luna", evidence: [], refreshing: false, unavailable: false
         )
         let spoken = SiriBrief.analyzedProject(DemoData.projects[0], status: status)
-        #expect(spoken.hasPrefix("Sample Tracker, analyzed"))
-        #expect(spoken.contains("Recently, Export checks passed"))
-        #expect(spoken.contains("Next, Review the export"))
-        #expect(!spoken.contains("[demo-evidence"))
+        // Two lines: the latest completed and current work, not the advice.
+        #expect(spoken == "Sample Tracker, analyzed 20 minutes ago: Recently, Export checks passed. Currently, Ready to review.")
         let waiting = VoiceStatus(answer: nil, analyzedAt: nil, model: nil, evidence: [], refreshing: true, unavailable: false)
         #expect(SiriBrief.analyzedProject(DemoData.projects[0], status: waiting).contains("preparing an analysis"))
-        let failedRefresh = VoiceStatus(answer: status.answer, analyzedAt: Date().addingTimeInterval(-6 * 3600),
-                                        model: status.model, evidence: [], refreshing: false, unavailable: true)
-        #expect(SiriBrief.analyzedProject(DemoData.projects[0], status: failedRefresh).contains("couldn't refresh"))
+        let older = VoiceStatus(answer: status.answer, analyzedAt: Date().addingTimeInterval(-6 * 3600),
+                                model: status.model, evidence: [], refreshing: false, unavailable: true)
+        #expect(SiriBrief.analyzedProject(DemoData.projects[0], status: older).hasPrefix("Sample Tracker, analyzed 6 hours ago:"))
+    }
+
+    @Test func spokenAnswersAreAtMostTwoLinesWithTheImportantUpdatesFirst() {
+        let unknown = "Unknown from available evidence."
+        let done = "Shipped build 136 to TestFlight. [git-commit-abc]"
+        let now = "An agent is fixing the launch crash. [session-codex-1]"
+        let next = "Review the crash fix. [session-codex-1]"
+        // Every combination of known and unknown Done/Now/Next lines.
+        for mask in 0..<8 {
+            let parts = [("Done", done, "Recently, Shipped"), ("Now", now, "Currently, An agent"), ("Next", next, "Next, Review")]
+            let lines = parts.enumerated().map { index, part in "\(part.0): " + (mask & (1 << index) != 0 ? part.1 : unknown) }
+            let spoken = SiriBrief.voice(lines.joined(separator: "\n"), evidence: [])
+            let expected = parts.enumerated().filter { mask & (1 << $0.offset) != 0 }.map(\.element.2).prefix(2)
+            #expect(SiriBrief.sentences(spoken).count == max(1, expected.count), "\(mask): \(spoken)")
+            for lead in expected { #expect(spoken.contains(lead), "\(mask): \(spoken)") }
+            if expected.isEmpty { #expect(spoken == unknown) }
+            #expect(!spoken.contains("["))
+        }
+        let paragraph = "SlipSpark build 136 is on TestFlight. The crash fix is in review. Tests passed on the runner. [git-commit-abc]"
+        #expect(SiriBrief.voice(paragraph, evidence: []) == "SlipSpark build 136 is on TestFlight. The crash fix is in review.")
+        #expect(SiriBrief.voice("Version 1.0.3 shipped. Build 35 is live.", evidence: [], maxLines: 1) == "Version 1.0.3 shipped.")
+    }
+
+    @Test func attentionAndSavedBriefsAreTwoLines() {
+        let projects = (0..<12).map { index in
+            ProjectSummary(id: "p\(index)", name: "Project \(index)", lastActivityAt: nil, branch: nil, dirty: nil,
+                           brief: ProjectBrief(state: .attention, headline: "Waiting for approval \(index)", headlineEvidence: [],
+                                               updatedAt: nil, activeSessionCount: 0, claims: []))
+        }
+        for count in 1...projects.count {
+            let snapshot = ProjectsStore.BriefSnapshot(projects: Array(projects.prefix(count)), fetchedAt: nil, isSaved: false, isDemo: false)
+            let text = SiriBrief.attention(snapshot)
+            #expect(SiriBrief.sentences(text).count == 2, "\(text)")
+            #expect(text.contains("Project 0: Waiting for approval 0."))
+            if count > 3 { #expect(text.contains("\(count - 3) more")) }
+        }
     }
 
     @Test func entityExposesUsefulMetadataWithoutPathsOrCredentials() {

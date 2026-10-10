@@ -39,9 +39,9 @@ interface Match {
 
 /**
  * Returns the IDs of projects named in `question`, in the order they are first
- * mentioned. A spoken name may be split ("slip spark") or joined
- * ("slipspark"); a longer name wins over a shorter one it contains, so
- * "trail map web" does not also select "trail map".
+ * mentioned. A spoken name may be split ("slip spark"), joined ("slipspark"),
+ * or pluralized ("slip sparks"); a longer name wins over a shorter one it
+ * contains, so "trail map web" does not also select "trail map".
  */
 export function resolveProjectMentions(
   question: string,
@@ -58,9 +58,11 @@ export function resolveProjectMentions(
     let window = "";
     for (let size = 1; size <= MAX_WINDOW && start + size <= words.length; size++) {
       window += words[start + size - 1];
+      // Dictation often pluralizes a name: "slip sparks" for SlipSpark.
+      const singular = window.length > MIN_COMPACT_LENGTH && window.endsWith("s") ? window.slice(0, -1) : null;
       for (const candidate of candidates) {
-        if (candidate.compact === window) {
-          matches.push({ id: candidate.id, start, end: start + size, length: window.length });
+        if (candidate.compact === window || candidate.compact === singular) {
+          matches.push({ id: candidate.id, start, end: start + size, length: candidate.compact.length });
         }
       }
     }

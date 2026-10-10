@@ -25,6 +25,8 @@ export interface ServerDeps {
   iosReleases?: IosReleaseProvider;
   decisions?: DecisionStore;
   launches?: LaunchService;
+  /** Receives one line per spoken question; defaults to stdout. */
+  askLog?: (line: string) => void;
 }
 
 /**

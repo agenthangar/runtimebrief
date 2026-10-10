@@ -3,7 +3,16 @@ import Foundation
 struct SiriQuestionReply: Equatable {
     /// Snippet heading: the project the answer is about, or the portfolio.
     let title: String
+    /// What Siri says and shows: at most two short lines.
     let text: String
+    /// The whole answer, returned to Shortcuts.
+    let detail: String
+
+    init(title: String, text: String, detail: String? = nil) {
+        self.title = title
+        self.text = text
+        self.detail = detail ?? text
+    }
 }
 
 /// Answers a free-form spoken question. The daemon decides whether the
@@ -16,12 +25,11 @@ enum SiriQuestion {
         question: String,
         projectID: String?,
         dataSource: any RuntimeBriefDataSource,
-        store: ProjectsStore = .shared,
-        now: Date = Date()
+        store: ProjectsStore = .shared
     ) async throws -> SiriQuestionReply {
         do {
             let response = try await dataSource.askAnything(question: question, projectID: projectID)
-            return reply(for: response, now: now)
+            return reply(for: response)
         } catch RuntimeBriefError.unsupportedServer {
             return try await olderServerAnswer(question: question, projectID: projectID, dataSource: dataSource, store: store)
         } catch RuntimeBriefError.network, RuntimeBriefError.timeout {
@@ -31,42 +39,28 @@ enum SiriQuestion {
         }
     }
 
-    static func reply(for response: AskResponse, now: Date = Date()) -> SiriQuestionReply {
+    static func reply(for response: AskResponse) -> SiriQuestionReply {
         let project = response.scope == .project ? response.projects.first : nil
         let title = project?.name ?? portfolioTitle
         if response.status == .answered, let answer = response.answer {
-            let text = SiriBrief.spoken(answer, evidence: response.evidence)
-            return SiriQuestionReply(title: title, text: project.map { naming($0.name, in: text) } ?? text)
+            let short = SiriBrief.voice(answer, evidence: response.evidence)
+            let full = SiriBrief.spoken(answer, evidence: response.evidence)
+            return SiriQuestionReply(
+                title: title,
+                text: project.map { naming($0.name, in: short) } ?? short,
+                detail: project.map { naming($0.name, in: full) } ?? full
+            )
         }
-        let saved = response.interim.map { SiriBrief.spoken($0.answer, evidence: $0.evidence) }
-        var parts: [String] = []
+        // Two lines: what is happening, then the most important saved update.
+        let opener: String
         switch (response.status, project) {
-        case (.pending, let project?):
-            parts.append("I'm still working on that for \(project.name).")
-        case (.pending, nil):
-            parts.append("I'm still working on that.")
-        case (_, let project?):
-            parts.append("I couldn't finish an answer for \(project.name) right now.")
-        case (_, nil):
-            parts.append("I couldn't finish an answer right now.")
+        case (.pending, let project?): opener = "Still checking \(project.name); ask again in a minute."
+        case (.pending, nil): opener = "Still checking; ask again in a minute."
+        case (_, let project?): opener = "I couldn't check \(project.name) right now."
+        case (_, nil): opener = "I couldn't check that right now."
         }
-        if let saved, !saved.isEmpty {
-            if project != nil {
-                parts.append(savedAnalysisLead(response.interim?.analyzedAt, now: now) + " " + saved)
-            } else {
-                parts.append("Here's what I know so far: " + saved)
-            }
-        }
-        if response.status == .pending {
-            parts.append("Ask me again in a minute for the full answer.")
-        }
-        return SiriQuestionReply(title: title, text: parts.joined(separator: " "))
-    }
-
-    private static func savedAnalysisLead(_ analyzedAt: Date?, now: Date) -> String {
-        guard let analyzedAt else { return "Its current brief says:" }
-        if now.timeIntervalSince(analyzedAt) < 5 * 60 { return "Its latest analysis says:" }
-        return "Its analysis from \(SiriBrief.age(of: analyzedAt, now: now)) says:"
+        let latest = response.interim.map { SiriBrief.voice($0.answer, evidence: $0.evidence, maxLines: 1) } ?? ""
+        return SiriQuestionReply(title: title, text: latest.isEmpty ? opener : "\(opener) \(latest)")
     }
 
     /// Project answers rarely repeat the project's name; Siri should say it.
@@ -108,17 +102,21 @@ enum SiriQuestion {
         guard let project = namedProject(question: question, projectID: projectID, projects: snapshot.projects) else {
             return SiriQuestionReply(
                 title: portfolioTitle,
-                text: SiriBrief.overview(snapshot)
-                    + " To ask questions across projects, update RuntimeBrief on your Mac."
+                text: SiriBrief.overview(snapshot) + " Update RuntimeBrief on your Mac to ask more."
             )
         }
         if !snapshot.isSaved, let answer = try? await dataSource.ask(projectID: project.id, question: question) {
-            let text = SiriBrief.spoken(answer.answer, evidence: answer.evidence ?? [])
-            return SiriQuestionReply(title: project.name, text: naming(project.name, in: text))
+            let evidence = answer.evidence ?? []
+            return SiriQuestionReply(
+                title: project.name,
+                text: naming(project.name, in: SiriBrief.voice(answer.answer, evidence: evidence)),
+                detail: naming(project.name, in: SiriBrief.spoken(answer.answer, evidence: evidence))
+            )
         }
         return SiriQuestionReply(
             title: project.name,
-            text: "I couldn't finish an answer right now. " + SiriBrief.project(project, snapshot: snapshot)
+            text: "I couldn't check \(project.name) right now. "
+                + SiriBrief.voice(project.brief?.headline ?? "No project brief is available", evidence: [], maxLines: 1)
         )
     }
 }

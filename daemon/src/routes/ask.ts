@@ -80,38 +80,49 @@ export function projectInterim(project: ProjectListEntry, latest: LatestStatus |
   };
 }
 
-/** Saved briefs for the named projects, or a portfolio overview. */
+function namesList(names: string[]): string {
+  if (names.length <= 1) return names.join("");
+  return `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
+}
+
+/** Saved briefs for up to two named projects, or a two-sentence overview:
+ * which projects need attention and where agents are working. */
 export function portfolioInterim(projects: ProjectListEntry[], named: ProjectListEntry[]): AskInterim {
   const evidence: EvidenceRef[] = [];
-  const describe = (project: ProjectListEntry) => {
-    const refs = scoped(project.brief.headlineEvidence, project);
-    evidence.push(...refs);
-    return `${project.name}: ${sentence(project.brief.headline)}${cite(refs)}`;
+  const refs = (shown: ProjectListEntry[]) => {
+    const scopedRefs = shown.flatMap((project) => scoped(project.brief.headlineEvidence, project));
+    evidence.push(...scopedRefs);
+    return cite(scopedRefs);
   };
   if (named.length > 0) {
-    return { answer: named.map(describe).join(" "), evidence, analyzedAt: null };
+    const answer = named
+      .slice(0, 2)
+      .map((project) => `${project.name}: ${sentence(project.brief.headline)}${refs([project])}`)
+      .join(" ");
+    return { answer, evidence, analyzedAt: null };
   }
   if (projects.length === 0) {
     return { answer: "No projects are registered yet.", evidence, analyzedAt: null };
   }
-  const parts = [`You have ${projects.length} project${projects.length === 1 ? "" : "s"}.`];
   const attention = projects.filter(needsAttention);
-  if (attention.length > 0) {
-    parts.push(
-      `${attention.length} need${attention.length === 1 ? "s" : ""} attention.`,
-      ...attention.slice(0, 3).map(describe),
-    );
-  } else {
-    parts.push("Nothing is marked as needing your attention.");
-  }
   const active = projects.filter(
     (project) => project.brief.state === "active" && !attention.includes(project),
   );
+  const parts: string[] = [];
+  if (attention.length > 0) {
+    const shown = attention.slice(0, 3);
+    const more = attention.length - shown.length;
+    parts.push(
+      `${attention.length} project${attention.length === 1 ? " needs" : "s need"} attention: ` +
+        namesList([...shown.map((project) => project.name), ...(more > 0 ? [`${more} more`] : [])]) +
+        `.${refs(shown)}`,
+    );
+  } else {
+    parts.push(`Nothing needs your attention across ${projects.length} project${projects.length === 1 ? "" : "s"}.`);
+  }
   if (active.length > 0) {
     const shown = active.slice(0, 3);
-    const refs = shown.flatMap((project) => scoped(project.brief.headlineEvidence, project));
-    evidence.push(...refs);
-    parts.push(`Agents are active in ${shown.map((project) => project.name).join(", ")}.${cite(refs)}`);
+    parts.push(`Agents are working in ${namesList(shown.map((project) => project.name))}.${refs(shown)}`);
   }
   return { answer: parts.join(" "), evidence, analyzedAt: null };
 }
@@ -135,6 +146,8 @@ export function registerAskRoutes(
   deps: ServerDeps,
   projectList: { get(): Promise<ProjectListEntry[]> },
 ) {
+  // Route, outcome, and timing only: never the question text.
+  const log = deps.askLog ?? ((line: string) => console.log(line));
   const jobs = new AskJobs();
   app.addHook("onClose", async () => jobs.close());
 
@@ -153,9 +166,26 @@ export function registerAskRoutes(
       .filter((project): project is ProjectListEntry => project !== undefined);
     const scope = named.length === 1 ? "project" : "portfolio";
 
+    const route = `scope=${scope} projects=${mentionedIds.join(",") || "-"}`;
     const key = JSON.stringify([scope, mentionedIds, question.toLowerCase().replace(/\s+/g, " ")]);
+    const startedAt = Date.now();
     const job = jobs.run(key, (signal) => {
-      if (scope === "project") return collect(deps.analyst.ask(named[0]!.id, question, signal));
+      const work = scope === "project"
+        ? collect(deps.analyst.ask(named[0]!.id, question, signal, { voice: true }))
+        : collectPortfolio(signal);
+      return work.then(
+        (outcome) => {
+          log(`[ask] finished ${route} status=answered ms=${Date.now() - startedAt} cached=${outcome.cached}`);
+          return outcome;
+        },
+        (error: unknown) => {
+          const reason = error instanceof Error ? error.message : String(error);
+          log(`[ask] finished ${route} status=failed ms=${Date.now() - startedAt} error=${JSON.stringify(reason.slice(0, 200))}`);
+          throw error;
+        },
+      );
+    });
+    function collectPortfolio(signal: AbortSignal): Promise<AskOutcome> {
       const inputs: PortfolioAskProject[] = projects.map((project) => ({
         id: project.id,
         name: project.name,
@@ -165,8 +195,9 @@ export function registerAskRoutes(
         latestStatus: deps.analyst.latestStatus(project.id),
       }));
       return collect(deps.analyst.askPortfolio(question, inputs, mentionedIds, signal));
-    });
+    }
     const state: AskJobState = job ? await jobs.wait(job, waitMs) : { status: "failed" };
+    log(`[ask] replied ${route} status=${job ? (state.status === "running" ? "pending" : state.status) : "busy"} ms=${Date.now() - startedAt}`);
 
     const response: AskResponse = {
       status: state.status === "running" ? "pending" : state.status,

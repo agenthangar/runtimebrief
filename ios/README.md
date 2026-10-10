@@ -102,10 +102,17 @@ question goes to the portfolio analyst, which reads every project's brief and
 latest saved analysis. Siri speaks the answer without evidence IDs and names
 the project it is about.
 
+Every spoken answer is at most two short lines, most important update first.
+The analysts are asked for two sentences, and the app also keeps only the first
+two lines; a Done/Now/Next analysis is read as its done and current lines.
+Status, attention, and list replies follow the same limit. The Shortcuts value
+of an open question is the full answer.
+
 The daemon waits up to eight seconds for an answer. A slower answer continues
-on the Mac: Siri speaks the latest saved analysis or portfolio overview, says
-so, and asks the person to repeat the question in a minute, which then returns
-the finished answer without another model run. With the Mac unreachable, Siri
+on the Mac: Siri says it is still checking, gives the most important saved
+update, and asks the person to repeat the question in a minute, which then
+returns the finished answer without another model run. The daemon log records
+each question's route, outcome, and timing, never its text. With the Mac unreachable, Siri
 uses the saved briefs with the existing saved-data warning. A daemon without
 `POST /v1/ask` still answers questions that name one project through that
 project's analyst, and gives the overview with an update reminder otherwise.

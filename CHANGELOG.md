@@ -1,5 +1,14 @@
 # Release notes
 
+## 1.0.3 (36) — 2026-10-10
+
+- Keep every Siri answer to two short lines with the most important update
+  first: open questions, project status and analysis, attention, and the
+  project list. Shortcuts still receive the full answer.
+- Recognize pluralized spoken project names, such as "slip sparks".
+- Log each spoken question's route, outcome, and timing on the Mac, without
+  the question text.
+
 ## 1.0.3 (35) — 2026-10-10
 
 - Ask RuntimeBrief anything through Siri in your own words: say "Ask

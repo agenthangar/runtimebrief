@@ -13,6 +13,7 @@ import {
   buildPortfolioEvidence,
   buildPortfolioPrompt,
   PORTFOLIO_SYSTEM_PROMPT,
+  VOICE_ANALYST_SYSTEM_PROMPT,
   type PortfolioAskProject,
 } from "../src/analyst/prompts.js";
 import { resolveProjectMentions } from "../src/analyst/projectMentions.js";
@@ -223,19 +224,30 @@ describe("interim answers", () => {
     );
   });
 
-  it("summarizes attention and activity across projects with scoped citations", () => {
+  it("summarizes attention and activity across projects in two sentences", () => {
     const projects = [
       entry("a", "Alpha", { state: "attention", headline: "Waiting for approval" }),
       entry("b", "Beta", { state: "active", headline: "Agent is editing" }),
       entry("c", "Gamma"),
     ];
     expect(portfolioInterim(projects, []).answer).toBe(
-      "You have 3 projects. 1 needs attention. Alpha: Waiting for approval. [git-commit-abc@a] " +
-        "Agents are active in Beta. [git-commit-abc@b]",
+      "1 project needs attention: Alpha. [git-commit-abc@a] Agents are working in Beta. [git-commit-abc@b]",
     );
-    expect(portfolioInterim(projects, [projects[2]!, projects[0]!]).answer).toBe(
+    expect(portfolioInterim(projects, [projects[2]!, projects[0]!, projects[1]!]).answer).toBe(
       "Gamma: Export checks passed. [git-commit-abc@c] Alpha: Waiting for approval. [git-commit-abc@a]",
     );
+    expect(portfolioInterim([entry("c", "Gamma")], []).answer).toBe("Nothing needs your attention across 1 project.");
+  });
+
+  it("names at most three attention projects however many there are", () => {
+    for (let count = 1; count <= 30; count++) {
+      const projects = Array.from({ length: count }, (_, i) => entry(`p${i}`, `P${i}`, { state: "attention" }));
+      const { answer } = portfolioInterim(projects, []);
+      const sentences = answer.replace(/\s*\[[^\]]+\]/g, "").split(/(?<=\.)\s+/);
+      expect(sentences.length, answer).toBeLessThanOrEqual(2);
+      expect((answer.match(/\bP\d+\b/g) ?? []).length).toBeLessThanOrEqual(3);
+      if (count > 3) expect(answer).toContain(`and ${count - 3} more.`);
+    }
   });
 });
 
@@ -246,11 +258,13 @@ describe("POST /v1/ask", () => {
   let calls: { systemPrompt: string; evidencePacket: string }[];
   let behavior: "answer" | "fail" | "hold";
   let release: () => void = () => {};
+  let logLines: string[];
 
   beforeAll(async () => {
     dir = tmpdir("ask-route");
     repos = [makeFixtureRepo(), makeFixtureRepo()];
     calls = [];
+    logLines = [];
     behavior = "answer";
     const config = testConfig({
       projects: [
@@ -275,7 +289,7 @@ describe("POST /v1/ask", () => {
     const analyst = createAnalystService(config, adapters, {
       runner, cache: new AnswerCache(path.join(dir, "cache.db")),
     });
-    app = buildServer({ config, adapters, analyst });
+    app = buildServer({ config, adapters, analyst, askLog: (line) => logLines.push(line) });
     await app.ready();
   });
 
@@ -309,7 +323,24 @@ describe("POST /v1/ask", () => {
       interim: null,
     });
     expect(calls.length).toBe(before + 1);
-    expect(calls.at(-1)!.systemPrompt).toContain("project-state analyst");
+    expect(calls.at(-1)!.systemPrompt).toBe(VOICE_ANALYST_SYSTEM_PROMPT);
+    expect(VOICE_ANALYST_SYSTEM_PROMPT).toContain("at most two short sentences");
+    expect(logLines.slice(-2)).toEqual([
+      expect.stringMatching(/^\[ask\] finished scope=project projects=fixture status=answered ms=\d+ cached=false$/),
+      expect.stringMatching(/^\[ask\] replied scope=project projects=fixture status=answered ms=\d+$/),
+    ]);
+  });
+
+  it("caches spoken answers apart from the app's longer answers", async () => {
+    const question = "Is the fixture app ready to release?";
+    await ask({ question });
+    const before = calls.length;
+    const appAnswer = await app.inject({
+      method: "POST", url: "/v1/projects/fixture/ask", headers: authHeaders(), payload: { question },
+    });
+    expect(appAnswer.json().cached).toBe(false);
+    expect(calls.length).toBe(before + 1);
+    expect(calls.at(-1)!.systemPrompt).not.toBe(VOICE_ANALYST_SYSTEM_PROMPT);
   });
 
   it("answers a question about no particular project across the portfolio", async () => {
@@ -338,7 +369,7 @@ describe("POST /v1/ask", () => {
     const pending = await ask({ question: "What did agents finish today?", waitMs: 20 });
     expect(pending.body.status).toBe("pending");
     expect(pending.body.answer).toBeNull();
-    expect(pending.body.interim?.answer).toMatch(/^You have 2 projects\./);
+    expect(pending.body.interim?.answer).toMatch(/^Nothing needs your attention across 2 projects\.|^\d+ projects? needs? attention/);
     const runs = calls.length;
     release();
     behavior = "answer";
@@ -352,6 +383,11 @@ describe("POST /v1/ask", () => {
     behavior = "fail";
     const { body } = await ask({ question: "Why did Orbit Tracker stall?" });
     behavior = "answer";
+    expect(logLines).toContain('[ask] finished scope=project projects=orbit status=failed ms=' +
+      /ms=(\d+)/.exec(logLines.find((line) => line.includes("projects=orbit status=failed"))!)![1] +
+      ' error="model unavailable"');
+    // Logs carry the route and outcome, never the question.
+    expect(logLines.join("\n")).not.toMatch(/stall|blocked|finish today/i);
     expect(body.status).toBe("failed");
     expect(body.scope).toBe("project");
     expect(body.interim?.answer).toEqual(expect.any(String));

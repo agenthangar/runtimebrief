@@ -22,8 +22,9 @@ enum ProjectMentionMatcher {
         return (meaningful.isEmpty ? all : meaningful).joined()
     }
 
-    /// IDs of the named projects in first-mention order. A longer name wins
-    /// over a shorter one it contains ("trail map web" is not "trail map").
+    /// IDs of the named projects in first-mention order. Names may be split,
+    /// joined, or pluralized; a longer name wins over a shorter one it
+    /// contains ("trail map web" is not "trail map").
     static func resolve(_ question: String, candidates: [(id: String, name: String)]) -> [String] {
         let words = tokens(question)
         var compacts: [(id: String, compact: String)] = []
@@ -39,8 +40,10 @@ enum ProjectMentionMatcher {
             var window = ""
             for size in 1...maxWindow where start + size <= words.count {
                 window += words[start + size - 1]
-                for candidate in compacts where candidate.compact == window {
-                    matches.append((candidate.id, start, start + size, window.count))
+                // Dictation often pluralizes a name: "slip sparks" for SlipSpark.
+                let singular = window.count > minCompactLength && window.hasSuffix("s") ? String(window.dropLast()) : nil
+                for candidate in compacts where candidate.compact == window || candidate.compact == singular {
+                    matches.append((candidate.id, start, start + size, candidate.compact.count))
                 }
             }
         }

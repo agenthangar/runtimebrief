@@ -20,6 +20,7 @@ import {
   buildPortfolioPrompt,
   DEFAULT_STATUS_QUESTION,
   PORTFOLIO_SYSTEM_PROMPT,
+  VOICE_ANALYST_SYSTEM_PROMPT,
   type PortfolioAskProject,
   type TranscriptDigestInput,
 } from "./prompts.js";
@@ -46,6 +47,7 @@ export interface AnalystService {
     projectId: string,
     question: string,
     callerSignal?: AbortSignal,
+    options?: AskOptions,
   ): AsyncGenerator<AnalystChunk>;
   /** Answers across projects from their briefs and latest analyses. */
   askPortfolio(
@@ -60,6 +62,11 @@ export interface AnalystService {
   latestStatus(projectId: string): LatestStatus | null;
   startBackgroundRefresh(): void;
   close(): void;
+}
+
+export interface AskOptions {
+  /** A spoken question: a two-sentence answer, cached apart from app answers. */
+  voice?: boolean;
 }
 
 export class ProjectNotFoundError extends Error {
@@ -105,7 +112,8 @@ export interface AnalystServiceOptions {
 export const DEFAULT_ANALYST_REQUEST_TIMEOUT_MS = 60_000;
 export const ANALYST_CACHE_BACKEND = "codex-cli";
 export const ANALYST_CACHE_PROMPT_VERSION = "runtimebrief-analyst-v2";
-export const PORTFOLIO_CACHE_PROMPT_VERSION = "runtimebrief-portfolio-v1";
+export const PORTFOLIO_CACHE_PROMPT_VERSION = "runtimebrief-portfolio-v2";
+export const VOICE_CACHE_PROMPT_VERSION = "runtimebrief-analyst-voice-v1";
 /** Cache rows for portfolio answers; registered project IDs never contain "*". */
 const PORTFOLIO_CACHE_ID = "*portfolio*";
 
@@ -253,6 +261,7 @@ export function createAnalystService(
     projectId: string,
     question: string,
     callerSignal?: AbortSignal,
+    askOptions: AskOptions = {},
   ): AsyncGenerator<AnalystChunk> {
     const project = projectsForConfig(config).find((p) => p.id === projectId);
     if (!project) throw new ProjectNotFoundError(projectId);
@@ -269,11 +278,11 @@ export function createAnalystService(
       question,
       prompt,
       evidence,
-      systemPrompt: ANALYST_SYSTEM_PROMPT,
-      promptVersion: ANALYST_CACHE_PROMPT_VERSION,
+      systemPrompt: askOptions.voice ? VOICE_ANALYST_SYSTEM_PROMPT : ANALYST_SYSTEM_PROMPT,
+      promptVersion: askOptions.voice ? VOICE_CACHE_PROMPT_VERSION : ANALYST_CACHE_PROMPT_VERSION,
       callerSignal,
       onAnswer: (answer, answerEvidence, createdAt) => {
-        if (question === DEFAULT_STATUS_QUESTION) {
+        if (question === DEFAULT_STATUS_QUESTION && !askOptions.voice) {
           cache.setLatestStatus(project.id, analystConfig.model, ANALYST_CACHE_PROMPT_VERSION,
             answer, answerEvidence, createdAt);
         }

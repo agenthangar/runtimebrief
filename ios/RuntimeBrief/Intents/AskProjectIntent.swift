@@ -42,7 +42,7 @@ struct AskProjectIntent: AppIntent {
                 projectID: project?.id,
                 dataSource: RuntimeBriefDataSourceFactory.current(timeout: 13)
             )
-            return .result(value: reply.text, dialog: IntentDialog(stringLiteral: reply.text),
+            return .result(value: reply.detail, dialog: IntentDialog(stringLiteral: reply.text),
                            view: StatusSnippetView(projectName: reply.title, branch: project?.branch, answer: reply.text))
         } catch {
             throw SiriIntentFailure(message: unreachableMessage(for: error))
