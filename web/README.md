@@ -54,6 +54,8 @@ still answer 401.
 
 - No Siri, Spotlight, or App Intents. Project discovery stays on iOS.
 - The daemon token lives in origin-scoped local storage, not the Keychain.
+- Settings pre-fills the origin that served the page. Task-retry identity
+  still uses the saved URL or `unconfigured` until you tap Save.
 - The terminal uses xterm.js instead of SwiftTerm.
 - Navigation is hash-based so the daemon does not grow a catch-all SPA route.
 

@@ -3,10 +3,13 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { App } from "../src/App";
 import { DemoClaudeTasks } from "../src/demo/demoClaudeTasks";
-import { RuntimeBriefModeStore } from "../src/networking/dataSource";
+import type { ClaudeLaunch, ConversationSnapshot } from "../src/models/claudeLaunch";
+import type { ProjectSummary } from "../src/models/types";
+import { RuntimeBriefModeStore, type RuntimeBriefDataSource } from "../src/networking/dataSource";
 import { AgentSessionsStore } from "../src/networking/agentSessionsStore";
 import { ProjectsStore } from "../src/networking/projectsStore";
 import { ServerSettingsStore } from "../src/networking/serverSettings";
+import { SessionConversationView } from "../src/views/SessionConversationView";
 import { SettingsView } from "../src/views/SettingsView";
 
 function resetSingletons(): void {
@@ -125,6 +128,27 @@ describe("first-launch demo", () => {
     expect(await screen.findByTestId("explore-demo")).toBeInTheDocument();
     expect(screen.queryByTestId("demo-data-banner")).not.toBeInTheDocument();
   });
+
+  it("keeps Explore Demo visible while a live refresh is in flight", async () => {
+    ServerSettingsStore.save("http://127.0.0.1:8484", "test-token");
+    vi.stubGlobal("fetch", () => new Promise(() => {}));
+    render(<App />);
+    expect(await screen.findByTestId("explore-demo")).toBeInTheDocument();
+    expect(screen.getByTestId("empty-state")).toBeInTheDocument();
+    expect(screen.queryByTestId("portfolio-brief-list")).not.toBeInTheDocument();
+  });
+
+  it("keeps Explore Demo visible after Exit Demo while refresh is in flight", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await enterDemo();
+    ServerSettingsStore.save("http://127.0.0.1:8484", "test-token");
+    vi.stubGlobal("fetch", () => new Promise(() => {}));
+    await user.click(screen.getByTestId("exit-demo"));
+    expect(await screen.findByTestId("explore-demo")).toBeInTheDocument();
+    expect(screen.getByTestId("empty-state")).toBeInTheDocument();
+    expect(screen.queryByTestId("portfolio-brief-list")).not.toBeInTheDocument();
+  });
 });
 
 describe("task composer and conversation", () => {
@@ -191,6 +215,91 @@ describe("task composer and conversation", () => {
     await user.click(within(conversation).getByTestId("session-conversation-send"));
     await waitFor(() => expect(conversation).toHaveTextContent("Demo received your response"));
     expect(conversation).toHaveTextContent("FOLLOW-UP-UI");
+  });
+
+  it("accepts a short Claude prompt and shows Ready to review", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await enterDemo();
+    await openSampleTracker();
+    await user.click(await screen.findByTestId("new-claude-task"));
+    const composer = await screen.findByTestId("task-composer");
+    await user.type(within(composer).getByTestId("claude-task-prompt"), "ok");
+    const start = within(composer).getByTestId("start-claude-task");
+    await waitFor(() => expect(start).toBeEnabled());
+    await user.click(start);
+    expect(await screen.findByText("Ready to review")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Continue in Claude" })).toBeInTheDocument();
+  });
+
+  it("freezes approval questions while a retry is pending", async () => {
+    const user = userEvent.setup();
+    const snapshot: ConversationSnapshot = {
+      state: "waiting",
+      message: "Needs a reply",
+      writable: true,
+      messages: [],
+      requests: [
+        {
+          id: "req-1",
+          title: "Which file?",
+          body: "Pick a path.",
+          options: [],
+          questions: [
+            { id: "q1", prompt: "File", options: [{ id: "a", label: "A" }, { id: "b", label: "B" }] },
+            { id: "q2", prompt: "Note", options: [] },
+          ],
+        },
+      ],
+    };
+    const source = {
+      conversation: async () => snapshot,
+      reply: async () => {
+        throw new Error("Delivery failed");
+      },
+    } as unknown as RuntimeBriefDataSource;
+    const project: ProjectSummary = {
+      id: "p",
+      name: "P",
+      lastActivityAt: null,
+      branch: "main",
+      dirty: false,
+      brief: null,
+    };
+    const launch: ClaudeLaunch = {
+      id: "launch-1",
+      projectId: "p",
+      name: "Task",
+      createdAt: new Date(),
+      state: "needs_input",
+      message: "Question waiting",
+      nativeId: "native",
+      sessionId: null,
+      cwd: "/tmp",
+      openedAt: null,
+      model: "default",
+      reasoningEffort: null,
+      effectiveReasoningEffort: null,
+      permissionMode: "manual",
+      backend: "native-codex",
+      tmuxTarget: null,
+      launchState: null,
+      activity: null,
+      requestedRemoteControl: true,
+      remoteControl: { state: "ready", url: null },
+      provider: "codex",
+    };
+    render(<SessionConversationView project={project} launch={launch} source={source} onDismiss={() => undefined} />);
+    const select = await screen.findByTestId("session-question-q1");
+    const input = screen.getByTestId("session-question-q2");
+    await user.selectOptions(select, "a");
+    await user.type(input, "note");
+    await user.click(screen.getByTestId("session-send-answers"));
+    expect(await screen.findByText("Delivery failed")).toBeInTheDocument();
+    expect(screen.getByText("Retry same response")).toBeInTheDocument();
+    expect(select).toBeDisabled();
+    expect(input).toBeDisabled();
+    expect(screen.getByTestId("session-send-answers")).toBeDisabled();
   });
 });
 

@@ -48,9 +48,12 @@ export function ProjectsListView() {
     } catch (error) {
       if (error instanceof Error && error.name === "CancellationError") return;
       const snapshot = ProjectsStore.shared.cachedSnapshot();
-      setProjects((current) => (current.length === 0 ? snapshot.projects : current));
+      setProjects((current) => {
+        const next = current.length === 0 ? snapshot.projects : current;
+        setShowingSavedBrief(next.length > 0);
+        return next;
+      });
       setLastSavedAt(snapshot.fetchedAt);
-      setShowingSavedBrief(snapshot.projects.length > 0);
       setErrorMessage(describeError(error));
     } finally {
       loading.current = false;
@@ -114,7 +117,9 @@ export function ProjectsListView() {
     </button>
   );
 
-  const showEmpty = projects.length === 0 && !isLoading;
+  // Keep the empty state up while a refresh is in flight so Exit Demo does
+  // not hide Explore Demo behind a blank loading list.
+  const showEmpty = projects.length === 0;
 
   return (
     <NavigationScreen title="RuntimeBrief" displayMode="large" trailing={trailing}>

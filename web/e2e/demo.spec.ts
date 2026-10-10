@@ -125,4 +125,35 @@ test.describe("offline demo", () => {
     await expect(conversation.getByText("Demo received your response")).toBeVisible();
     await expect(conversation.getByText("FOLLOW-UP-UI")).toBeVisible();
   });
+
+  test("Cursor conversation accepts a fictional follow-up", async ({ page }) => {
+    await enterDemo(page);
+    await page.getByTestId("project-link-demo-sample-tracker").click();
+    await page.getByTestId("new-claude-task").click();
+    const composer = page.getByTestId("task-composer");
+    await composer.getByTestId("session-provider-picker").selectOption("cursor");
+    await composer.getByTestId("claude-task-prompt").fill("x");
+    await expect(composer.getByTestId("start-claude-task")).toBeEnabled();
+    await composer.getByTestId("start-claude-task").click();
+
+    await page.getByTestId("open-session-conversation").click();
+    const conversation = page.getByTestId("session-conversation");
+    await expect(conversation).toBeVisible();
+    await conversation.getByTestId("session-conversation-input").fill("FOLLOW-UP-UI");
+    await conversation.getByTestId("session-conversation-send").click();
+    await expect(conversation.getByText("Demo received your response")).toBeVisible();
+    await expect(conversation.getByText("FOLLOW-UP-UI")).toBeVisible();
+  });
+
+  test("a short Claude demo task is ready to review", async ({ page }) => {
+    await enterDemo(page);
+    await page.getByTestId("project-link-demo-sample-tracker").click();
+    await page.getByTestId("new-claude-task").click();
+    const composer = page.getByTestId("task-composer");
+    await composer.getByTestId("claude-task-prompt").fill("ok");
+    await expect(composer.getByTestId("start-claude-task")).toBeEnabled();
+    await composer.getByTestId("start-claude-task").click();
+    await expect(page.getByText("Ready to review", { exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Continue in Claude" })).toBeVisible();
+  });
 });

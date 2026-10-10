@@ -125,7 +125,7 @@ export function SettingsView({ onDismiss }: { onDismiss: () => void }) {
                 autoCorrect="off"
                 autoComplete="off"
                 spellCheck={false}
-                placeholder="Paste the token from runtimebriefd init"
+                placeholder="Paste the token from `runtimebriefd init`"
                 value={token}
                 onChange={(event) => setToken(event.target.value)}
                 aria-label="Token"

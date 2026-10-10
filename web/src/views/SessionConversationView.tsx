@@ -127,8 +127,10 @@ export function SessionConversationView({
             </span>
           </div>
         ))}
-        {(snapshot?.requests ?? []).map((request) => (
-          <div key={request.id} className="request-card stack g10" aria-disabled={sending || retry !== null}>
+        {(snapshot?.requests ?? []).map((request) => {
+          const locked = sending || retry !== null;
+          return (
+          <div key={request.id} className="request-card stack g10" aria-disabled={locked}>
             <span className="t-headline">{request.title}</span>
             {request.body.length > 0 ? <span className="t-callout selectable prewrap">{request.body}</span> : null}
             {request.options.map((option) => (
@@ -136,7 +138,7 @@ export function SessionConversationView({
                 <button
                   type="button"
                   className="btn bordered"
-                  disabled={sending || retry !== null}
+                  disabled={locked}
                   onClick={() => void send({ requestId: uuidLowercase(), approvalId: request.id, optionId: option.id })}
                   data-testid={`session-decision-${option.id}`}
                 >
@@ -152,7 +154,9 @@ export function SessionConversationView({
                     className="text-field"
                     value={answers[question.id] ?? ""}
                     onChange={(event) => setAnswers((current) => ({ ...current, [question.id]: event.target.value }))}
+                    disabled={locked}
                     aria-label="Answer"
+                    data-testid={`session-question-${question.id}`}
                   >
                     <option value="">Choose…</option>
                     {question.options.map((option) => (
@@ -168,7 +172,9 @@ export function SessionConversationView({
                     placeholder="Your answer"
                     value={answers[question.id] ?? ""}
                     onChange={(event) => setAnswers((current) => ({ ...current, [question.id]: event.target.value }))}
+                    disabled={locked}
                     aria-label="Your answer"
+                    data-testid={`session-question-${question.id}`}
                   />
                 )}
               </div>
@@ -178,7 +184,7 @@ export function SessionConversationView({
                 <button
                   type="button"
                   className="btn bordered"
-                  disabled={sending || retry !== null || request.questions.some((question) => (answers[question.id] ?? "").length === 0)}
+                  disabled={locked || request.questions.some((question) => (answers[question.id] ?? "").length === 0)}
                   onClick={() =>
                     void send({
                       requestId: uuidLowercase(),
@@ -186,13 +192,15 @@ export function SessionConversationView({
                       answers: Object.fromEntries(request.questions.map((question) => [question.id, [answers[question.id] ?? ""]])),
                     })
                   }
+                  data-testid="session-send-answers"
                 >
                   Send answers
                 </button>
               </div>
             ) : null}
           </div>
-        ))}
+          );
+        })}
         {error ? <span className="c-red">{error}</span> : null}
         {retry ? (
           <div className="stack g8">

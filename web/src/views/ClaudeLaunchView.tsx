@@ -351,9 +351,7 @@ function ClaudeTaskComposer({
     if (sending || !isValid) return;
     setSending(true);
     setErrorMessage(null);
-    const scope = RuntimeBriefModeStore.isDemoEnabled
-      ? "demo"
-      : (ServerSettingsStore.load().baseURL ?? "unconfigured");
+    const scope = ServerSettingsStore.draftScope(RuntimeBriefModeStore.isDemoEnabled);
     const identity: SessionDraftIdentity = {
       projectID: project.id,
       scope,

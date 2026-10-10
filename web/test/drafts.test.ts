@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { makeMemoryStore } from "../src/lib/storage";
 import { ClaudeLaunchDraft, SessionLaunchDraft } from "../src/networking/drafts";
+import { ServerSettingsStore } from "../src/networking/serverSettings";
 
 // Parity with ios/RuntimeBriefTests/ClaudeLaunchTests.swift retry-identity cases
 describe("ClaudeLaunchDraft", () => {
@@ -87,5 +88,36 @@ describe("SessionLaunchDraft", () => {
       store,
     );
     expect(reasoning.requestId).not.toBe(legacy.requestId);
+  });
+});
+
+describe("ServerSettingsStore.draftScope", () => {
+  it("uses demo, the saved URL, or unconfigured — never the implicit page origin", () => {
+    const store = makeMemoryStore();
+    expect(ServerSettingsStore.draftScope(true, store)).toBe("demo");
+    expect(ServerSettingsStore.draftScope(false, store)).toBe("unconfigured");
+    expect(ServerSettingsStore.load(store).baseURL).not.toBeNull();
+    ServerSettingsStore.save("http://127.0.0.1:8484", "token", store);
+    expect(ServerSettingsStore.draftScope(false, store)).toBe("http://127.0.0.1:8484");
+    expect(ServerSettingsStore.draftScope(true, store)).toBe("demo");
+  });
+
+  it("keeps an unconfigured retry ID distinct from one keyed on the page origin", async () => {
+    const store = makeMemoryStore();
+    const implicit = ServerSettingsStore.load(store).baseURL;
+    expect(implicit).toBeTruthy();
+    const identity = {
+      projectID: "p",
+      scope: "unconfigured",
+      prompt: "Fix tests",
+      provider: "claude" as const,
+      model: "default",
+      permissionMode: "manual",
+      reasoningEffort: "default",
+      remoteControl: true,
+    };
+    const unconfigured = await SessionLaunchDraft.request(identity, store);
+    const originScoped = await SessionLaunchDraft.request({ ...identity, scope: implicit! }, store);
+    expect(originScoped.requestId).not.toBe(unconfigured.requestId);
   });
 });

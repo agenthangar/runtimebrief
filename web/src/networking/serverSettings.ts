@@ -59,6 +59,20 @@ export const ServerSettingsStore = {
     return settings.baseURL !== null && !!settings.token && settings.token.length > 0;
   },
 
+  /**
+   * URL the user saved. Does not fall back to the page origin. iOS draft
+   * identity uses the persisted address or "unconfigured".
+   */
+  persistedURL(store: KeyValueStore = defaultStore): string | null {
+    return store.get(URL_KEY);
+  },
+
+  /** Same retry-identity scope as iOS ClaudeTaskComposer.submit(). */
+  draftScope(isDemo: boolean, store: KeyValueStore = defaultStore): string {
+    if (isDemo) return "demo";
+    return store.get(URL_KEY) ?? "unconfigured";
+  },
+
   normalizeURL,
 };
 

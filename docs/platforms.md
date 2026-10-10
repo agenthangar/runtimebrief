@@ -28,6 +28,10 @@ Cursor, or the analyst.
   "Make Projects Discoverable" control.
 - **Token storage:** iOS uses the Keychain; the browser uses origin-scoped
   local storage. Settings copy on web says so.
+- **Settings URL:** iOS starts with an empty server field. The web app
+  pre-fills the origin that served the page because the daemon hosts the
+  client. Task-retry identity still uses the saved URL or `unconfigured`,
+  matching iOS, until the user taps Save.
 - **Routing:** iOS uses NavigationPath; web uses `#/` and `#/projects/<id>`
   so the daemon can keep an explicit static-file public surface.
 - **Terminal:** SwiftTerm on iOS, xterm.js on web.
