@@ -9,6 +9,9 @@ struct ProjectSummary: Codable, Identifiable, Hashable, Sendable {
     let branch: String?
     let dirty: Bool?
     let brief: ProjectBrief?
+    /// Other spellings Siri may hear, such as "Slip Spark" for "slipspark".
+    /// Older daemons omit it.
+    var spokenNames: [String]? = nil
 }
 
 struct ProjectCard: Codable, Sendable {

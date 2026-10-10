@@ -130,6 +130,12 @@ struct RuntimeBriefShortcuts: AppShortcutsProvider {
                 "Get the status of \(\.$project) using \(.applicationName)",
                 "Tell me a project's status from \(.applicationName)",
                 "Ask \(.applicationName) about \(\.$project)",
+                // One-sentence requests that start with the app name.
+                "Ask \(.applicationName) what's the status of \(\.$project)",
+                "Ask \(.applicationName) for the status of \(\.$project)",
+                "Ask \(.applicationName) how \(\.$project) is doing",
+                "Ask \(.applicationName) what's happening with \(\.$project)",
+                "Ask \(.applicationName) for an update on \(\.$project)",
                 "\(.applicationName) status for \(\.$project)",
             ],
             shortTitle: "Project Status",

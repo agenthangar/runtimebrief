@@ -106,6 +106,8 @@ final class SiriVoiceRoutingUITests: XCTestCase {
             "Get me the analysis of the project Sample Tracker from RuntimeBrief",
             "Give me the latest analysis of the project Sample Tracker from RuntimeBrief",
             "RuntimeBrief analysis for Sample Tracker",
+            "Ask RuntimeBrief what's the status of Sample Tracker",
+            "Ask RuntimeBrief how Sample Tracker is doing",
         ] {
             XCUIDevice.shared.siriService.activate(voiceRecognitionText: request)
             let initial = XCTAttachment(screenshot: XCUIScreen.main.screenshot())

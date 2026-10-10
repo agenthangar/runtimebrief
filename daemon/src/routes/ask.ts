@@ -146,7 +146,8 @@ export function registerAskRoutes(
   deps: ServerDeps,
   projectList: { get(): Promise<ProjectListEntry[]> },
 ) {
-  // Route, outcome, and timing only: never the question text.
+  // The owner's private daemon log: what Siri sent, where it went, and how
+  // it ended, so a misheard or failed question can be traced.
   const log = deps.askLog ?? ((line: string) => console.log(line));
   const jobs = new AskJobs();
   app.addHook("onClose", async () => jobs.close());
@@ -166,7 +167,9 @@ export function registerAskRoutes(
       .filter((project): project is ProjectListEntry => project !== undefined);
     const scope = named.length === 1 ? "project" : "portfolio";
 
-    const route = `scope=${scope} projects=${mentionedIds.join(",") || "-"}`;
+    const route =
+      `scope=${scope} projects=${mentionedIds.join(",") || "-"}` +
+      `${projectId ? " chosen=1" : ""} question=${JSON.stringify(question.slice(0, 300))}`;
     const key = JSON.stringify([scope, mentionedIds, question.toLowerCase().replace(/\s+/g, " ")]);
     const startedAt = Date.now();
     const job = jobs.run(key, (signal) => {

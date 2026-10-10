@@ -153,6 +153,39 @@
         }
       }
     },
+    "Ask ${applicationName} for an update on ${project}": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ask ${applicationName} for an update on ${project}"
+          }
+        }
+      }
+    },
+    "Ask ${applicationName} for the status of ${project}": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ask ${applicationName} for the status of ${project}"
+          }
+        }
+      }
+    },
+    "Ask ${applicationName} how ${project} is doing": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ask ${applicationName} how ${project} is doing"
+          }
+        }
+      }
+    },
     "Ask ${applicationName} something": {
       "extractionState": "manual",
       "localizations": {
@@ -160,6 +193,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ask ${applicationName} something"
+          }
+        }
+      }
+    },
+    "Ask ${applicationName} what's happening with ${project}": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ask ${applicationName} what's happening with ${project}"
+          }
+        }
+      }
+    },
+    "Ask ${applicationName} what's the status of ${project}": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ask ${applicationName} what's the status of ${project}"
           }
         }
       }

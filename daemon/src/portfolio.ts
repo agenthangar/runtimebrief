@@ -1,5 +1,6 @@
 import { FilesystemGitAdapter, type GitSummary } from "./adapters/filesystemGit.js";
 import { buildProjectBrief } from "./brief.js";
+import { spokenNames } from "./spokenNames.js";
 import type { IosReleaseProvider, IosReleaseSummary } from "./iosRelease.js";
 import type {
   EvidenceRef,
@@ -16,6 +17,8 @@ export type ProjectProvider = () => ProjectConfig[];
 export interface ProjectListEntry {
   id: string;
   name: string;
+  /** Other spellings of the name for speech recognition, e.g. "Slip Spark". */
+  spokenNames: string[];
   lastActivityAt: string | null;
   branch: string | null;
   dirty: boolean | null;
@@ -151,6 +154,7 @@ export class PortfolioService {
       entry: {
         id: project.id,
         name: project.name,
+        spokenNames: spokenNames(project.path, project.name),
         lastActivityAt: lastActivityAt(git, sessions),
         branch: git?.branch ?? null,
         dirty: git?.dirty ?? null,

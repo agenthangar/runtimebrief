@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 @testable import RuntimeBrief
 
@@ -38,6 +39,45 @@ struct EntityQueryTests {
         let entity = ProjectEntity(id: "sampletracker", name: "Sample Tracker")
         let spokenNames = entity.displayRepresentation.synonyms.map { String(localized: $0) }
         #expect(spokenNames.contains("the Sample Tracker app"))
+    }
+
+    private func summary(_ id: String, _ name: String, spoken: [String]? = nil) -> ProjectSummary {
+        ProjectSummary(id: id, name: name, lastActivityAt: nil, branch: nil, dirty: nil, brief: nil, spokenNames: spoken)
+    }
+
+    @Test func siriFindsAProjectByAnySpellingOrAMisheardName() {
+        let projects = [
+            summary("slipspark", "slipspark", spoken: ["Slip Spark", "SlipSpark"]),
+            summary("mealplanner", "Meal Planner"),
+            summary("sampletracker", "Sample Tracker"),
+        ]
+        for heard in ["SlipSpark", "Slip Spark", "slipspark", "the Slip Spark app", "slip park", "Slip Sparks"] {
+            #expect(ProjectQuery.matches(for: heard, in: projects).map(\.id) == ["slipspark"], "heard: \(heard)")
+        }
+        #expect(ProjectQuery.matches(for: "meal planer", in: projects).map(\.id) == ["mealplanner"])
+        #expect(ProjectQuery.matches(for: "spaceship", in: projects).isEmpty)
+        #expect(ProjectQuery.matches(for: "sky dark", in: projects).isEmpty)
+    }
+
+    @Test func spokenSpellingsJoinSiriVocabularyAndSurviveOlderDaemons() throws {
+        let entity = ProjectEntity(summary: summary("slipspark", "slipspark", spoken: ["Slip Spark", "SlipSpark"]))
+        let spokenNames = entity.displayRepresentation.synonyms.map { String(localized: $0) }
+        #expect(spokenNames.contains("Slip Spark"))
+        #expect(spokenNames.contains("the SlipSpark app"))
+        let current = try JSONDecoder.runtimeBrief.decode(ProjectSummary.self, from: Data(
+            #"{"id":"slipspark","name":"slipspark","spokenNames":["Slip Spark"],"lastActivityAt":null,"branch":null,"dirty":null}"#.utf8))
+        #expect(current.spokenNames == ["Slip Spark"])
+        let older = try JSONDecoder.runtimeBrief.decode(ProjectSummary.self, from: Data(
+            #"{"id":"slipspark","name":"slipspark","lastActivityAt":null,"branch":null,"dirty":null}"#.utf8))
+        #expect(older.spokenNames == nil)
+        #expect(ProjectEntity(summary: older).displayRepresentation.synonyms.count == 3)
+    }
+
+    @Test func editDistanceStopsAtItsLimit() {
+        #expect(ProjectMentionMatcher.editDistance("slippark", "slipspark", max: 1) == 1)
+        #expect(ProjectMentionMatcher.editDistance("slpispark", "slipspark", max: 1) == 1)
+        #expect(ProjectMentionMatcher.editDistance("skydark", "skyspark", max: 1) == 2)
+        #expect(ProjectMentionMatcher.editDistance("", "abc", max: 5) == 3)
     }
 
     @Test func noMatchReturnsEmpty() {

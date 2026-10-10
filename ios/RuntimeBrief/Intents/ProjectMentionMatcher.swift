@@ -7,6 +7,8 @@ enum ProjectMentionMatcher {
     private static let fillerWords: Set<String> = ["the", "app", "project"]
     private static let maxWindow = 5
     private static let minCompactLength = 3
+    /// Misheard names ("slip park" for SlipSpark) span at most this many words.
+    private static let maxFuzzyWindow = 3
     private static let wordCharacters = CharacterSet.letters.union(.decimalDigits)
 
     static func tokens(_ text: String) -> [String] {
@@ -22,8 +24,41 @@ enum ProjectMentionMatcher {
         return (meaningful.isEmpty ? all : meaningful).joined()
     }
 
+    /// Edits tolerated in a misheard name: none below six letters, one up to
+    /// nine, two from ten. The first letter must match.
+    static func allowedMishearing(_ length: Int) -> Int {
+        length >= 10 ? 2 : length >= 6 ? 1 : 0
+    }
+
+    /// Optimal string alignment distance, or `max + 1` once it exceeds `max`.
+    static func editDistance(_ lhs: String, _ rhs: String, max limit: Int) -> Int {
+        let a = Array(lhs), b = Array(rhs)
+        if abs(a.count - b.count) > limit { return limit + 1 }
+        if a.isEmpty || b.isEmpty { return Swift.min(Swift.max(a.count, b.count), limit + 1) }
+        var previous2: [Int] = []
+        var previous = Array(0...b.count)
+        for i in 1...a.count {
+            var current = [i]
+            var rowMinimum = i
+            for j in 1...b.count {
+                let cost = a[i - 1] == b[j - 1] ? 0 : 1
+                var value = Swift.min(previous[j] + 1, current[j - 1] + 1, previous[j - 1] + cost)
+                if i > 1, j > 1, a[i - 1] == b[j - 2], a[i - 2] == b[j - 1] {
+                    value = Swift.min(value, previous2[j - 2] + 1)
+                }
+                current.append(value)
+                rowMinimum = Swift.min(rowMinimum, value)
+            }
+            if rowMinimum > limit { return limit + 1 }
+            previous2 = previous
+            previous = current
+        }
+        return Swift.min(previous[b.count], limit + 1)
+    }
+
     /// IDs of the named projects in first-mention order. Names may be split,
-    /// joined, or pluralized; a longer name wins over a shorter one it
+    /// joined, pluralized, or slightly misheard ("slip park"). Exact matches
+    /// win over misheard ones, and a longer name over a shorter one it
     /// contains ("trail map web" is not "trail map").
     static func resolve(_ question: String, candidates: [(id: String, name: String)]) -> [String] {
         let words = tokens(question)
@@ -35,20 +70,46 @@ enum ProjectMentionMatcher {
                 compacts.append((candidate.id, compact))
             }
         }
-        var matches: [(id: String, start: Int, end: Int, length: Int)] = []
+        typealias Match = (id: String, start: Int, end: Int, length: Int, distance: Int)
+        var matches: [Match] = []
         for start in words.indices {
             var window = ""
             for size in 1...maxWindow where start + size <= words.count {
                 window += words[start + size - 1]
                 // Dictation often pluralizes a name: "slip sparks" for SlipSpark.
                 let singular = window.count > minCompactLength && window.hasSuffix("s") ? String(window.dropLast()) : nil
+                var exact = false
                 for candidate in compacts where candidate.compact == window || candidate.compact == singular {
-                    matches.append((candidate.id, start, start + size, candidate.compact.count))
+                    matches.append((candidate.id, start, start + size, candidate.compact.count, 0))
+                    exact = true
+                }
+                if exact || size > maxFuzzyWindow { continue }
+                // A misheard name counts only when exactly one project is closest.
+                var best = Int.max
+                var closest = Set<String>()
+                var closestLength = 0
+                for candidate in compacts {
+                    let allowed = allowedMishearing(candidate.compact.count)
+                    guard allowed > 0, candidate.compact.first == window.first else { continue }
+                    let distance = editDistance(window, candidate.compact, max: allowed)
+                    guard distance <= allowed, distance <= best else { continue }
+                    if distance < best {
+                        best = distance
+                        closest = []
+                    }
+                    closest.insert(candidate.id)
+                    closestLength = candidate.compact.count
+                }
+                if closest.count == 1, let id = closest.first {
+                    matches.append((id, start, start + size, closestLength, best))
                 }
             }
         }
-        matches.sort { $0.length != $1.length ? $0.length > $1.length : $0.start < $1.start }
-        var accepted: [(id: String, start: Int, end: Int, length: Int)] = []
+        matches.sort {
+            if $0.distance != $1.distance { return $0.distance < $1.distance }
+            return $0.length != $1.length ? $0.length > $1.length : $0.start < $1.start
+        }
+        var accepted: [Match] = []
         for match in matches where !accepted.contains(where: { match.start < $0.end && $0.start < match.end }) {
             accepted.append(match)
         }

@@ -88,7 +88,10 @@ time, deterministic brief headline and claims, and latest saved analysis with
 its evidence labels. The portfolio packet contains no transcripts or Git
 detail beyond those saved briefs and analyses. Siri sends the dictated question
 text to the daemon over the paired connection; the daemon keeps recent answers
-in memory for ten minutes and in its answer cache for the configured TTL.
+in memory for ten minutes and in its answer cache for the configured TTL. The
+daemon's private log (`~/.runtimebrief/logs`) records each spoken question's
+text (up to 300 characters), the projects it was routed to, its outcome,
+timing, and any failure reason, so misheard or failed questions can be traced.
 
 The isolated process ignores user configuration and repository rules, disables
 unapproved features plus MCP and dynamic tools, turns off local history

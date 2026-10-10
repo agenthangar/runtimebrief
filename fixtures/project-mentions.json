@@ -36,6 +36,18 @@
     {
       "id": "draft",
       "name": "Draft"
+    },
+    {
+      "id": "skyspark",
+      "name": "SkySpark"
+    },
+    {
+      "id": "moonbase",
+      "name": "Moon Base"
+    },
+    {
+      "id": "moonvase",
+      "name": "Moon Vase"
     }
   ],
   "cases": [
@@ -156,6 +168,54 @@
       "expected": [
         "trail-map-web"
       ]
+    },
+    {
+      "question": "What's the status of sky park?",
+      "expected": [
+        "skyspark"
+      ]
+    },
+    {
+      "question": "How is skyspark doing?",
+      "expected": [
+        "skyspark"
+      ]
+    },
+    {
+      "question": "Is the sky dark?",
+      "expected": []
+    },
+    {
+      "question": "Did the wether widget update?",
+      "expected": [
+        "weather-widget"
+      ]
+    },
+    {
+      "question": "what's new in recipe bax",
+      "expected": [
+        "recipe-box"
+      ]
+    },
+    {
+      "question": "is trail mop deployed",
+      "expected": [
+        "trail-map"
+      ]
+    },
+    {
+      "question": "status of moon base",
+      "expected": [
+        "moonbase"
+      ]
+    },
+    {
+      "question": "status of moon case",
+      "expected": []
+    },
+    {
+      "question": "Is the orbet build done?",
+      "expected": []
     }
   ]
 }

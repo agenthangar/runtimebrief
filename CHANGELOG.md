@@ -1,5 +1,15 @@
 # Release notes
 
+## 1.0.3 (37) — 2026-10-10
+
+- Find a project whose name Siri mishears slightly, such as "slip park" for
+  SlipSpark, when only one project is that close.
+- Teach Siri each app's own spelling from its Xcode project, such as
+  "SlipSpark" and "Slip Spark" for a folder named `slipspark`.
+- Answer one-sentence requests such as "Ask RuntimeBrief what's the status of
+  SlipSpark" without a follow-up question.
+- Record the question Siri sent in the Mac's private daemon log.
+
 ## 1.0.3 (36) — 2026-10-10
 
 - Keep every Siri answer to two short lines with the most important update

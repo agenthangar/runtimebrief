@@ -16,13 +16,20 @@ import {
   VOICE_ANALYST_SYSTEM_PROMPT,
   type PortfolioAskProject,
 } from "../src/analyst/prompts.js";
-import { resolveProjectMentions } from "../src/analyst/projectMentions.js";
+import {
+  allowedMishearing,
+  compactName,
+  editDistance,
+  resolveProjectMentions,
+} from "../src/analyst/projectMentions.js";
 import { portfolioInterim, projectInterim, type AskResponse } from "../src/routes/ask.js";
 import type { ProjectListEntry } from "../src/portfolio.js";
+import { spokenNames } from "../src/spokenNames.js";
 import type { EvidenceRef, ProjectBrief } from "../src/types.js";
 import { authHeaders, makeFixtureRepo, testConfig, tmpdir } from "./helpers.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
+const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 interface MentionFixture {
   projects: { id: string; name: string }[];
@@ -46,6 +53,45 @@ describe("spoken question project routing", () => {
         expect(resolveProjectMentions(question, fixture.projects), question).toEqual([project.id]);
       }
     }
+  });
+});
+
+describe("misheard project names", () => {
+  const fixture = JSON.parse(
+    fs.readFileSync(path.join(here, "../../fixtures/project-mentions.json"), "utf8"),
+  ) as MentionFixture;
+
+  it("never selects a different project for any one-letter mishearing", () => {
+    const letters = "abcdefghijklmnopqrstuvwxyz";
+    // A variant that spells another project exactly names that project.
+    const exactNames = new Set(fixture.projects.flatMap((p) => [compactName(p.name), compactName(p.id)]));
+    let resolved = 0;
+    for (const project of fixture.projects) {
+      const name = compactName(project.name);
+      if (allowedMishearing(name.length) === 0) continue;
+      const variants = new Set<string>();
+      for (let i = 1; i < name.length; i++) {
+        variants.add(name.slice(0, i) + name.slice(i + 1));
+        for (const letter of letters) variants.add(name.slice(0, i) + letter + name.slice(i + 1));
+      }
+      for (const variant of variants) {
+        if (exactNames.has(variant)) continue;
+        const ids = resolveProjectMentions(`how is ${variant} doing`, fixture.projects);
+        expect(ids.filter((id) => id !== project.id), `${variant} for ${project.id}`).toEqual([]);
+        if (ids.length === 1) resolved++;
+      }
+    }
+    expect(resolved).toBeGreaterThan(500);
+  });
+
+  it("measures edits with an early cutoff", () => {
+    expect(editDistance("slippark", "slipspark", 1)).toBe(1);
+    expect(editDistance("slpispark", "slipspark", 1)).toBe(1);
+    expect(editDistance("skydark", "skyspark", 1)).toBe(2);
+    expect(editDistance("a", "abcdef", 2)).toBe(3);
+    expect(allowedMishearing(5)).toBe(0);
+    expect(allowedMishearing(9)).toBe(1);
+    expect(allowedMishearing(10)).toBe(2);
   });
 });
 
@@ -204,8 +250,29 @@ describe("analyst portfolio answers", () => {
 });
 
 function entry(id: string, name: string, overrides: Partial<ProjectBrief> = {}): ProjectListEntry {
-  return { id, name, lastActivityAt: null, branch: "main", dirty: false, brief: brief(overrides) };
+  return { id, name, spokenNames: [], lastActivityAt: null, branch: "main", dirty: false, brief: brief(overrides) };
 }
+
+describe("spoken project names", () => {
+  it("offers the Xcode spelling of a lowercase folder name, and nothing else", () => {
+    const root = tmpdir("spoken");
+    try {
+      const make = (...parts: string[]) => fs.mkdirSync(path.join(root, ...parts), { recursive: true });
+      make("slipspark", "SlipSpark.xcodeproj");
+      make("slipspark", "SlipSpark.xcworkspace");
+      make("runtimebrief", "ios", "RuntimeBrief.xcodeproj");
+      make("spice", "SpiceSort.xcodeproj");
+      make("plain", "Plain.xcodeproj");
+      expect(spokenNames(path.join(root, "slipspark"), "slipspark")).toEqual(["Slip Spark", "SlipSpark"]);
+      expect(spokenNames(path.join(root, "runtimebrief"), "runtimebrief")).toEqual(["Runtime Brief", "RuntimeBrief"]);
+      expect(spokenNames(path.join(root, "spice"), "Spice Sorter")).toEqual([]);
+      expect(spokenNames(path.join(root, "plain"), "Plain")).toEqual([]);
+      expect(spokenNames(path.join(root, "missing"), "missing")).toEqual([]);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+});
 
 describe("interim answers", () => {
   it("prefers the latest completed project analysis", () => {
@@ -325,9 +392,10 @@ describe("POST /v1/ask", () => {
     expect(calls.length).toBe(before + 1);
     expect(calls.at(-1)!.systemPrompt).toBe(VOICE_ANALYST_SYSTEM_PROMPT);
     expect(VOICE_ANALYST_SYSTEM_PROMPT).toContain("at most two short sentences");
+    const route = 'scope=project projects=fixture question="Is the fixture app branch merged yet?"';
     expect(logLines.slice(-2)).toEqual([
-      expect.stringMatching(/^\[ask\] finished scope=project projects=fixture status=answered ms=\d+ cached=false$/),
-      expect.stringMatching(/^\[ask\] replied scope=project projects=fixture status=answered ms=\d+$/),
+      expect.stringMatching(new RegExp(`^\\[ask\\] finished ${escapeRegExp(route)} status=answered ms=\\d+ cached=false$`)),
+      expect.stringMatching(new RegExp(`^\\[ask\\] replied ${escapeRegExp(route)} status=answered ms=\\d+$`)),
     ]);
   });
 
@@ -383,11 +451,10 @@ describe("POST /v1/ask", () => {
     behavior = "fail";
     const { body } = await ask({ question: "Why did Orbit Tracker stall?" });
     behavior = "answer";
-    expect(logLines).toContain('[ask] finished scope=project projects=orbit status=failed ms=' +
-      /ms=(\d+)/.exec(logLines.find((line) => line.includes("projects=orbit status=failed"))!)![1] +
-      ' error="model unavailable"');
-    // Logs carry the route and outcome, never the question.
-    expect(logLines.join("\n")).not.toMatch(/stall|blocked|finish today/i);
+    const failure = logLines.find((line) => line.startsWith("[ask] finished") && line.includes("status=failed"));
+    expect(failure).toMatch(
+      /^\[ask\] finished scope=project projects=orbit question="Why did Orbit Tracker stall\?" status=failed ms=\d+ error="model unavailable"$/,
+    );
     expect(body.status).toBe("failed");
     expect(body.scope).toBe("project");
     expect(body.interim?.answer).toEqual(expect.any(String));

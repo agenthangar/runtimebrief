@@ -111,8 +111,16 @@ of an open question is the full answer.
 The daemon waits up to eight seconds for an answer. A slower answer continues
 on the Mac: Siri says it is still checking, gives the most important saved
 update, and asks the person to repeat the question in a minute, which then
-returns the finished answer without another model run. The daemon log records
-each question's route, outcome, and timing, never its text. With the Mac unreachable, Siri
+returns the finished answer without another model run. The daemon's private
+log records each question as Siri sent it, with its route, outcome, and timing.
+
+Project names may be split, joined, pluralized, or slightly misheard: "slip
+park" finds SlipSpark when no other project is as close and the first letter
+matches. Each project also offers Siri other spellings of its name taken from
+its Xcode project, so a folder named `slipspark` is also "SlipSpark" and "Slip
+Spark". One-sentence status requests such as "Ask RuntimeBrief what's the
+status of SlipSpark" need no follow-up; any other question still starts with
+"Ask RuntimeBrief" because a shortcut phrase cannot carry free text. With the Mac unreachable, Siri
 uses the saved briefs with the existing saved-data warning. A daemon without
 `POST /v1/ask` still answers questions that name one project through that
 project's analyst, and gives the overview with an update reminder otherwise.

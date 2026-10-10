@@ -232,7 +232,7 @@ All endpoints require `Authorization: Bearer <token>` and are rate-limited to
 | Endpoint | Description |
 | --- | --- |
 | `GET /v1/health` | Daemon version and uptime |
-| `GET /v1/projects` | Deterministic portfolio entries and evidence |
+| `GET /v1/projects` | Deterministic portfolio entries and evidence, with `spokenNames` (other spellings for speech) |
 | `GET /v1/projects/:id` | Git, agent lifecycle, brief, and iOS release details |
 | `GET /v1/projects/:id/status` | On-demand analyst status answer |
 | `GET /v1/projects/:id/voice-status` | Latest completed analysis, returned immediately; queues a refresh when missing or old |
