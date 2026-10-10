@@ -1,0 +1,13 @@
+{
+  "name": "RuntimeBrief",
+  "short_name": "RuntimeBrief",
+  "description": "Evidence-backed project updates from your Mac's repositories and coding agents.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f2f2f7",
+  "theme_color": "#f2f2f7",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

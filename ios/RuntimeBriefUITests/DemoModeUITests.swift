@@ -86,9 +86,14 @@ final class DemoModeUITests: XCTestCase {
 
         app.navigationBars.buttons.firstMatch.tap()
         let exitDemo = app.buttons["exit-demo"]
-        XCTAssertTrue(exitDemo.waitForExistence(timeout: 5))
+        XCTAssertTrue(exitDemo.waitForExistence(timeout: 10))
         exitDemo.tap()
-        XCTAssertTrue(app.buttons["explore-demo"].waitForExistence(timeout: 5))
+        // Match the first-launch wait. Exit Demo kicks a live refresh that can
+        // briefly stall on Spotlight maintenance on the hosted simulator.
+        XCTAssertTrue(
+            app.buttons["explore-demo"].waitForExistence(timeout: 10),
+            "Exit Demo should return to the first-launch empty state."
+        )
     }
 
     @MainActor

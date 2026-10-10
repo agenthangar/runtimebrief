@@ -15,6 +15,7 @@ import {
   type RuntimeBriefConfig,
 } from "./config.js";
 import { VERSION, startServer } from "./server.js";
+import { resolveWebRoot } from "./routes/web.js";
 import { defaultAdapters } from "./adapters/index.js";
 import { createAnalystService } from "./analyst/index.js";
 import { IosReleaseService } from "./iosRelease.js";
@@ -241,8 +242,11 @@ async function cmdStart(allowAll: boolean): Promise<void> {
   const launches = new LaunchService(config, new NativeClaudeProvider(), new LaunchStore(),
     new NativeSessionBackend("claude"),
     [new NativeSessionBackend("codex"), new NativeSessionBackend("cursor")]);
+  const webRoot = config.server.web_app === false
+    ? null
+    : resolveWebRoot(typeof config.server.web_app === "string" ? config.server.web_app : undefined);
   const app = await startServer(
-    { config, adapters, analyst, iosReleases, decisions, launches },
+    { config, adapters, analyst, iosReleases, decisions, launches, webRoot },
     { allowAllInterfaces: allowAll },
   );
   launches.providers();
@@ -251,6 +255,11 @@ async function cmdStart(allowAll: boolean): Promise<void> {
     `runtimebriefd ${VERSION} listening on http://${config.server.host}:${config.server.port} ` +
       `(${projectsForConfig(config).length} projects)`,
   );
+  if (webRoot) {
+    console.log(`Serving the RuntimeBrief web app from ${webRoot}`);
+  } else if (config.server.web_app !== false) {
+    console.log("Web app not served: build it with `npm run build` in web/ or set server.web_app in config.");
+  }
   const shutdown = async () => {
     await app.close();
     process.exit(0);

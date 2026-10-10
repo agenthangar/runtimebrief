@@ -2,17 +2,19 @@
 
 RuntimeBrief turns local repository and coding-agent activity into short,
 evidence-backed project updates. A self-hosted daemon on your Mac collects the
-facts; the iOS app, Siri, ChatGPT, or Codex can show what changed, what is still
-in progress, and what needs your attention.
+facts; the iOS app, the web app, Siri, ChatGPT, or Codex can show what changed,
+what is still in progress, and what needs your attention.
 
 > *"Hey Siri, what's the state of the sample tracker app?"*
 >
 > *"The shopping-list work landed this morning and all 12 tests pass. A Codex
 > session is still working on export; nothing is waiting for you."*
 
-The daemon and plugin are built from source. The iOS app can also be built
-from source; maintainers distribute internal TestFlight builds. See the
-[release notes](CHANGELOG.md) for changes and build compatibility.
+The daemon, web app, and plugin are built from source. The iOS app can also
+be built from source; maintainers distribute internal TestFlight builds. See
+the [release notes](CHANGELOG.md) for changes and build compatibility. The
+[platform map](docs/platforms.md) lists active clients and intentional
+differences.
 
 ## What you get
 
@@ -24,6 +26,8 @@ from source; maintainers distribute internal TestFlight builds. See the
 - Native Claude Code, Codex, and Cursor tasks, with model and permission
   choices, native project sessions, and phone continuation.
 - Local Xcode metadata plus optional read-only App Store Connect status.
+- A same-origin web app served by the daemon, matching the iOS portfolio and
+  task surfaces in any browser.
 - Siri access through the iOS app and local MCP tools for ChatGPT and Codex.
 - No RuntimeBrief account, hosted relay, or analytics SDK.
 
@@ -31,10 +35,11 @@ from source; maintainers distribute internal TestFlight builds. See the
 
 ```text
                                       Mac
-iPhone / Siri ── tailnet-only HTTPS + bearer ─▶ Tailscale Serve
-                                                   │ loopback HTTP
-                                                   ▼
-                                          runtimebriefd REST/SSE
+iPhone / Siri / browser ── tailnet-only HTTPS + bearer ─▶ Tailscale Serve
+                                                             │ loopback HTTP
+                                                             ▼
+                                                    runtimebriefd REST/SSE
+                                                    (+ static web app)
 
 ChatGPT / Codex ──── local MCP over stdio ─────▶ runtimebriefd mcp
                                                    │
@@ -75,7 +80,7 @@ You need macOS and Node 22 or newer. Optional on-demand analyst answers require
 exactly [Codex CLI](https://learn.chatgpt.com/docs/codex/cli) 0.156.1, installed
 separately and signed in to ChatGPT with `codex login`. RuntimeBrief rejects
 other CLI versions until their capability surface has been reviewed;
-deterministic portfolio and MCP read tools work without Codex. An iPhone and a
+deterministic portfolio and MCP read tools work without Codex. An iPhone, a browser, and a
 private network such as Tailscale are optional.
 
 ### 1. Install the daemon
@@ -138,9 +143,13 @@ the same URL with `:443` appended. Serve remains private to your tailnet and
 supplies the certificate required by iOS App Transport Security. Do not use
 Tailscale Funnel or expose the daemon directly to the public internet.
 
-See [ios/README.md](ios/README.md) to generate and build the iOS project. Enter
-the server address and daemon token in Settings. **Test Connection** verifies
-both daemon health and usable project data; tap **Save** after it succeeds.
+See [ios/README.md](ios/README.md) to generate and build the iOS project, or
+[web/README.md](web/README.md) to build the browser client. Enter the server
+address and daemon token in Settings. **Test Connection** verifies both daemon
+health and usable project data; tap **Save** after it succeeds. The same Serve
+URL can open the web app when `web/dist` is present (`server.web_app` defaults
+to `true`). The browser stores the token in that origin's local storage; iOS
+keeps it in the Keychain.
 The app refreshes when it becomes active and supports pull to refresh. If a
 refresh fails, the saved brief stays visible with the error. See
 [connection troubleshooting](ios/README.md#connection-and-refresh-troubleshooting).
@@ -224,8 +233,10 @@ launch tasks.
 
 ## API
 
-All endpoints require `Authorization: Bearer <token>` and are rate-limited to
-30 requests per minute.
+All `/v1` endpoints require `Authorization: Bearer <token>` and are rate-limited
+to 30 requests per minute. When `server.web_app` is enabled and `web/dist`
+exists, the daemon also exposes the built HTML, hashed assets, and icons as
+explicit public static routes. Unknown paths still answer 401.
 
 | Endpoint | Description |
 | --- | --- |
@@ -272,6 +283,7 @@ whether a model sentence semantically interprets the cited record correctly.
 server:
   host: 127.0.0.1
   port: 8484
+  # web_app: true   # serve sibling web/dist; a path, or false for API-only
 auth:
   token_hash: scrypt:…
 # New tasks use direct native Claude Code, Codex App Server, and Cursor ACP.
@@ -315,7 +327,9 @@ daemon token share the same project scope.
 ## Security and privacy
 
 - The daemon defaults to loopback and authenticates every API route with a
-  random bearer token stored only as a scrypt hash.
+  random bearer token stored only as a scrypt hash. The iOS app keeps that
+  token in the Keychain; the web app keeps it in the page origin's local
+  storage. Static web files are the only public routes.
 - The analyst is Codex CLI-only: one pinned 0.156.1 `codex app-server --stdio
   --strict-config` process per request on macOS. RuntimeBrief sends filtered
   evidence only after same-process auth, config, requirements, thread,
@@ -350,6 +364,11 @@ cd daemon
 npm test
 npm run build
 scripts/smoke-analyst.sh   # optional; needs ChatGPT login and a running daemon
+
+cd ../web
+npm test
+npm run test:e2e           # Playwright Chromium; offline demo only
+npm run build
 ```
 
 Automated analyst tests use a fake Codex process and never make a hosted model

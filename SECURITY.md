@@ -18,8 +18,10 @@ RuntimeBrief is designed for a user-controlled Mac and private network:
   API endpoint. Alternate wildcard spellings and hostnames that resolve to a
   wildcard address are refused unless the explicit override is supplied; a
   hostname is resolved once and the validated numeric address is bound.
-- The plaintext token is shown once, stored in the iOS Keychain, and retained
-  by the daemon only as a scrypt hash.
+- The plaintext token is shown once, stored in the iOS Keychain or the web
+  app's origin-scoped local storage, and retained by the daemon only as a
+  scrypt hash. The daemon serves only the static web files that exist at
+  startup as public routes; `/v1` and unknown paths still require the token.
 - The macOS-only analyst backend invokes exactly Codex CLI 0.156.1 as a fresh
   `codex app-server --stdio --strict-config` process for every request. It uses
   separate temporary workspace, user-home, and Codex-home directories, ignores
@@ -81,9 +83,9 @@ RuntimeBrief is designed for a user-controlled Mac and private network:
   context is constructed. Filtering reduces risk but is not a substitute for
   reviewing which repositories and transcripts are made available.
 - Plain HTTP must be used only over loopback or a trusted local network. For
-  iOS access over Tailscale, keep the daemon on loopback and use Tailscale
-  Serve for tailnet-only HTTPS. Never use Funnel or expose the daemon directly
-  to the public internet or an untrusted network.
+  iOS or web access over Tailscale, keep the daemon on loopback and use
+  Tailscale Serve for tailnet-only HTTPS. Never use Funnel or expose the
+  daemon directly to the public internet or an untrusted network.
 
 The Codex CLI sends selected repository and agent-session context to its remote
 service for scheduled background analysis and explicit questions. Siri and the

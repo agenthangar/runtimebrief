@@ -1,10 +1,13 @@
 # Testing without model usage
 
-Ordinary daemon and iOS tests use mocks. Run `npm test` in `daemon`; its Node
-preload rejects installed Claude, Codex, Cursor, and native-worker subprocesses.
-iOS demo and transport tests create fictional receipts only. The retired live
-XCTest launch flags no longer create sessions. HTTP fixture tests require
-`RUNTIMEBRIEF_E2E_MOCK=1` and must point at an isolated mock server.
+Ordinary daemon, web, and iOS tests use mocks. Run `npm test` in `daemon`; its
+Node preload rejects installed Claude, Codex, Cursor, and native-worker
+subprocesses. Run `npm test` in `web` for unit and component tests, and
+`npm run test:e2e` for the Playwright Chromium demo flow. Those suites never
+start a daemon or coding agent. iOS demo and transport tests create fictional
+receipts only. The retired live XCTest launch flags no longer create sessions.
+HTTP fixture tests require `RUNTIMEBRIEF_E2E_MOCK=1` and must point at an
+isolated mock server.
 
 ## Native release checks
 

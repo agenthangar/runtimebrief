@@ -27,6 +27,9 @@ app preferences. That snapshot can include project identifiers and names,
 branches, briefs, attention state, and evidence labels. It stores the daemon
 bearer token in the iOS Keychain. Siri and App Shortcuts may receive project
 names needed to resolve RuntimeBrief requests under Apple's platform behavior.
+The web app stores the same address, snapshot, and token in this origin's
+local storage because a browser has no Keychain. Clearing site data for that
+origin removes them. The web client has no Siri or system-search integration.
 For coding-agent launches, app preferences also keep an opaque request ID indexed by
 a fingerprint of the server, project, and task, so a retry can avoid duplicate
 dispatch. The app does not persist the task text in this retry record.
@@ -168,13 +171,17 @@ Keychain items can survive uninstall. Clear the saved daemon token in the app
 before uninstalling when possible, or remove the item through the operating
 system or a new installation using the same Keychain access group.
 
+Clearing the web app's site data, or using the browser's site settings for
+the daemon origin, removes the stored URL, token, and saved brief. That does
+not stop the daemon or remove `~/.runtimebrief`.
+
 ## User choices
 
 Users choose which projects or parent directories the daemon may inspect and
 may stop it at any time. Trusting a project root opts in every current and
 future non-hidden direct child Git repository under that root. Users also
 choose whether to install and sign in to Codex CLI, configure App Store Connect
-access, use an iOS client or Tailscale, or connect an MCP client.
+access, use an iOS or web client or Tailscale, or connect an MCP client.
 Coding-agent launches are enabled by default for these registered projects. Setting
 `claude_launch_enabled: false` for a project blocks new launches and continuation writes
 requests after daemon restart; it does not stop

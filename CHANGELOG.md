@@ -1,5 +1,15 @@
 # Release notes
 
+## Unreleased
+
+- Add a browser client that mirrors the iOS portfolio, project detail,
+  Settings, task composer, conversation, and terminal surfaces, including the
+  offline demo. Siri, Spotlight, and App Intents stay on iOS.
+- Serve the built web app from the daemon origin (`server.web_app`, default
+  on when `web/dist` exists) so a phone or desktop browser can use the same
+  Tailscale Serve URL as the iOS app. Only the static files present at boot
+  are public; `/v1` and unknown paths stay bearer-authed.
+
 ## 1.0.2 (19) — 2026-09-30
 
 - Select Claude, Codex, and Cursor models from each native harness catalog.
