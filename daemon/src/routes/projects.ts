@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import type { ServerDeps } from "../server.js";
 import { projectsForConfig } from "../projectRegistry.js";
-import { PortfolioService } from "../portfolio.js";
+import { PortfolioService, type ProjectListEntry } from "../portfolio.js";
 
 /** The portfolio scans local Git trees and agent transcripts. Share one scan
  * across simultaneous clients and serve a recent complete result while the
@@ -45,7 +45,11 @@ export class ProjectListCache<T> {
   }
 }
 
-export function registerProjectRoutes(app: FastifyInstance, deps: ServerDeps) {
+/** Returns the shared project list so other routes reuse the same scan. */
+export function registerProjectRoutes(
+  app: FastifyInstance,
+  deps: ServerDeps,
+): ProjectListCache<ProjectListEntry[]> {
   const portfolio = new PortfolioService(
     () => projectsForConfig(deps.config),
     deps.adapters,
@@ -64,4 +68,6 @@ export function registerProjectRoutes(app: FastifyInstance, deps: ServerDeps) {
     if (!project) return reply.code(404).send({ error: "not_found" });
     return project;
   });
+
+  return projectList;
 }

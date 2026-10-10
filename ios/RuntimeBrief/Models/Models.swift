@@ -184,6 +184,32 @@ struct VoiceStatus: Codable, Sendable, Equatable {
     let unavailable: Bool
 }
 
+/// `POST /v1/ask`: a free-form question, answered for one named project or
+/// across the portfolio, or saved evidence while the answer is unavailable.
+struct AskResponse: Codable, Sendable, Equatable {
+    enum Status: String, Codable, Sendable { case answered, pending, failed }
+    enum Scope: String, Codable, Sendable { case project, portfolio }
+
+    struct NamedProject: Codable, Sendable, Equatable {
+        let id: String
+        let name: String
+    }
+
+    struct Interim: Codable, Sendable, Equatable {
+        let answer: String
+        let evidence: [EvidenceRef]
+        let analyzedAt: Date?
+    }
+
+    let status: Status
+    let scope: Scope
+    let projects: [NamedProject]
+    let answer: String?
+    let evidence: [EvidenceRef]
+    let cached: Bool
+    let interim: Interim?
+}
+
 struct HealthInfo: Codable, Sendable {
     let version: String
     let uptime: Int

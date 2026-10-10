@@ -88,6 +88,17 @@
         }
       }
     },
+    "Ask ${applicationName}": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ask ${applicationName}"
+          }
+        }
+      }
+    },
     "Ask ${applicationName} a question": {
       "localizations": {
         "en": {
@@ -120,6 +131,39 @@
         }
       }
     },
+    "Ask ${applicationName} about my agents": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ask ${applicationName} about my agents"
+          }
+        }
+      }
+    },
+    "Ask ${applicationName} about my projects": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ask ${applicationName} about my projects"
+          }
+        }
+      }
+    },
+    "Ask ${applicationName} something": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ask ${applicationName} something"
+          }
+        }
+      }
+    },
     "Can you tell me the status of the ${project} app from ${applicationName}": {
       "extractionState": "stale",
       "localizations": {
@@ -138,6 +182,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Catch me up on ${project} using ${applicationName}"
+          }
+        }
+      }
+    },
+    "Check with ${applicationName}": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Check with ${applicationName}"
           }
         }
       }
@@ -357,6 +412,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "How is ${project} doing in ${applicationName}"
+          }
+        }
+      }
+    },
+    "I have a question for ${applicationName}": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "I have a question for ${applicationName}"
           }
         }
       }
@@ -653,6 +719,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Start Cursor with ${applicationName}"
+          }
+        }
+      }
+    },
+    "Talk to ${applicationName}": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Talk to ${applicationName}"
           }
         }
       }

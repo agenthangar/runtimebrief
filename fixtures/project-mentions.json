@@ -1,0 +1,34 @@
+{
+  "description": "Spoken-question project routing. The daemon and the iOS app both run every case.",
+  "projects": [
+    { "id": "sample-tracker", "name": "Sample Tracker" },
+    { "id": "catalog", "name": "Catalog Builder" },
+    { "id": "weather-widget", "name": "Weather Widget" },
+    { "id": "recipe-box", "name": "Recipe Box App" },
+    { "id": "orbit", "name": "Orbit" },
+    { "id": "trail-map", "name": "Trail Map" },
+    { "id": "trail-map-web", "name": "Trail Map Web" },
+    { "id": "ai", "name": "AI" },
+    { "id": "draft", "name": "Draft" }
+  ],
+  "cases": [
+    { "question": "Is anything blocked?", "expected": [] },
+    { "question": "", "expected": [] },
+    { "question": "Did the Sample Tracker checks pass?", "expected": ["sample-tracker"] },
+    { "question": "what's claude doing on sampletracker", "expected": ["sample-tracker"] },
+    { "question": "How is the Sample-Tracker app doing?", "expected": ["sample-tracker"] },
+    { "question": "SAMPLE TRACKER?", "expected": ["sample-tracker"] },
+    { "question": "sample tracker versus sample tracker", "expected": ["sample-tracker"] },
+    { "question": "Compare Weather Widget and Catalog Builder", "expected": ["weather-widget", "catalog"] },
+    { "question": "what's new in catalog", "expected": ["catalog"] },
+    { "question": "What changed in Trail Map Web today?", "expected": ["trail-map-web"] },
+    { "question": "Is trail map deployed?", "expected": ["trail-map"] },
+    { "question": "Did Orbit's build pass?", "expected": ["orbit"] },
+    { "question": "Explain orbital mechanics", "expected": [] },
+    { "question": "recipebox status", "expected": ["recipe-box"] },
+    { "question": "status of the recipe box app", "expected": ["recipe-box"] },
+    { "question": "what can ai do for me", "expected": [] },
+    { "question": "What is Codex drafting right now?", "expected": [] },
+    { "question": "Which agents are working on weather widget or trail map?", "expected": ["weather-widget", "trail-map"] }
+  ]
+}

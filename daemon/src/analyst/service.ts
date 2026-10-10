@@ -16,7 +16,11 @@ import {
   ANALYST_SYSTEM_PROMPT,
   buildAnalystEvidence,
   buildAnalystPrompt,
+  buildPortfolioEvidence,
+  buildPortfolioPrompt,
   DEFAULT_STATUS_QUESTION,
+  PORTFOLIO_SYSTEM_PROMPT,
+  type PortfolioAskProject,
   type TranscriptDigestInput,
 } from "./prompts.js";
 import {
@@ -43,8 +47,17 @@ export interface AnalystService {
     question: string,
     callerSignal?: AbortSignal,
   ): AsyncGenerator<AnalystChunk>;
+  /** Answers across projects from their briefs and latest analyses. */
+  askPortfolio(
+    question: string,
+    projects: PortfolioAskProject[],
+    mentionedIds?: readonly string[],
+    callerSignal?: AbortSignal,
+  ): AsyncGenerator<AnalystChunk>;
   statusQuestion: string;
   voiceStatus(projectId: string): { status: LatestStatus | null; refreshing: boolean; unavailable: boolean };
+  /** The latest completed status analysis, without queueing a refresh. */
+  latestStatus(projectId: string): LatestStatus | null;
   startBackgroundRefresh(): void;
   close(): void;
 }
@@ -92,6 +105,9 @@ export interface AnalystServiceOptions {
 export const DEFAULT_ANALYST_REQUEST_TIMEOUT_MS = 60_000;
 export const ANALYST_CACHE_BACKEND = "codex-cli";
 export const ANALYST_CACHE_PROMPT_VERSION = "runtimebrief-analyst-v2";
+export const PORTFOLIO_CACHE_PROMPT_VERSION = "runtimebrief-portfolio-v1";
+/** Cache rows for portfolio answers; registered project IDs never contain "*". */
+const PORTFOLIO_CACHE_ID = "*portfolio*";
 
 /**
  * Do not surface uncited model assertions as project facts. A line with no
@@ -248,26 +264,68 @@ export function createAnalystService(
     ]);
     const prompt = buildAnalystPrompt(question, project.name, git, transcripts, iosRelease);
     const evidence = buildAnalystEvidence(git, transcripts, undefined, iosRelease);
+    yield* runAnalysis({
+      cacheProjectId: project.id,
+      question,
+      prompt,
+      evidence,
+      systemPrompt: ANALYST_SYSTEM_PROMPT,
+      promptVersion: ANALYST_CACHE_PROMPT_VERSION,
+      callerSignal,
+      onAnswer: (answer, answerEvidence, createdAt) => {
+        if (question === DEFAULT_STATUS_QUESTION) {
+          cache.setLatestStatus(project.id, analystConfig.model, ANALYST_CACHE_PROMPT_VERSION,
+            answer, answerEvidence, createdAt);
+        }
+      },
+    });
+  }
+
+  async function* askPortfolio(
+    question: string,
+    projects: PortfolioAskProject[],
+    mentionedIds: readonly string[] = [],
+    callerSignal?: AbortSignal,
+  ): AsyncGenerator<AnalystChunk> {
+    yield* runAnalysis({
+      cacheProjectId: PORTFOLIO_CACHE_ID,
+      question,
+      prompt: buildPortfolioPrompt(question, projects, mentionedIds),
+      evidence: buildPortfolioEvidence(projects),
+      systemPrompt: PORTFOLIO_SYSTEM_PROMPT,
+      promptVersion: PORTFOLIO_CACHE_PROMPT_VERSION,
+      callerSignal,
+    });
+  }
+
+  async function* runAnalysis(request: {
+    cacheProjectId: string;
+    question: string;
+    prompt: string;
+    evidence: EvidenceRef[];
+    systemPrompt: string;
+    promptVersion: string;
+    callerSignal: AbortSignal | undefined;
+    onAnswer?: (answer: string, evidence: EvidenceRef[], createdAt: number) => void;
+  }): AsyncGenerator<AnalystChunk> {
+    const { cacheProjectId, question, prompt, evidence, callerSignal, onAnswer } = request;
     const firstSectionEnd = prompt.indexOf("\n\n");
     const filteredEvidenceForCache =
       firstSectionEnd === -1 ? prompt : prompt.slice(firstSectionEnd + 2);
     const cacheIdentity = {
       backend: ANALYST_CACHE_BACKEND,
       model: analystConfig.model,
-      promptVersion: ANALYST_CACHE_PROMPT_VERSION,
+      promptVersion: request.promptVersion,
       evidenceHash: AnswerCache.evidenceHash(filteredEvidenceForCache),
     };
     const cached = cache.get(
-      project.id,
+      cacheProjectId,
       question,
       cacheIdentity,
       analystConfig.cache_ttl_minutes,
     );
     if (cached) {
-      if (question === DEFAULT_STATUS_QUESTION) {
-        cache.setLatestStatus(project.id, analystConfig.model, ANALYST_CACHE_PROMPT_VERSION,
-          cached.answer, cached.evidence, cached.createdAt);
-      }
+      onAnswer?.(cached.answer, cached.evidence, cached.createdAt);
       yield { type: "text", text: cached.answer };
       yield {
         type: "done",
@@ -297,7 +355,7 @@ export function createAnalystService(
     try {
       const events = runner({
         evidencePacket: prompt,
-        systemPrompt: ANALYST_SYSTEM_PROMPT,
+        systemPrompt: request.systemPrompt,
         model: analystConfig.model,
         signal: abort.signal,
       });
@@ -323,13 +381,8 @@ export function createAnalystService(
 
     if (answer.length > 0) {
       const analyzedAt = Date.now();
-      cache.set(project.id, question, cacheIdentity, answer, evidence, analyzedAt);
-      if (question === DEFAULT_STATUS_QUESTION) {
-        cache.setLatestStatus(project.id, analystConfig.model, ANALYST_CACHE_PROMPT_VERSION,
-          answer, evidence, analyzedAt);
-      }
-    }
-    if (answer.length > 0) {
+      cache.set(cacheProjectId, question, cacheIdentity, answer, evidence, analyzedAt);
+      onAnswer?.(answer, evidence, analyzedAt);
       yield { type: "text", text: answer };
     }
     // Codex CLI uses the user's ChatGPT plan and does not expose a dollar cost.
@@ -398,5 +451,13 @@ export function createAnalystService(
     refreshQueue.length = 0;
   }
 
-  return { ask, statusQuestion: DEFAULT_STATUS_QUESTION, voiceStatus, startBackgroundRefresh, close };
+  return {
+    ask,
+    askPortfolio,
+    statusQuestion: DEFAULT_STATUS_QUESTION,
+    voiceStatus,
+    latestStatus: latest,
+    startBackgroundRefresh,
+    close,
+  };
 }

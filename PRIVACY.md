@@ -82,6 +82,13 @@ user's question and project name; Git branch, status, commits, authors,
 messages, timestamps, filenames, diff and TODO counts; session identifiers,
 sources, states, titles, prompts, final reports, file paths, tool counts, and
 timestamps; and iOS bundle, version, build, TestFlight, or App Store status.
+A question that names no single project instead uses a portfolio packet: the
+question, and for each registered project its name, ID, branch, last-activity
+time, deterministic brief headline and claims, and latest saved analysis with
+its evidence labels. The portfolio packet contains no transcripts or Git
+detail beyond those saved briefs and analyses. Siri sends the dictated question
+text to the daemon over the paired connection; the daemon keeps recent answers
+in memory for ten minutes and in its answer cache for the configured TTL.
 
 The isolated process ignores user configuration and repository rules, disables
 unapproved features plus MCP and dynamic tools, turns off local history

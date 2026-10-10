@@ -84,10 +84,31 @@ personal signing change local; do not commit it or change the production
 | Needs attention | What needs attention in RuntimeBrief? | Project entities |
 | List projects | List my RuntimeBrief projects | Project entities |
 | Open project | Open Sample Tracker in RuntimeBrief | Opens project detail |
-| Ask the analyst | Ask RuntimeBrief a question about Sample Tracker | Answer text |
+| Ask anything | Ask RuntimeBrief, then any question, such as "What needs my attention?" or "Did the Sample Tracker checks pass?" | Answer text |
+| Ask about one project | Ask RuntimeBrief a question about Sample Tracker, then the question | Answer text |
 | Start coding session | Start a new coding agent for Sample Tracker from RuntimeBrief | Session receipt ID |
 | Start a named agent | Start Codex for Sample Tracker from RuntimeBrief; also Claude or Cursor | Session receipt ID |
 | Start with spoken follow-ups | RuntimeBrief start Codex, then name the project and task | Session receipt ID |
+
+**Ask RuntimeBrief** is the open-ended entry point. A spoken shortcut phrase
+cannot contain free text, so Siri replies "What do you want to know?" and the
+next sentence can be any question in the person's own words. Other entry
+phrases include "I have a question for RuntimeBrief", "Talk to RuntimeBrief",
+and "Ask RuntimeBrief about my agents". The app sends the dictated question to
+`POST /v1/ask`. The daemon finds any registered project the question names,
+including joined or split names such as "sampletracker" or "sample tracker".
+A question naming one project goes to that project's analyst; any other
+question goes to the portfolio analyst, which reads every project's brief and
+latest saved analysis. Siri speaks the answer without evidence IDs and names
+the project it is about.
+
+The daemon waits up to eight seconds for an answer. A slower answer continues
+on the Mac: Siri speaks the latest saved analysis or portfolio overview, says
+so, and asks the person to repeat the question in a minute, which then returns
+the finished answer without another model run. With the Mac unreachable, Siri
+uses the saved briefs with the existing saved-data warning. A daemon without
+`POST /v1/ask` still answers questions that name one project through that
+project's analyst, and gives the overview with an update reminder otherwise.
 
 **Start Coding Session** supports Claude Code, Codex, and Cursor through the
 same native adapters and `/sessions` API as the app. Requests can use agent,
@@ -139,7 +160,8 @@ explicit saved-data warning and timestamp. Authentication and configuration
 failures stop the action instead of returning cached data.
 
 Answers include a Siri card and reusable Shortcuts values. Asking a question
-remains an explicit analyst action. Existing custom actions work on iOS 26;
+remains an explicit analyst action; the Shortcuts action takes a question and
+an optional project. Existing custom actions work on iOS 26;
 iOS 27 also exposes the system opening schema. Project rows and detail views
 provide entity context for requests about visible content.
 

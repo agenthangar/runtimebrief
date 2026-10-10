@@ -12,6 +12,8 @@ enum RuntimeBriefError: Error, LocalizedError, Equatable {
     case timeout
     case launch(String)
     case projectRefresh(String)
+    /// The connected daemon predates an endpoint this request needs.
+    case unsupportedServer
 
     var errorDescription: String? {
         switch self {
@@ -37,6 +39,8 @@ enum RuntimeBriefError: Error, LocalizedError, Equatable {
             return message
         case .projectRefresh(let detail):
             return "Connected to your Mac, but project data couldn't load. \(detail)"
+        case .unsupportedServer:
+            return "Update RuntimeBrief on your Mac to use this."
         }
     }
 }
@@ -173,6 +177,25 @@ struct RuntimeBriefClient: Sendable {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try JSONEncoder().encode(["question": question])
         let (data, response) = try await perform(request)
+        try check(response)
+        return try decode(data)
+    }
+
+    /// Any spoken question. The daemon routes it to one project or the whole
+    /// portfolio and waits at most `waitMs` before returning saved evidence.
+    func askAnything(question: String, projectID: String?, waitMs: Int) async throws -> AskResponse {
+        struct Body: Encodable { let question: String; let projectId: String?; let waitMs: Int }
+        struct Failure: Decodable { let error: String? }
+        var request = try makeRequest(path: "/v1/ask")
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONEncoder().encode(Body(question: question, projectId: projectID, waitMs: waitMs))
+        let (data, response) = try await perform(request)
+        // An unknown project is {"error":"not_found"}; an older daemon has no route.
+        if (response as? HTTPURLResponse)?.statusCode == 404,
+           (try? JSONDecoder().decode(Failure.self, from: data))?.error != "not_found" {
+            throw RuntimeBriefError.unsupportedServer
+        }
         try check(response)
         return try decode(data)
     }

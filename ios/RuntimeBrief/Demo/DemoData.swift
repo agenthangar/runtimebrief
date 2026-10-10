@@ -60,6 +60,26 @@ enum DemoData {
         )
     }
 
+    /// Fictional answer to any spoken question, routed like the daemon's.
+    static func askResponse(question: String, projectID: String?) throws -> AskResponse {
+        let ids = projectID.map { [$0] }
+            ?? ProjectMentionMatcher.resolve(question, candidates: projects.map { ($0.id, $0.name) })
+        let named = try ids.map { id -> AskResponse.NamedProject in
+            let card = try card(id: id)
+            return AskResponse.NamedProject(id: card.id, name: card.name)
+        }
+        if named.count == 1 {
+            let answer = try analystAnswer(projectID: named[0].id, question: question)
+            return AskResponse(status: .answered, scope: .project, projects: named, answer: answer.answer,
+                               evidence: answer.evidence ?? [], cached: true, interim: nil)
+        }
+        return AskResponse(
+            status: .answered, scope: .portfolio, projects: named,
+            answer: "This is a fictional demo response. Catalog Builder needs your attention for a copy decision, Sample Tracker's export validation is ready to review, and Weather Widget is quiet. [demo-evidence-commit-001]",
+            evidence: [commitEvidence], cached: true, interim: nil
+        )
+    }
+
     private static var sampleTrackerSummary: ProjectSummary {
         ProjectSummary(
             id: projectID,
@@ -336,6 +356,10 @@ struct DemoRuntimeBriefDataSource: RuntimeBriefDataSource {
 
     func ask(projectID: String, question: String) async throws -> AnalystAnswer {
         try DemoData.analystAnswer(projectID: projectID, question: question)
+    }
+
+    func askAnything(question: String, projectID: String?) async throws -> AskResponse {
+        try DemoData.askResponse(question: question, projectID: projectID)
     }
 
     func streamStatus(projectID: String) -> AsyncThrowingStream<AnalystStreamEvent, Error> {

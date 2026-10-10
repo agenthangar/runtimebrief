@@ -70,6 +70,15 @@ final class SiriIntegrationUITests: XCTestCase {
             .makeIntent(project: project, question: "Did the checks pass?").run()
         let answer: String = try answerResult.value
         XCTAssertTrue(answer.contains("fictional demo response"))
+
+        // An open question without a chosen project: the named project is
+        // found in the words, and anything else is answered for every project.
+        let ask = definitions.intents["AskProjectIntent"]
+        let routed: String = try await ask.makeIntent(question: "Did the Sample Tracker checks pass?").run().value
+        XCTAssertTrue(routed.hasPrefix("Sample Tracker: This is a fictional demo response"), routed)
+        let portfolio: String = try await ask.makeIntent(question: "What needs my attention?").run().value
+        XCTAssertTrue(portfolio.contains("Catalog Builder needs your attention"), portfolio)
+        XCTAssertFalse(portfolio.contains("[demo-evidence-"))
     }
 
     @MainActor

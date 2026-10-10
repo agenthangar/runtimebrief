@@ -135,14 +135,24 @@ struct RuntimeBriefShortcuts: AppShortcutsProvider {
             shortTitle: "Project Status",
             systemImageName: "shippingbox"
         )
+        // The open-ended entry point. A spoken phrase cannot carry free text,
+        // so Siri asks "What do you want to know?" and the daemon interprets
+        // the answer, including any project it names.
         AppShortcut(
             intent: AskProjectIntent(),
             phrases: [
+                "Ask \(.applicationName)",
                 "Ask \(.applicationName) a question",
+                "Ask \(.applicationName) something",
+                "I have a question for \(.applicationName)",
+                "Talk to \(.applicationName)",
+                "Check with \(.applicationName)",
+                "Ask \(.applicationName) about my projects",
+                "Ask \(.applicationName) about my agents",
                 "Ask \(.applicationName) a question about \(\.$project)",
                 "Question \(.applicationName) about \(\.$project)",
             ],
-            shortTitle: "Ask About Project",
+            shortTitle: "Ask RuntimeBrief",
             systemImageName: "questionmark.bubble"
         )
         AppShortcut(

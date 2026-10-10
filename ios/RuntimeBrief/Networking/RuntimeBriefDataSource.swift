@@ -8,6 +8,7 @@ protocol RuntimeBriefDataSource: Sendable {
     func status(projectID: String) async throws -> AnalystAnswer
     func voiceStatus(projectID: String) async throws -> VoiceStatus
     func ask(projectID: String, question: String) async throws -> AnalystAnswer
+    func askAnything(question: String, projectID: String?) async throws -> AskResponse
     func claudeLaunches(projectID: String) async throws -> ClaudeLaunchList
     func startClaude(projectID: String, request: ClaudeLaunchRequest) async throws -> ClaudeLaunch
     func agentProviders() async throws -> AgentProviderList
@@ -78,6 +79,12 @@ struct LiveRuntimeBriefDataSource: RuntimeBriefDataSource {
         try await client.ask(projectID: projectID, question: question)
     }
 
+    func askAnything(question: String, projectID: String?) async throws -> AskResponse {
+        // Leave time for the round trip within the request timeout.
+        let waitMs = max(0, min(8_000, Int((client.timeout - 4) * 1_000)))
+        return try await client.askAnything(question: question, projectID: projectID, waitMs: waitMs)
+    }
+
     func streamStatus(projectID: String) -> AsyncThrowingStream<AnalystStreamEvent, Error> {
         client.streamStatus(projectID: projectID)
     }
@@ -125,6 +132,7 @@ enum RuntimeBriefDataSourceFactory {
 }
 
 extension RuntimeBriefDataSource {
+    func askAnything(question: String, projectID: String?) async throws -> AskResponse { throw RuntimeBriefError.unsupportedServer }
     func agentProviders() async throws -> AgentProviderList { throw RuntimeBriefError.notFound }
     func agentModels(projectID: String, provider: AgentProvider) async throws -> AgentCapability { throw RuntimeBriefError.notFound }
     func conversation(projectID: String, launchID: String) async throws -> ConversationSnapshot { throw RuntimeBriefError.notFound }

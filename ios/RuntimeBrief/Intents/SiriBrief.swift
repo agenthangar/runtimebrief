@@ -40,25 +40,35 @@ enum SiriBrief {
             }
             return "I'm preparing an analysis for \(project.name). The current brief says: \(headline) Ask me again shortly."
         }
-        let lines = EvidencePresentation.text(answer, evidence: status.evidence).split(separator: "\n").map { line in
+        let text = spoken(answer, evidence: status.evidence)
+        let analyzedAge = age(of: analyzedAt)
+        let refreshNote: String
+        if status.unavailable { refreshNote = " I couldn't refresh it right now." }
+        else if status.refreshing { refreshNote = " I'm refreshing the analysis now." }
+        else { refreshNote = "" }
+        return "\(project.name), analyzed \(analyzedAge). \(text)\(refreshNote)"
+    }
+
+    /// An analyst answer as one spoken paragraph: no evidence IDs, and the
+    /// status labels read as sentence openings.
+    static func spoken(_ answer: String, evidence: [EvidenceRef]) -> String {
+        let lines = EvidencePresentation.text(answer, evidence: evidence).split(separator: "\n").map { line in
             String(line)
                 .trimmingCharacters(in: .whitespacesAndNewlines)
                 .replacingOccurrences(of: #"^Done:\s*"#, with: "Recently, ", options: [.regularExpression, .caseInsensitive])
                 .replacingOccurrences(of: #"^Now:\s*"#, with: "Currently, ", options: [.regularExpression, .caseInsensitive])
                 .replacingOccurrences(of: #"^Next:\s*"#, with: "Next, ", options: [.regularExpression, .caseInsensitive])
         }.filter { !$0.isEmpty }
-        let spoken = lines.map { $0.hasSuffix(".") ? $0 : $0 + "." }.joined(separator: " ")
-        let elapsed = max(0, Date().timeIntervalSince(analyzedAt))
-        let age: String
-        if elapsed < 60 * 5 { age = "just now" }
-        else if elapsed < 60 * 60 { age = "\(Int(elapsed / 60)) minutes ago" }
-        else if elapsed < 24 * 60 * 60 { age = "\(Int(elapsed / 3600)) hours ago" }
-        else { age = dateText(analyzedAt) }
-        let refreshNote: String
-        if status.unavailable { refreshNote = " I couldn't refresh it right now." }
-        else if status.refreshing { refreshNote = " I'm refreshing the analysis now." }
-        else { refreshNote = "" }
-        return "\(project.name), analyzed \(age). \(spoken)\(refreshNote)"
+        return lines.map { $0.hasSuffix(".") || $0.hasSuffix("?") || $0.hasSuffix("!") ? $0 : $0 + "." }
+            .joined(separator: " ")
+    }
+
+    static func age(of date: Date, now: Date = Date()) -> String {
+        let elapsed = max(0, now.timeIntervalSince(date))
+        if elapsed < 60 * 5 { return "just now" }
+        if elapsed < 60 * 60 { return "\(Int(elapsed / 60)) minutes ago" }
+        if elapsed < 24 * 60 * 60 { return "\(Int(elapsed / 3600)) hours ago" }
+        return dateText(date)
     }
 
     static func attentionProjects(_ projects: [ProjectSummary]) -> [ProjectSummary] {

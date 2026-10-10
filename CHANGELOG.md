@@ -1,5 +1,16 @@
 # Release notes
 
+## 1.0.2 (35) — 2026-10-10
+
+- Ask RuntimeBrief anything through Siri in your own words: say "Ask
+  RuntimeBrief", then the question. A question that names a project is
+  answered by that project's analyst; anything else is answered across all
+  projects from their briefs and latest analyses.
+- Add `POST /v1/ask`. Slow answers keep running on the Mac while Siri speaks
+  the latest saved analysis; repeating the question returns the finished answer.
+- Keep older daemons usable: questions naming one project still reach its
+  analyst, and other questions get the overview with an update reminder.
+
 ## 1.0.2 (19) — 2026-09-30
 
 - Select Claude, Codex, and Cursor models from each native harness catalog.
