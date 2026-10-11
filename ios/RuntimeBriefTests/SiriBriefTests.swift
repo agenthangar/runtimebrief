@@ -109,7 +109,7 @@ struct SiriBriefTests {
         let next = "Review the crash fix. [session-codex-1]"
         // Every combination of known and unknown Done/Now/Next lines.
         for mask in 0..<8 {
-            let parts = [("Done", done, "Recently, Shipped"), ("Now", now, "Currently, An agent"), ("Next", next, "Next, Review")]
+            let parts = [("Done", done, "Recently, Shipped"), ("Now", now, "Currently, an agent"), ("Next", next, "Next, Review")]
             let lines = parts.enumerated().map { index, part in "\(part.0): " + (mask & (1 << index) != 0 ? part.1 : unknown) }
             let spoken = SiriBrief.voice(lines.joined(separator: "\n"), evidence: [])
             let expected = parts.enumerated().filter { mask & (1 << $0.offset) != 0 }.map(\.element.2).prefix(2)
