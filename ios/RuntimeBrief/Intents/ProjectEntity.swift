@@ -98,7 +98,7 @@ struct ProjectQuery: EntityStringQuery, EnumerableEntityQuery {
         }
         var ids = ProjectFuzzyMatcher.rank(query: string, candidates: spellings)
         if ids.isEmpty {
-            ids = ProjectMentionMatcher.resolve(string, candidates: projects.map { ($0.id, $0.name) })
+            ids = ProjectMentionMatcher.resolve(string, candidates: SiriQuestion.mentionCandidates(projects))
         }
         var seen = Set<String>()
         return ids.filter { seen.insert($0).inserted }.compactMap { id in projects.first { $0.id == id } }

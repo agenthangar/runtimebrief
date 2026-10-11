@@ -9,6 +9,8 @@
 export interface MentionCandidate {
   id: string;
   name: string;
+  /** Other names for the project, such as configured spoken names. */
+  aliases?: readonly string[];
 }
 
 /** Words that people add around a project name without it changing. */
@@ -82,9 +84,17 @@ export function resolveProjectMentions(
   question: string,
   projects: readonly MentionCandidate[],
 ): string[] {
+  return analyzeMentions(question, projects).ids;
+}
+
+/** The named projects, plus the question's words outside those names. */
+export function analyzeMentions(
+  question: string,
+  projects: readonly MentionCandidate[],
+): { ids: string[]; otherWords: string[] } {
   const words = mentionTokens(question);
   const candidates = projects.flatMap((project) =>
-    [...new Set([compactName(project.name), compactName(project.id)])]
+    [...new Set([project.name, project.id, ...(project.aliases ?? [])].map(compactName))]
       .filter((compact) => compact.length >= MIN_COMPACT_LENGTH)
       .map((compact) => ({ id: project.id, compact })),
   );
@@ -131,5 +141,8 @@ export function resolveProjectMentions(
     accepted.push(match);
   }
   accepted.sort((a, b) => a.start - b.start);
-  return [...new Set(accepted.map((match) => match.id))];
+  return {
+    ids: [...new Set(accepted.map((match) => match.id))],
+    otherWords: words.filter((_, index) => !accepted.some((match) => index >= match.start && index < match.end)),
+  };
 }

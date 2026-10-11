@@ -1,5 +1,5 @@
 {
-  "description": "Spoken-question project routing. The daemon and the iOS app both run every case.",
+  "description": "Spoken-question project routing. The daemon and the iOS app both run every case. Aliases are configured spoken names.",
   "projects": [
     {
       "id": "sample-tracker",
@@ -48,6 +48,13 @@
     {
       "id": "moonvase",
       "name": "Moon Vase"
+    },
+    {
+      "id": "ledger",
+      "name": "Mystic Ledger",
+      "aliases": [
+        "Misty Letter"
+      ]
     }
   ],
   "cases": [
@@ -216,6 +223,18 @@
     {
       "question": "Is the orbet build done?",
       "expected": []
+    },
+    {
+      "question": "status of misty letter",
+      "expected": [
+        "ledger"
+      ]
+    },
+    {
+      "question": "how is mystic ledger doing",
+      "expected": [
+        "ledger"
+      ]
     }
   ]
 }

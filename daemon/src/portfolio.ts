@@ -154,7 +154,7 @@ export class PortfolioService {
       entry: {
         id: project.id,
         name: project.name,
-        spokenNames: spokenNames(project.path, project.name),
+        spokenNames: [...new Set([...(project.spoken_names ?? []), ...spokenNames(project.path, project.name)])],
         lastActivityAt: lastActivityAt(git, sessions),
         branch: git?.branch ?? null,
         dirty: git?.dirty ?? null,

@@ -75,7 +75,7 @@ enum SiriBrief {
         let chosen: [String]
         if !labeled.isEmpty {
             let known = leads.compactMap { label, lead in
-                labeled[label].flatMap { isUnknown($0) ? nil : lead + $0 }
+                labeled[label].flatMap { isUnknown($0) ? nil : lead + continuing($0) }
             }
             chosen = known.isEmpty ? ["Unknown from available evidence."] : Array(known.prefix(maxLines))
         } else {
@@ -87,6 +87,18 @@ enum SiriBrief {
     static func sentences(_ text: String) -> [String] {
         text.replacingOccurrences(of: #"(?<=[.!?])\s+(?=[A-Z0-9"“])"#, with: "\n", options: .regularExpression)
             .split(separator: "\n").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+    }
+
+    /// "Recently, the latest session…": a sentence opener that follows the
+    /// spoken lead is lowercased; names and acronyms keep their case.
+    private static let continuingOpeners: Set<String> = [
+        "A", "All", "An", "Both", "Each", "It", "Its", "Most", "No", "Nothing",
+        "Several", "Some", "That", "The", "There", "These", "This", "Those",
+    ]
+
+    private static func continuing(_ text: String) -> String {
+        guard let first = text.split(separator: " ").first, continuingOpeners.contains(String(first)) else { return text }
+        return text.prefix(1).lowercased() + text.dropFirst()
     }
 
     private static func isUnknown(_ line: String) -> Bool {

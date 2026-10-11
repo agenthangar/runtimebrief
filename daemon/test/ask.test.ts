@@ -18,11 +18,17 @@ import {
 } from "../src/analyst/prompts.js";
 import {
   allowedMishearing,
+  analyzeMentions,
   compactName,
   editDistance,
   resolveProjectMentions,
 } from "../src/analyst/projectMentions.js";
-import { portfolioInterim, projectInterim, type AskResponse } from "../src/routes/ask.js";
+import {
+  isPlainStatusRequest,
+  portfolioInterim,
+  projectInterim,
+  type AskResponse,
+} from "../src/routes/ask.js";
 import type { ProjectListEntry } from "../src/portfolio.js";
 import { spokenNames } from "../src/spokenNames.js";
 import type { EvidenceRef, ProjectBrief } from "../src/types.js";
@@ -32,7 +38,7 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 interface MentionFixture {
-  projects: { id: string; name: string }[];
+  projects: { id: string; name: string; aliases?: string[] }[];
   cases: { question: string; expected: string[] }[];
 }
 
@@ -92,6 +98,41 @@ describe("misheard project names", () => {
     expect(allowedMishearing(5)).toBe(0);
     expect(allowedMishearing(9)).toBe(1);
     expect(allowedMishearing(10)).toBe(2);
+  });
+});
+
+describe("plain status requests", () => {
+  const projects = [{ id: "slipspark", name: "slipspark" }, { id: "meal", name: "Meal Planner" }];
+  const plain = (question: string) => {
+    const { ids, otherWords } = analyzeMentions(question, projects);
+    return isPlainStatusRequest(otherWords, ids.length === 1 ? "project" : "portfolio");
+  };
+
+  it.each([
+    "Status status for project meal planner",
+    "What's the status of SlipSpark?",
+    "how is slip park doing",
+    "Any update on meal planner?",
+    "What's new with slipspark today",
+    "slipspark",
+    "Tell me about my projects",
+    "Is anything blocked right now?",
+    "What needs my attention?",
+    "Which agents are working?",
+    "What should I look at?",
+  ])("answers %s from saved evidence", (question) => {
+    expect(plain(question)).toBe(true);
+  });
+
+  it.each([
+    "Did the slipspark tests pass?",
+    "Why is meal planner failing to build?",
+    "What did Codex change in slipspark?",
+    "Which project changed the most code this week?",
+    "Is the TestFlight build of meal planner processing?",
+    "What did agents finish today?",
+  ])("sends %s to the analyst", (question) => {
+    expect(plain(question)).toBe(false);
   });
 });
 
@@ -338,6 +379,7 @@ describe("POST /v1/ask", () => {
         { id: "fixture", name: "Fixture App", path: repos[0]! },
         { id: "orbit", name: "Orbit Tracker", path: repos[1]! },
       ],
+      spoken_names: { orbit: ["Orbiter"] },
     });
     const runner: AnalystBackendRunner = async function* (params) {
       calls.push(params);
@@ -412,7 +454,7 @@ describe("POST /v1/ask", () => {
   });
 
   it("answers a question about no particular project across the portfolio", async () => {
-    const { body } = await ask({ question: "Is anything blocked right now?" });
+    const { body } = await ask({ question: "Which project changed the most code this week?" });
     expect(body).toMatchObject({ status: "answered", scope: "portfolio", projects: [] });
     const cited = /\[([^\[\]]+@fixture)\]$/.exec(body.answer ?? "")?.[1];
     expect(body.answer).toMatch(/^Nothing is blocked across Fixture App and Orbit Tracker\./);
@@ -445,6 +487,40 @@ describe("POST /v1/ask", () => {
     const repeated = await ask({ question: "what did agents  finish today?", waitMs: 0 });
     expect(repeated.body).toMatchObject({ status: "answered", interim: null });
     expect(calls.length).toBe(runs);
+  });
+
+  it("answers plain status requests at once from saved evidence", async () => {
+    const before = calls.length;
+    const overview = await ask({ question: "Is anything blocked right now?" });
+    expect(overview.body).toMatchObject({ status: "answered", scope: "portfolio", cached: true, interim: null });
+    expect(overview.body.answer).toMatch(/projects?\.|attention/);
+    expect(calls.length).toBe(before);
+    expect(logLines.at(-1)).toMatch(/^\[ask\] replied scope=portfolio projects=- question="Is anything blocked right now\?" status=answered instant=1/);
+
+    // No saved analysis yet: the project question goes to the analyst.
+    const first = await ask({ question: "What's the status of Orbit Tracker?" });
+    expect(first.body).toMatchObject({ status: "answered", scope: "project" });
+    expect(calls.length).toBe(before + 1);
+    expect(calls.at(-1)!.systemPrompt).toBe(VOICE_ANALYST_SYSTEM_PROMPT);
+
+    // With a saved analysis, the same kind of request needs no model run.
+    await app.inject({ method: "GET", url: "/v1/projects/orbit/status", headers: authHeaders() });
+    const runs = calls.length;
+    const saved = await ask({ question: "how is orbit tracker doing" });
+    expect(saved.body).toMatchObject({
+      status: "answered", scope: "project", cached: true, projects: [{ id: "orbit" }],
+      answer: "The feature branch is in progress. [git-working-tree]",
+    });
+    expect(saved.body.analyzedAt).toEqual(expect.any(String));
+    expect(calls.length).toBe(runs);
+  });
+
+  it("routes configured spoken names and lists them for Siri's vocabulary", async () => {
+    const list = await app.inject({ method: "GET", url: "/v1/projects", headers: authHeaders() });
+    const orbit = (list.json() as ProjectListEntry[]).find((project) => project.id === "orbit");
+    expect(orbit?.spokenNames).toEqual(["Orbiter"]);
+    const { body } = await ask({ question: "Did the orbiter tests pass?" });
+    expect(body.projects).toEqual([{ id: "orbit", name: "Orbit Tracker" }]);
   });
 
   it("reports a failed analysis with the project's saved brief", async () => {

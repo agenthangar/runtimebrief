@@ -112,7 +112,7 @@ export interface AnalystServiceOptions {
 export const DEFAULT_ANALYST_REQUEST_TIMEOUT_MS = 60_000;
 export const ANALYST_CACHE_BACKEND = "codex-cli";
 export const ANALYST_CACHE_PROMPT_VERSION = "runtimebrief-analyst-v2";
-export const PORTFOLIO_CACHE_PROMPT_VERSION = "runtimebrief-portfolio-v2";
+export const PORTFOLIO_CACHE_PROMPT_VERSION = "runtimebrief-portfolio-v3";
 export const VOICE_CACHE_PROMPT_VERSION = "runtimebrief-analyst-voice-v1";
 /** Cache rows for portfolio answers; registered project IDs never contain "*". */
 const PORTFOLIO_CACHE_ID = "*portfolio*";

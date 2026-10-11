@@ -6,7 +6,7 @@ import type { EvidenceRef } from "../types.js";
 import type { AnalystChunk } from "../analyst/service.js";
 import type { LatestStatus } from "../analyst/cache.js";
 import { AskJobs, type AskJobState, type AskOutcome } from "../analyst/askJobs.js";
-import { resolveProjectMentions } from "../analyst/projectMentions.js";
+import { analyzeMentions } from "../analyst/projectMentions.js";
 import { scopedEvidenceId, type PortfolioAskProject } from "../analyst/prompts.js";
 
 /** Long enough for a cached or quick answer, short enough for Siri. */
@@ -32,8 +32,32 @@ export interface AskResponse {
   answer: string | null;
   evidence: EvidenceRef[];
   cached: boolean;
+  /** When the answer is a saved analysis, the time it was made. */
+  analyzedAt?: string | null;
   /** Recent saved evidence to speak while a full answer is unavailable. */
   interim: AskInterim | null;
+}
+
+/** Words of a plain status request ("what's the status of", "how is ...
+ * doing", "any update on"). Such a question needs no model run: the saved
+ * analysis or the deterministic overview answers it at once. */
+const STATUS_WORDS = new Set(
+  ("a about all an any anything app are at been brief can check could current currently " +
+    "day did do does doing far for get give going has have hey how hows i in is it its " +
+    "lately latest like look looking me my new news now of ok okay on overall please " +
+    "progress project projects quick recent recently report right runtime runtimebrief s show so " +
+    "state status summary tell that the there these things this to today up update updates " +
+    "was week what whats where with you").split(" "),
+);
+/** A plain portfolio request may also ask who needs attention or is working. */
+const OVERVIEW_WORDS = new Set([
+  ...STATUS_WORDS,
+  ..."active agent agents attention blocked blocker blockers blocking busy everything need needs needing review should stuck wait waiting which work working".split(" "),
+]);
+
+export function isPlainStatusRequest(otherWords: string[], scope: "project" | "portfolio"): boolean {
+  const vocabulary = scope === "project" ? STATUS_WORDS : OVERVIEW_WORDS;
+  return otherWords.every((word) => vocabulary.has(word));
 }
 
 function cite(refs: EvidenceRef[]): string {
@@ -161,7 +185,11 @@ export function registerAskRoutes(
     if (projectId && !projects.some((project) => project.id === projectId)) {
       return reply.code(404).send({ error: "not_found" });
     }
-    const mentionedIds = projectId ? [projectId] : resolveProjectMentions(question, projects);
+    const mentions = analyzeMentions(
+      question,
+      projects.map((project) => ({ id: project.id, name: project.name, aliases: project.spokenNames })),
+    );
+    const mentionedIds = projectId ? [projectId] : mentions.ids;
     const named = mentionedIds
       .map((id) => projects.find((project) => project.id === id))
       .filter((project): project is ProjectListEntry => project !== undefined);
@@ -170,6 +198,30 @@ export function registerAskRoutes(
     const route =
       `scope=${scope} projects=${mentionedIds.join(",") || "-"}` +
       `${projectId ? " chosen=1" : ""} question=${JSON.stringify(question.slice(0, 300))}`;
+
+    // A plain status request is answered at once from saved evidence.
+    if (named.length <= 1 && isPlainStatusRequest(mentions.otherWords, scope)) {
+      const saved = scope === "project" ? deps.analyst.latestStatus(named[0]!.id) : null;
+      if (saved) {
+        // Queues a refresh when the saved analysis is missing or old.
+        try { deps.analyst.voiceStatus(named[0]!.id); } catch { /* registered after startup */ }
+      }
+      const instant = scope === "project" ? projectInterim(named[0]!, saved) : portfolioInterim(projects, []);
+      if (scope === "portfolio" || saved) {
+        log(`[ask] replied ${route} status=answered instant=1 ms=0`);
+        const response: AskResponse = {
+          status: "answered",
+          scope,
+          projects: named.map((project) => ({ id: project.id, name: project.name })),
+          answer: instant.answer,
+          evidence: instant.evidence,
+          cached: true,
+          analyzedAt: instant.analyzedAt,
+          interim: null,
+        };
+        return reply.send(response);
+      }
+    }
     const key = JSON.stringify([scope, mentionedIds, question.toLowerCase().replace(/\s+/g, " ")]);
     const startedAt = Date.now();
     const job = jobs.run(key, (signal) => {

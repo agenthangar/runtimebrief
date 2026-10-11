@@ -85,12 +85,20 @@ struct RuntimeBriefShortcuts: AppShortcutsProvider {
             shortTitle: "Open Project",
             systemImageName: "shippingbox"
         )
+        // Every request about one project uses the analysis action, whose
+        // project is required: when Siri mishears the name, it asks "Which
+        // project?" and resolves the reply, rather than answering for all.
         AppShortcut(
             intent: GetProjectAnalysisIntent(),
             phrases: [
-                // This short form asks for a project aloud when none was named.
                 "\(.applicationName) project analysis",
                 "Get a project analysis from \(.applicationName)",
+                "Get my project status from \(.applicationName)",
+                "Get a project status in \(.applicationName)",
+                "Show project status in \(.applicationName)",
+                "Run \(.applicationName) project status",
+                "What's the state of my project in \(.applicationName)",
+                "Tell me a project's status from \(.applicationName)",
                 "Get me the analysis of the project \(\.$project) from \(.applicationName)",
                 "Get the analysis of \(\.$project) from \(.applicationName)",
                 "Give me the latest analysis of the project \(\.$project) from \(.applicationName)",
@@ -99,24 +107,6 @@ struct RuntimeBriefShortcuts: AppShortcutsProvider {
                 "Catch me up on \(\.$project) using \(.applicationName)",
                 "What happened with \(\.$project) in \(.applicationName)",
                 "\(.applicationName) analysis for \(\.$project)",
-            ],
-            shortTitle: "Project Analysis",
-            systemImageName: "waveform"
-        )
-        AppShortcut(
-            intent: GetProjectStatusIntent(),
-            phrases: [
-                // Keep at least one phrase without \(\.$project): shortcuts whose
-                // every phrase embeds a parameter stay hidden until parameter
-                // values have been donated via updateAppShortcutParameters().
-                "Get me status from \(.applicationName)",
-                "Get my project status from \(.applicationName)",
-                "Get status from \(.applicationName)",
-                "Get a project status in \(.applicationName)",
-                "Show project status in \(.applicationName)",
-                "Run \(.applicationName) project status",
-                "Show \(.applicationName) status",
-                "What's the state of my project in \(.applicationName)",
                 "What's the state of \(\.$project) in \(.applicationName)",
                 "What's the status of \(\.$project) in \(.applicationName)",
                 "How is \(\.$project) doing in \(.applicationName)",
@@ -128,9 +118,7 @@ struct RuntimeBriefShortcuts: AppShortcutsProvider {
                 "Tell me the status of \(\.$project) from \(.applicationName)",
                 "Can you tell me the status of the \(\.$project) app from \(.applicationName)",
                 "Get the status of \(\.$project) using \(.applicationName)",
-                "Tell me a project's status from \(.applicationName)",
                 "Ask \(.applicationName) about \(\.$project)",
-                // One-sentence requests that start with the app name.
                 "Ask \(.applicationName) what's the status of \(\.$project)",
                 "Ask \(.applicationName) for the status of \(\.$project)",
                 "Ask \(.applicationName) how \(\.$project) is doing",
@@ -139,6 +127,19 @@ struct RuntimeBriefShortcuts: AppShortcutsProvider {
                 "\(.applicationName) status for \(\.$project)",
             ],
             shortTitle: "Project Status",
+            systemImageName: "waveform"
+        )
+        // Status for every project at once; no project is asked for.
+        AppShortcut(
+            intent: GetProjectStatusIntent(),
+            phrases: [
+                "Get me status from \(.applicationName)",
+                "Get status from \(.applicationName)",
+                "Show \(.applicationName) status",
+                "How are my projects doing in \(.applicationName)",
+                "Give me a status update from \(.applicationName)",
+            ],
+            shortTitle: "All Projects Status",
             systemImageName: "shippingbox"
         )
         // The open-ended entry point. A spoken phrase cannot carry free text,

@@ -45,6 +45,11 @@ enum SiriQuestion {
         if response.status == .answered, let answer = response.answer {
             let short = SiriBrief.voice(answer, evidence: response.evidence)
             let full = SiriBrief.spoken(answer, evidence: response.evidence)
+            // A saved analysis says how old it is, like the status action.
+            if let project, let analyzedAt = response.analyzedAt {
+                let lead = "\(project.name), analyzed \(SiriBrief.age(of: analyzedAt)): "
+                return SiriQuestionReply(title: title, text: lead + short, detail: lead + full)
+            }
             return SiriQuestionReply(
                 title: title,
                 text: project.map { naming($0.name, in: short) } ?? short,
@@ -74,9 +79,16 @@ enum SiriQuestion {
         projects: [ProjectSummary]
     ) -> ProjectSummary? {
         let ids = projectID.map { [$0] }
-            ?? ProjectMentionMatcher.resolve(question, candidates: projects.map { ($0.id, $0.name) })
+            ?? ProjectMentionMatcher.resolve(question, candidates: mentionCandidates(projects))
         guard ids.count == 1 else { return nil }
         return projects.first { $0.id == ids[0] }
+    }
+
+    /// Every name a project may be spoken as, including its spoken names.
+    static func mentionCandidates(_ projects: [ProjectSummary]) -> [(id: String, name: String)] {
+        projects.flatMap { project in
+            [(id: project.id, name: project.name)] + (project.spokenNames ?? []).map { (id: project.id, name: $0) }
+        }
     }
 
     private static func savedAnswer(

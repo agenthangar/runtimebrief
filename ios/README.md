@@ -114,9 +114,19 @@ update, and asks the person to repeat the question in a minute, which then
 returns the finished answer without another model run. The daemon's private
 log records each question as Siri sent it, with its route, outcome, and timing.
 
+Every request about one project ("What's the status of SlipSpark in
+RuntimeBrief", "Ask RuntimeBrief how SlipSpark is doing") uses the Project
+Status action, whose project is required: when Siri cannot recognize the name,
+it asks "Which project?" and resolves the reply instead of answering for every
+project. Status for all projects has separate phrases such as "How are my
+projects doing in RuntimeBrief". A plain status or overview question asked
+through "Ask RuntimeBrief" is answered at once from the saved analysis, with
+its age; other questions run the analyst.
+
 Project names may be split, joined, pluralized, or slightly misheard: "slip
 park" finds SlipSpark when no other project is as close and the first letter
-matches. Each project also offers Siri other spellings of its name taken from
+matches. For a name Siri consistently mishears, add what it hears to the
+daemon's `spoken_names` config. Each project also offers Siri other spellings of its name taken from
 its Xcode project, so a folder named `slipspark` is also "SlipSpark" and "Slip
 Spark". One-sentence status requests such as "Ask RuntimeBrief what's the
 status of SlipSpark" need no follow-up; any other question still starts with

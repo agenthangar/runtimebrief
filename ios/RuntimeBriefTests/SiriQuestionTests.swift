@@ -7,7 +7,7 @@ private final class FixtureBundle {}
 @Suite("Siri open questions", .serialized)
 struct SiriQuestionTests {
     private struct MentionFixture: Decodable {
-        struct Project: Decodable { let id: String; let name: String }
+        struct Project: Decodable { let id: String; let name: String; let aliases: [String]? }
         struct Case: Decodable { let question: String; let expected: [String] }
         let projects: [Project]
         let cases: [Case]
@@ -53,7 +53,9 @@ struct SiriQuestionTests {
 
     @Test func mentionMatcherPassesTheSharedFixture() throws {
         let fixture = try mentionFixture()
-        let candidates = fixture.projects.map { (id: $0.id, name: $0.name) }
+        let candidates = fixture.projects.flatMap { project in
+            [(id: project.id, name: project.name)] + (project.aliases ?? []).map { (id: project.id, name: $0) }
+        }
         for example in fixture.cases {
             #expect(ProjectMentionMatcher.resolve(example.question, candidates: candidates) == example.expected,
                     "\(example.question)")
@@ -126,6 +128,18 @@ struct SiriQuestionTests {
                 }
             }
         }
+    }
+
+    @Test func instantSavedAnswersSayTheirAgeInTwoLines() throws {
+        var saved = response(.answered, scope: .project,
+                             answer: "Done: The latest session fixed ingredient search. [git-commit-abc]\nNow: The working tree is clean. [git-commit-abc]\nNext: Ship it. [git-commit-abc]")
+        saved.analyzedAt = Date().addingTimeInterval(-2 * 3600)
+        let reply = SiriQuestion.reply(for: saved)
+        #expect(reply.text == "Sample Tracker, analyzed 2 hours ago: Recently, the latest session fixed ingredient search. Currently, the working tree is clean.")
+        #expect(reply.detail.contains("Next, Ship it."))
+        let decoded = try JSONDecoder.runtimeBrief.decode(AskResponse.self, from: Data(
+            #"{"status":"answered","scope":"project","projects":[],"answer":"Ok.","evidence":[],"cached":true,"analyzedAt":"2026-10-10T10:00:00.000Z","interim":null}"#.utf8))
+        #expect(decoded.analyzedAt != nil)
     }
 
     @Test func projectAnswersAreNotNamedTwice() {

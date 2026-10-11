@@ -15,6 +15,8 @@ export interface ProjectConfig {
    * Approval is only recorded by RuntimeBrief; execution remains out of scope.
    */
   allowed_actions?: string[] | undefined;
+  /** Extra spoken names from the config's `spoken_names` map. */
+  spoken_names?: string[] | undefined;
 }
 
 export interface TranscriptSourceConfig {

@@ -210,6 +210,8 @@ struct AskResponse: Codable, Sendable, Equatable {
     let answer: String?
     let evidence: [EvidenceRef]
     let cached: Bool
+    /// Set when the answer is a saved analysis rather than a new one.
+    var analyzedAt: Date? = nil
     let interim: Interim?
 }
 

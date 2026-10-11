@@ -1,5 +1,16 @@
 # Release notes
 
+## 1.0.3 (38) — 2026-10-11
+
+- When Siri cannot recognize the project in a status request, ask "Which
+  project?" instead of answering for every project. Status for every project
+  keeps its own phrases, such as "How are my projects doing in RuntimeBrief".
+- Answer plain status and overview questions at once from saved analyses,
+  with their age, instead of waiting for a new analysis.
+- Add `spoken_names` to the daemon config for names Siri mishears, and tell
+  the portfolio analyst that spoken project names may be misheard.
+- Read "Recently, the latest session…" rather than "Recently, The latest…".
+
 ## 1.0.3 (37) — 2026-10-10
 
 - Find a project whose name Siri mishears slightly, such as "slip park" for

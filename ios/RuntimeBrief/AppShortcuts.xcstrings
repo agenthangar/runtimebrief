@@ -427,6 +427,17 @@
         }
       }
     },
+    "Give me a status update from ${applicationName}": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Give me a status update from ${applicationName}"
+          }
+        }
+      }
+    },
     "Give me an overview in ${applicationName}": {
       "extractionState": "stale",
       "localizations": {
@@ -456,6 +467,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Give me the latest analysis of the project ${project} from ${applicationName}"
+          }
+        }
+      }
+    },
+    "How are my projects doing in ${applicationName}": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "How are my projects doing in ${applicationName}"
           }
         }
       }

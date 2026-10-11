@@ -99,7 +99,7 @@ final class SiriVoiceRoutingUITests: XCTestCase {
 
         for request in [
             "Get me status from RuntimeBrief",
-            "Get a project status in RuntimeBrief",
+            "How are my projects doing in RuntimeBrief",
             "Show Runtime Brief status",
             "What's the status of Sample Tracker in RuntimeBrief",
             "Can you tell me the status of the Sample Tracker app from RuntimeBrief",
@@ -156,6 +156,36 @@ final class SiriVoiceRoutingUITests: XCTestCase {
             screenshot.lifetime = .keepAlways
             add(screenshot)
             XCTAssertTrue(matched, "Siri did not open the question prompt for: \(request). \(XCUIDevice.shared.siriService.debugDescription)")
+            guard matched else { return }
+            app.activate()
+        }
+    }
+
+    @MainActor
+    func testProjectRequestsWithoutARecognizedNameAskWhichProject() async throws {
+        try requireRoutingTest()
+        let app = XCUIApplication()
+        app.launchEnvironment["RUNTIMEBRIEF_E2E_CLEAR_STATE"] = "1"
+        app.launchEnvironment["RUNTIMEBRIEF_E2E_DEMO"] = "1"
+        app.launch()
+        XCTAssertTrue(app.staticTexts["demo-data-banner"].waitForExistence(timeout: 10))
+        try await Task.sleep(for: .seconds(10))
+
+        for request in [
+            "Get a project status in RuntimeBrief",
+            "Tell me a project's status from RuntimeBrief",
+            "Ask RuntimeBrief for the status of Zebra Quasar",
+        ] {
+            XCUIDevice.shared.siriService.activate(voiceRecognitionText: request)
+            let prompt = XCUIDevice.shared.siriService.staticTexts.matching(
+                NSPredicate(format: "label CONTAINS[c] %@", "Which project")
+            ).firstMatch
+            let matched = prompt.waitForExistence(timeout: 30)
+            let screenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+            screenshot.name = request
+            screenshot.lifetime = .keepAlways
+            add(screenshot)
+            XCTAssertTrue(matched, "Siri answered for every project instead of asking which: \(request). \(XCUIDevice.shared.siriService.debugDescription)")
             guard matched else { return }
             app.activate()
         }

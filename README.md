@@ -297,6 +297,15 @@ analyst:
   max_transcripts: 5
 ```
 
+Speech recognition can mishear invented project names. List what Siri hears
+under `spoken_names`, keyed by project ID; RuntimeBrief adds these names to
+Siri's vocabulary and to question routing:
+
+```yaml
+spoken_names:
+  skyspark: ["Sky Park"]
+```
+
 The daemon precomputes a cited Done/Now/Next analysis for each registered
 project every three hours, with at most two refreshes active at once. Siri
 reads the last completed analysis immediately, states its age, and requests a
