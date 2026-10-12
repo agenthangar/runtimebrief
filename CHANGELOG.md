@@ -10,6 +10,9 @@
 - Add `spoken_names` to the daemon config for names Siri mishears, and tell
   the portfolio analyst that spoken project names may be misheard.
 - Read "Recently, the latest session…" rather than "Recently, The latest…".
+- Daemon: answer project lists at once from the last scan (up to six hours
+  old) while rescanning, and rescan every five minutes, so a slow scan on a
+  busy Mac no longer times out the app's connection test or Siri.
 
 ## 1.0.3 (37) — 2026-10-10
 

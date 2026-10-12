@@ -5,17 +5,35 @@ import { PortfolioService, type ProjectListEntry } from "../portfolio.js";
 
 /** The portfolio scans local Git trees and agent transcripts. Share one scan
  * across simultaneous clients and serve a recent complete result while the
- * next scan runs. Project briefs carry their own evidence timestamps. */
+ * next scan runs. Project briefs carry their own evidence timestamps.
+ *
+ * A scan of many projects can take 20 seconds on a busy Mac, longer than
+ * the phone and Siri wait, so an older complete result (up to `maxStaleMs`)
+ * is served at once while the next scan runs, and `keepWarm` rescans in the
+ * background so that result is rarely old. */
 export class ProjectListCache<T> {
   private cached: { value: T; at: number } | null = null;
   private inFlight: Promise<T> | null = null;
+  private timer: NodeJS.Timeout | undefined;
 
   constructor(
     private readonly fetch: () => Promise<T>,
     private readonly now: () => number = Date.now,
     private readonly freshMs = 5_000,
-    private readonly maxStaleMs = 60_000,
+    private readonly maxStaleMs = 6 * 60 * 60_000,
   ) {}
+
+  /** Rescan every `intervalMs` without blocking clients or the process. */
+  keepWarm(intervalMs: number): void {
+    if (this.timer) return;
+    this.timer = setInterval(() => this.warm(), intervalMs);
+    this.timer.unref();
+  }
+
+  close(): void {
+    if (this.timer) clearInterval(this.timer);
+    this.timer = undefined;
+  }
 
   get(): Promise<T> {
     const age = this.cached ? this.now() - this.cached.at : Infinity;
@@ -58,6 +76,8 @@ export function registerProjectRoutes(
   );
   const projectList = new ProjectListCache(() => portfolio.listProjects());
   projectList.warm();
+  projectList.keepWarm(5 * 60_000);
+  app.addHook("onClose", async () => projectList.close());
 
   app.get("/v1/projects", async () => {
     return projectList.get();
