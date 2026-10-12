@@ -40,7 +40,7 @@ struct SettingsView: View {
                 } header: {
                     Text("Presentation")
                 } footer: {
-                    Text("For demos and screen sharing: hides your prompts, session titles, and agent messages in the app and in Siri's answers. Project states and counts stay visible.")
+                    Text("For demos and screen sharing: hides your prompts and agent messages in the app and in Siri's answers. Session titles, project states, and counts stay visible.")
                 }
                 Section {
                     TextField("https://your-mac.tailnet.ts.net", text: $serverURL)

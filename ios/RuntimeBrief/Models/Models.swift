@@ -113,6 +113,15 @@ struct BriefClaim: Codable, Identifiable, Hashable, Sendable {
     let category: BriefClaimCategory
     let text: String
     let evidence: [EvidenceRef]
+    /// The quoted session subject and whether it is a native title or the
+    /// person's request. Older daemons omit it.
+    var subject: ClaimSubject? = nil
+}
+
+struct ClaimSubject: Codable, Hashable, Sendable {
+    let text: String
+    /// "title" or "request".
+    let source: String
 }
 
 struct ProjectBrief: Codable, Hashable, Sendable {
@@ -156,6 +165,8 @@ struct SessionInfo: Codable, Identifiable, Hashable, Sendable {
     let filesTouched: [String]?
     let toolUseCount: Int?
     let conclusion: String?
+    /// "title" when `summary` is a native session title. Older daemons omit it.
+    var summarySource: String? = nil
 }
 
 enum AgentSessionState: String, Codable, Hashable, Sendable {

@@ -95,8 +95,9 @@ personal signing change local; do not commit it or change the production
 **What Got Done** names the projects with completed agent work in the period
 and the latest item, from the briefs' completed claims and their evidence
 times, without an analyst run. **Settings → Presentation → Hide Prompts on
-Screen** removes quoted prompts, session titles, and agent messages from the
-app and from Siri's answers, keeping states and counts, for demos.
+Screen** removes quoted prompts and agent messages from the app and from
+Siri's answers, keeping native session titles, states, and counts, for demos.
+The daemon marks each quoted subject as a title or a request.
 
 **Tell an Agent** sends a spoken message to an agent that RuntimeBrief
 started on the project, preferring the one waiting for input, otherwise the

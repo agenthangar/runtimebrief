@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { presentablePrompt, sessionSubject } from "../src/sessionSubject.js";
+import { describedSubject, presentablePrompt, sessionSubject } from "../src/sessionSubject.js";
+import { buildProjectBrief } from "../src/brief.js";
+import type { TranscriptRef } from "../src/types.js";
 
 describe("session subjects", () => {
   it("prefers the native title and keeps ordinary requests", () => {
@@ -27,5 +29,30 @@ describe("session subjects", () => {
     expect(sessionSubject({ title: "RuntimeBrief Meal Planner 21bfbe3a", summary: "Fix the login crash" })).toBe("Fix the login crash");
     expect(sessionSubject({ title: "RuntimeBrief Home We Go e316bf2a-5b6f-43a7-a4aa-d1d2f231dcb9" })).toBeNull();
     expect(sessionSubject({ title: "RuntimeBrief Siri integration" })).toBe("RuntimeBrief Siri integration");
+  });
+
+  it("says whether a subject is a native title or the person's request", () => {
+    expect(describedSubject({ title: "Fix login crash", summary: "please fix it" })).toEqual({ text: "Fix login crash", source: "title" });
+    expect(describedSubject({ title: "RuntimeBrief Meal Planner 21bfbe3a", summary: "Add search" })).toEqual({ text: "Add search", source: "request" });
+    expect(describedSubject({})).toBeNull();
+  });
+
+  it("marks every quoted claim subject so presentation mode can keep titles", () => {
+    const now = new Date("2026-10-11T12:00:00.000Z");
+    const session = (id: string, state: TranscriptRef["state"], extra: Partial<TranscriptRef>): TranscriptRef => ({
+      source: "claude-code", id, path: `/x/${id}.jsonl`, state,
+      startedAt: new Date("2026-10-11T11:00:00.000Z"), endedAt: new Date("2026-10-11T11:30:00.000Z"), ...extra,
+    });
+    const brief = buildProjectBrief("Demo", null, [
+      session("a", "waiting", { title: "Ship the release" }),
+      session("b", "completed", { summary: "search the whole machine for .p8 file?" }),
+    ], now);
+    const quoted = brief.claims.filter((claim) => claim.text.includes("“"));
+    expect(quoted.length).toBeGreaterThan(0);
+    for (const claim of quoted) {
+      expect(claim.subject, claim.text).toBeDefined();
+      expect(claim.text).toContain(`“${claim.subject!.text}”`);
+    }
+    expect(quoted.map((claim) => claim.subject!.source).sort()).toEqual(["request", "title"]);
   });
 });

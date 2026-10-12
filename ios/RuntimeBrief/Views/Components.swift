@@ -110,8 +110,7 @@ struct ClaimLabel: View {
     @AppStorage(PresentationMode.key) private var presenting = false
 
     var body: some View {
-        Label(PresentationMode.text(EvidencePresentation.text(claim.text, evidence: claim.evidence), enabled: presenting),
-              systemImage: icon)
+        Label(PresentationMode.text(for: claim, enabled: presenting), systemImage: icon)
             .font(.subheadline)
             .foregroundStyle(.primary)
             .accessibilityIdentifier("project-brief-claim")

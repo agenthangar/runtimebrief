@@ -1,4 +1,4 @@
-import { sessionSubject } from "./sessionSubject.js";
+import { describedSubject } from "./sessionSubject.js";
 import type { GitSummary } from "./adapters/filesystemGit.js";
 import type {
   BriefClaim,
@@ -165,24 +165,28 @@ export function buildProjectBrief(
   const claims: BriefClaim[] = [];
 
   for (const session of waiting.slice(0, 2)) {
-    const name = sessionSubject(session);
-    const subject = name ? ` on “${compact(name, 90)}”` : "";
+    const described = describedSubject(session);
+    const quoted = described ? { ...described, text: compact(described.text, 90) } : null;
+    const subject = quoted ? ` on “${quoted.text}”` : "";
     claims.push({
       id: `waiting-${session.source}-${session.id}`,
       category: "attention",
       text: `${sourceName(session.source)} is waiting for your input${subject}.`,
       evidence: [sessionEvidence(session)],
+      ...(quoted ? { subject: quoted } : {}),
     });
   }
 
   for (const session of active.slice(0, 2)) {
-    const name = sessionSubject(session);
-    const subject = name ? ` on “${compact(name, 90)}”` : "";
+    const described = describedSubject(session);
+    const quoted = described ? { ...described, text: compact(described.text, 90) } : null;
+    const subject = quoted ? ` on “${quoted.text}”` : "";
     claims.push({
       id: `active-${session.source}-${session.id}`,
       category: "progress",
       text: `${sourceName(session.source)} is actively working${subject}.`,
       evidence: [sessionEvidence(session)],
+      ...(quoted ? { subject: quoted } : {}),
     });
   }
 
@@ -199,13 +203,15 @@ export function buildProjectBrief(
   for (const session of completed) {
     if (completedSources.has(session.source)) continue;
     completedSources.add(session.source);
-    const name = sessionSubject(session);
-    const subject = name ? ` “${compact(name, 100)}”` : "";
+    const described = describedSubject(session);
+    const quoted = described ? { ...described, text: compact(described.text, 100) } : null;
+    const subject = quoted ? ` “${quoted.text}”` : "";
     claims.push({
       id: `completed-${session.source}-${session.id}`,
       category: "completed",
       text: `${sourceName(session.source)} completed${subject}.`,
       evidence: [sessionEvidence(session)],
+      ...(quoted ? { subject: quoted } : {}),
     });
   }
 

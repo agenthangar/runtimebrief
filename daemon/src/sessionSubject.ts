@@ -4,7 +4,20 @@
  * Returns null when nothing presentable remains.
  */
 export function sessionSubject(session: { title?: string | undefined; summary?: string | undefined }): string | null {
-  return presentablePrompt(session.title) ?? presentablePrompt(session.summary);
+  return describedSubject(session)?.text ?? null;
+}
+
+/** Where a subject came from: a native session title is safe to show in a
+ * presentation; a request is the person's own words and may not be. */
+export type SubjectSource = "title" | "request";
+
+export function describedSubject(
+  session: { title?: string | undefined; summary?: string | undefined },
+): { text: string; source: SubjectSource } | null {
+  const title = presentablePrompt(session.title);
+  if (title) return { text: title, source: "title" };
+  const request = presentablePrompt(session.summary);
+  return request ? { text: request, source: "request" } : null;
 }
 
 const BOILERPLATE = [

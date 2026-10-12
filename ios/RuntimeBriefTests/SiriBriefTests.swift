@@ -161,6 +161,22 @@ struct SiriBriefTests {
             #expect(PresentationMode.text(input, enabled: true) == expected)
             #expect(PresentationMode.text(input, enabled: false) == input)
         }
+        // Native session titles stay; requests and claims from older daemons go.
+        func claim(_ text: String, _ source: String?) -> BriefClaim {
+            BriefClaim(id: "c", category: .progress, text: text, evidence: [],
+                       subject: source.map { ClaimSubject(text: "Siri integration", source: $0) })
+        }
+        let text = "Claude Code is actively working on “Siri integration”."
+        #expect(PresentationMode.text(for: claim(text, "title"), enabled: true) == text)
+        #expect(PresentationMode.text(for: claim(text, "request"), enabled: true) == "Claude Code is actively working.")
+        #expect(PresentationMode.text(for: claim(text, nil), enabled: true) == "Claude Code is actively working.")
+        #expect(PresentationMode.showsSessionSummary(source: "title", enabled: true))
+        #expect(!PresentationMode.showsSessionSummary(source: "request", enabled: true))
+        #expect(!PresentationMode.showsSessionSummary(source: nil, enabled: true))
+        #expect(PresentationMode.showsSessionSummary(source: nil, enabled: false))
+        let decoded = try? JSONDecoder.runtimeBrief.decode(BriefClaim.self, from: Data(
+            #"{"id":"c","category":"progress","text":"t","evidence":[],"subject":{"text":"Siri integration","source":"title"}}"#.utf8))
+        #expect(decoded?.subject?.source == "title")
     }
 
     @Test func periodsStartAtLocalMidnightOrAWeekAgo() {

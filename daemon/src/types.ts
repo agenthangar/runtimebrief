@@ -99,6 +99,9 @@ export interface BriefClaim {
   text: string;
   /** Every claim must carry at least one concrete source record. */
   evidence: EvidenceRef[];
+  /** The quoted session subject in `text`, and whether it is a native title
+   * or the person's request, so presentation mode can hide requests only. */
+  subject?: { text: string; source: "title" | "request" };
 }
 
 export type ProjectBriefState = "active" | "attention" | "recent" | "quiet" | "unavailable";

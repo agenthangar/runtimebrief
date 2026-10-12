@@ -25,7 +25,7 @@ enum SiriBrief {
         var text = "\(project.name): \(terminated(project.brief?.headline ?? "No project brief is available"))"
         let attention = project.brief?.claims.first { $0.category == .attention && $0.text != project.brief?.headline }
         if let attention {
-            text += " \(terminated(PresentationMode.text(attention.text)))"
+            text += " \(terminated(PresentationMode.text(for: attention)))"
         } else if let evidenceDate = project.brief?.updatedAt {
             text += " Last activity \(dateText(evidenceDate))."
         }
@@ -132,7 +132,7 @@ enum SiriBrief {
         var names: [String] = []
         for (project, _, _) in done where !names.contains(project.name) { names.append(project.name) }
         let shown = names.prefix(3) + (names.count > 3 ? ["\(names.count - 3) more"] : [])
-        let item = PresentationMode.text(EvidencePresentation.text(latest.1.text, evidence: latest.1.evidence))
+        let item = PresentationMode.text(for: latest.1)
         return prefix(snapshot)
             + "Agents finished work in \(names.count) project\(names.count == 1 ? "" : "s") \(period): \(shown.formatted(.list(type: .and)))."
             + " Latest, \(latest.0.name): \(terminated(item))"

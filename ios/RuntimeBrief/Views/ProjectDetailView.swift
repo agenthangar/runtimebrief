@@ -465,7 +465,8 @@ struct ProjectDetailView: View {
                             Spacer()
                             RelativeTimeText(date: session.endedAt ?? session.startedAt)
                         }
-                        if let summary = session.summary, !presenting {
+                        if let summary = session.summary,
+                           PresentationMode.showsSessionSummary(source: session.summarySource, enabled: presenting) {
                             Text(summary)
                                 .font(.subheadline)
                                 .lineLimit(3)

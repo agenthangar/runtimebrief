@@ -1,5 +1,11 @@
 # Release notes
 
+## 1.0.3 (42) — 2026-10-11
+
+- Hide Prompts on Screen now keeps native session titles, such as “Siri
+  natural language integration”, and hides only your own prompts and agent
+  messages.
+
 ## 1.0.3 (41) — 2026-10-11
 
 - "Tell the Meal Planner agent in RuntimeBrief", then the message: Siri reads
