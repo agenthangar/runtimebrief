@@ -64,7 +64,7 @@ struct SiriAgentTests {
 
     @Test func explainsHowToStartAnAgentWhenNoneIsRunning() async throws {
         do {
-            _ = try await SiriAgentMessenger.send(message: "Hi", projectID: "demo-no-agent", projectName: "Weather Widget",
+            _ = try await SiriAgentMessenger.send(message: "Hi", projectID: "demo-weather-widget", projectName: "Weather Widget",
                                                   source: DemoRuntimeBriefDataSource(), scope: "demo", isDemo: true, defaults: defaults()) { _, _, _ in }
             Issue.record("Expected a failure")
         } catch let failure as SiriIntentFailure {
