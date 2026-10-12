@@ -315,6 +315,37 @@ describe("spoken project names", () => {
   });
 });
 
+describe("spoken questions and reasoning effort", () => {
+  it("retries at the default effort when the low-effort run fails", async () => {
+    const dir = tmpdir("effort");
+    const repo = makeFixtureRepo();
+    const cache = new AnswerCache(path.join(dir, "cache.db"));
+    try {
+      const efforts: (string | undefined)[] = [];
+      const runner: AnalystBackendRunner = async function* (params) {
+        efforts.push(params.reasoningEffort);
+        if (params.reasoningEffort === "low") throw new Error("unsupported effort");
+        yield { type: "result", costUsd: 0, isError: false, finalText: "Ready to ship. [git-working-tree]" };
+      };
+      const analyst = createAnalystService(
+        testConfig({ projects: [{ id: "demo", name: "Demo", path: repo }] }),
+        [new FilesystemGitAdapter()], { runner, cache },
+      );
+      const answers: string[] = [];
+      for await (const chunk of analyst.ask("demo", "Ready?", undefined, { voice: true })) {
+        if (chunk.type === "done") answers.push(chunk.answer);
+      }
+      expect(efforts).toEqual(["low", undefined]);
+      expect(answers).toEqual(["Ready to ship. [git-working-tree]"]);
+      analyst.close();
+    } finally {
+      cache.close();
+      fs.rmSync(dir, { recursive: true, force: true });
+      fs.rmSync(repo, { recursive: true, force: true });
+    }
+  });
+});
+
 describe("interim answers", () => {
   it("prefers the latest completed project analysis", () => {
     const latest = { answer: "Done: Shipped. [git-commit-abc]", createdAt: 0, evidence: [ref("git-commit-abc")], model: "m" };

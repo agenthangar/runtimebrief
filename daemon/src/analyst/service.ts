@@ -374,23 +374,33 @@ export function createAnalystService(
     requestTimeout.unref();
     let finalText: string | null = null;
 
-    try {
+    const runOnce = async (reasoningEffort?: "low"): Promise<string | null> => {
       const events = runner({
         evidencePacket: prompt,
         systemPrompt: request.systemPrompt,
         model: analystConfig.model,
         signal: abort.signal,
-        ...(request.reasoningEffort ? { reasoningEffort: request.reasoningEffort } : {}),
+        ...(reasoningEffort ? { reasoningEffort } : {}),
       });
-
       for await (const event of events) {
         if (event.type === "result") {
           if (event.isError) {
             throw new Error("Codex CLI analyst did not produce a valid result.");
           }
-          finalText = event.finalText;
-          break;
+          return event.finalText;
         }
+      }
+      return null;
+    };
+
+    try {
+      try {
+        finalText = await runOnce(request.reasoningEffort);
+      } catch (error) {
+        // A Codex CLI or model that rejects the effort setting must not fail
+        // every spoken question: retry once at the default effort.
+        if (!request.reasoningEffort || abort.signal.aborted) throw error;
+        finalText = await runOnce();
       }
     } finally {
       clearTimeout(requestTimeout);
