@@ -235,6 +235,36 @@
       "expected": [
         "ledger"
       ]
+    },
+    {
+      "question": "What's the status of my project spark",
+      "expected": [
+        "skyspark"
+      ]
+    },
+    {
+      "question": "status of project tracker",
+      "expected": [
+        "sample-tracker"
+      ]
+    },
+    {
+      "question": "how is my project base doing",
+      "expected": [
+        "moonbase"
+      ]
+    },
+    {
+      "question": "status of project moon",
+      "expected": []
+    },
+    {
+      "question": "how is the weather",
+      "expected": []
+    },
+    {
+      "question": "what's the spark status",
+      "expected": []
     }
   ]
 }

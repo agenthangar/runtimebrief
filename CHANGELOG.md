@@ -1,5 +1,15 @@
 # Release notes
 
+## 1.0.3 (39) — 2026-10-11
+
+- When an answer is still being prepared, Siri asks "Still checking. Keep
+  waiting?" and answers after a yes, instead of asking you to repeat the
+  question.
+- Spoken questions run the analyst with low reasoning effort and a smaller
+  evidence packet, so answers arrive sooner.
+- "My project park" finds the one project whose name begins or ends with
+  "park", and a project named in the question wins over Siri's own pick.
+
 ## 1.0.3 (38) — 2026-10-11
 
 - When Siri cannot recognize the project in a status request, ask "Which

@@ -56,6 +56,28 @@ enum ProjectMentionMatcher {
         return Swift.min(previous[b.count], limit + 1)
     }
 
+    private static let projectMarkers: Set<String> = ["project", "projects"]
+
+    /// Speech recognition often keeps only part of an invented name ("project
+    /// park" for SlipSpark). After the word "project", a word of four or more
+    /// letters that begins or ends exactly one project's name selects it.
+    private static func partialNameAfterProject(
+        _ words: [String],
+        compacts: [(id: String, compact: String)]
+    ) -> (id: String, start: Int, end: Int, length: Int, distance: Int)? {
+        for index in words.indices.dropFirst() where projectMarkers.contains(words[index - 1]) {
+            let word = words[index]
+            guard word.count >= 4, !fillerWords.contains(word) else { continue }
+            let ids = Set(compacts.filter {
+                $0.compact != word && ($0.compact.hasPrefix(word) || $0.compact.hasSuffix(word))
+            }.map(\.id))
+            if ids.count == 1, let id = ids.first {
+                return (id, index, index + 1, word.count, 2)
+            }
+        }
+        return nil
+    }
+
     /// IDs of the named projects in first-mention order. Names may be split,
     /// joined, pluralized, or slightly misheard ("slip park"). Exact matches
     /// win over misheard ones, and a longer name over a shorter one it
@@ -112,6 +134,9 @@ enum ProjectMentionMatcher {
         var accepted: [Match] = []
         for match in matches where !accepted.contains(where: { match.start < $0.end && $0.start < match.end }) {
             accepted.append(match)
+        }
+        if accepted.isEmpty, let partial = partialNameAfterProject(words, compacts: compacts) {
+            accepted.append(partial)
         }
         var ids: [String] = []
         for match in accepted.sorted(by: { $0.start < $1.start }) where !ids.contains(match.id) {

@@ -87,6 +87,35 @@ export function resolveProjectMentions(
   return analyzeMentions(question, projects).ids;
 }
 
+/** Words that mark the next word as a project name: "my project park". */
+const PROJECT_MARKERS = new Set(["project", "projects"]);
+
+/**
+ * Speech recognition often keeps only part of an invented name ("project
+ * park" for SlipSpark). After the word "project", a word of four or more
+ * letters that begins or ends exactly one project's name selects it.
+ */
+function partialNameAfterProject(
+  words: string[],
+  candidates: { id: string; compact: string }[],
+): Match | null {
+  for (let index = 1; index < words.length; index++) {
+    if (!PROJECT_MARKERS.has(words[index - 1]!)) continue;
+    const word = words[index]!;
+    if (word.length < 4 || FILLER_WORDS.has(word)) continue;
+    const ids = new Set(
+      candidates
+        .filter((candidate) => candidate.compact !== word &&
+          (candidate.compact.startsWith(word) || candidate.compact.endsWith(word)))
+        .map((candidate) => candidate.id),
+    );
+    if (ids.size === 1) {
+      return { id: [...ids][0]!, start: index, end: index + 1, length: word.length, distance: 2 };
+    }
+  }
+  return null;
+}
+
 /** The named projects, plus the question's words outside those names. */
 export function analyzeMentions(
   question: string,
@@ -139,6 +168,10 @@ export function analyzeMentions(
   for (const match of matches) {
     if (accepted.some((other) => match.start < other.end && other.start < match.end)) continue;
     accepted.push(match);
+  }
+  if (accepted.length === 0) {
+    const partial = partialNameAfterProject(words, candidates);
+    if (partial) accepted.push(partial);
   }
   accepted.sort((a, b) => a.start - b.start);
   return {

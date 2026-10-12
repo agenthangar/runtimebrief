@@ -108,10 +108,12 @@ two lines; a Done/Now/Next analysis is read as its done and current lines.
 Status, attention, and list replies follow the same limit. The Shortcuts value
 of an open question is the full answer.
 
-The daemon waits up to eight seconds for an answer. A slower answer continues
-on the Mac: Siri says it is still checking, gives the most important saved
-update, and asks the person to repeat the question in a minute, which then
-returns the finished answer without another model run. The daemon's private
+The daemon waits up to eight seconds for an answer, and spoken questions use
+low reasoning effort and a smaller evidence packet. A slower answer continues
+on the Mac while Siri asks "Still checking. Keep waiting?"; each yes waits
+again for the same analysis, up to three times. After that, or after a no,
+asking the same question again returns the finished answer without another
+model run. The daemon's private
 log records each question as Siri sent it, with its route, outcome, and timing.
 
 Every request about one project ("What's the status of SlipSpark in

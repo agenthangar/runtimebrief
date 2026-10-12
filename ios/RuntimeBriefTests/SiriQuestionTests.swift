@@ -204,6 +204,41 @@ struct SiriQuestionTests {
         }
     }
 
+    @Test func siriKeepsWaitingOnYesInsteadOfAskingAgain() async throws {
+        let pending = try json(response(.pending, scope: .project, interim: .init(
+            answer: "Done: Export shipped. [git-commit-abc]", evidence: [], analyzedAt: nil)))
+        let answered = try json(response(.answered, scope: .project, answer: "The checks passed. [git-commit-abc@demo-sample-tracker]"))
+        let transport = SequencedTransport(bodies: [pending, pending, answered])
+        let source = LiveRuntimeBriefDataSource(client: RuntimeBriefClient(settings: .mock, transport: transport, timeout: 13))
+        var prompts: [String] = []
+        let reply = try await SiriQuestion.answerWaiting(question: "Did the checks pass?", projectID: "demo-sample-tracker",
+                                                         dataSource: source, store: store()) { prompts.append($0) }
+        #expect(prompts == ["Still checking Sample Tracker. Keep waiting?", "Still checking Sample Tracker. Keep waiting?"])
+        #expect(reply.text == "Sample Tracker: The checks passed.")
+        #expect(reply.keepWaitingPrompt == nil)
+        // Every round re-asks the same question, so the Mac joins one analysis.
+        let bodies = try transport.requests().map { try JSONSerialization.jsonObject(with: #require($0.httpBody)) as! [String: Any] }
+        #expect(bodies.count == 3)
+        #expect(bodies.allSatisfy { $0["question"] as? String == "Did the checks pass?" && $0["projectId"] as? String == "demo-sample-tracker" })
+    }
+
+    @Test func waitingStopsAfterThreeRoundsOrWhenThePersonDeclines() async throws {
+        let pending = try json(response(.pending, scope: .portfolio))
+        let transport = SequencedTransport(bodies: Array(repeating: pending, count: 5))
+        let source = LiveRuntimeBriefDataSource(client: RuntimeBriefClient(settings: .mock, transport: transport, timeout: 13))
+        var rounds = 0
+        let reply = try await SiriQuestion.answerWaiting(question: "Anything new?", projectID: nil, dataSource: source,
+                                                         store: store()) { _ in rounds += 1 }
+        #expect(rounds == 3)
+        #expect(reply.text.contains("ask again in a minute"))
+
+        struct Declined: Error {}
+        await #expect(throws: Declined.self) {
+            _ = try await SiriQuestion.answerWaiting(question: "Anything new?", projectID: nil, dataSource: source,
+                                                     store: store()) { _ in throw Declined() }
+        }
+    }
+
     // MARK: Demo
 
     @Test func demoRoutesLikeTheDaemon() async throws {
@@ -216,5 +251,37 @@ struct SiriQuestionTests {
         #expect(portfolio.text.contains("Catalog Builder needs your attention"))
         let chosen = try await demo.askAnything(question: "Anything new?", projectID: "demo-weather-widget")
         #expect(chosen.projects.map(\.name) == ["Weather Widget"])
+    }
+}
+
+/// Returns the given bodies in order, one per request, repeating the last.
+private final class SequencedTransport: HTTPTransport, @unchecked Sendable {
+    private let lock = NSLock()
+    private var bodies: [Data]
+    private var recorded: [URLRequest] = []
+
+    init(bodies: [Data]) { self.bodies = bodies }
+
+    func requests() -> [URLRequest] {
+        lock.lock(); defer { lock.unlock() }
+        return recorded
+    }
+
+    private func next(_ request: URLRequest) -> (Data, URLResponse) {
+        lock.lock(); defer { lock.unlock() }
+        recorded.append(request)
+        let body = bodies.count > 1 ? bodies.removeFirst() : bodies[0]
+        return (body, HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1",
+                                      headerFields: ["Content-Type": "application/json"])!)
+    }
+
+    func data(for request: URLRequest) async throws -> (Data, URLResponse) { next(request) }
+
+    func byteStream(for request: URLRequest) async throws -> (AsyncThrowingStream<UInt8, Error>, URLResponse) {
+        let (body, response) = next(request)
+        return (AsyncThrowingStream { continuation in
+            for byte in body { continuation.yield(byte) }
+            continuation.finish()
+        }, response)
     }
 }

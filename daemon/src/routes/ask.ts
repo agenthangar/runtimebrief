@@ -189,7 +189,10 @@ export function registerAskRoutes(
       question,
       projects.map((project) => ({ id: project.id, name: project.name, aliases: project.spokenNames })),
     );
-    const mentionedIds = projectId ? [projectId] : mentions.ids;
+    // The words of the question beat Siri's own project pick when they
+    // clearly name a different single project.
+    const overridesChoice = projectId !== undefined && mentions.ids.length === 1 && mentions.ids[0] !== projectId;
+    const mentionedIds = projectId && !overridesChoice ? [projectId] : mentions.ids;
     const named = mentionedIds
       .map((id) => projects.find((project) => project.id === id))
       .filter((project): project is ProjectListEntry => project !== undefined);
@@ -197,7 +200,8 @@ export function registerAskRoutes(
 
     const route =
       `scope=${scope} projects=${mentionedIds.join(",") || "-"}` +
-      `${projectId ? " chosen=1" : ""} question=${JSON.stringify(question.slice(0, 300))}`;
+      `${projectId ? (overridesChoice ? ` chosen=${projectId}:overridden` : " chosen=1") : ""}` +
+      ` question=${JSON.stringify(question.slice(0, 300))}`;
 
     // A plain status request is answered at once from saved evidence.
     if (named.length <= 1 && isPlainStatusRequest(mentions.otherWords, scope)) {

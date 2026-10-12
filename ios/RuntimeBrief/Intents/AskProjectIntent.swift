@@ -37,14 +37,17 @@ struct AskProjectIntent: AppIntent {
             throw $question.needsValueError("What do you want to know?")
         }
         do {
-            let reply = try await SiriQuestion.answer(
+            let reply = try await SiriQuestion.answerWaiting(
                 question: trimmed,
                 projectID: project?.id,
                 dataSource: RuntimeBriefDataSourceFactory.current(timeout: 13)
-            )
+            ) { prompt in
+                // Declining ends the request; the answer stays ready on the Mac.
+                try await requestConfirmation(actionName: .continue, dialog: IntentDialog(stringLiteral: prompt))
+            }
             return .result(value: reply.detail, dialog: IntentDialog(stringLiteral: reply.text),
                            view: StatusSnippetView(projectName: reply.title, branch: project?.branch, answer: reply.text))
-        } catch {
+        } catch let error as RuntimeBriefError {
             throw SiriIntentFailure(message: unreachableMessage(for: error))
         }
     }

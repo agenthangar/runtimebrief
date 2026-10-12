@@ -7,11 +7,14 @@ struct SiriQuestionReply: Equatable {
     let text: String
     /// The whole answer, returned to Shortcuts.
     let detail: String
+    /// Set while the Mac is still answering: what Siri asks before waiting on.
+    let keepWaitingPrompt: String?
 
-    init(title: String, text: String, detail: String? = nil) {
+    init(title: String, text: String, detail: String? = nil, keepWaitingPrompt: String? = nil) {
         self.title = title
         self.text = text
         self.detail = detail ?? text
+        self.keepWaitingPrompt = keepWaitingPrompt
     }
 }
 
@@ -37,6 +40,26 @@ enum SiriQuestion {
             let snapshot = try await store.briefSnapshot(dataSource: dataSource)
             return savedAnswer(question: question, projectID: projectID, snapshot: snapshot)
         }
+    }
+
+    /// Like `answer`, but while the Mac is still working Siri asks "Keep
+    /// waiting?" and, on yes, waits again, so the person need not ask twice.
+    static func answerWaiting(
+        question: String,
+        projectID: String?,
+        dataSource: any RuntimeBriefDataSource,
+        store: ProjectsStore = .shared,
+        maxRounds: Int = 3,
+        keepWaiting: (String) async throws -> Void
+    ) async throws -> SiriQuestionReply {
+        var reply = try await answer(question: question, projectID: projectID, dataSource: dataSource, store: store)
+        var rounds = 0
+        while let prompt = reply.keepWaitingPrompt, rounds < maxRounds {
+            rounds += 1
+            try await keepWaiting(prompt)
+            reply = try await answer(question: question, projectID: projectID, dataSource: dataSource, store: store)
+        }
+        return reply
     }
 
     static func reply(for response: AskResponse) -> SiriQuestionReply {
@@ -65,7 +88,11 @@ enum SiriQuestion {
         case (_, nil): opener = "I couldn't check that right now."
         }
         let latest = response.interim.map { SiriBrief.voice($0.answer, evidence: $0.evidence, maxLines: 1) } ?? ""
-        return SiriQuestionReply(title: title, text: latest.isEmpty ? opener : "\(opener) \(latest)")
+        let waitPrompt = response.status == .pending
+            ? (project.map { "Still checking \($0.name). Keep waiting?" } ?? "Still checking. Keep waiting?")
+            : nil
+        return SiriQuestionReply(title: title, text: latest.isEmpty ? opener : "\(opener) \(latest)",
+                                 keepWaitingPrompt: waitPrompt)
     }
 
     /// Project answers rarely repeat the project's name; Siri should say it.

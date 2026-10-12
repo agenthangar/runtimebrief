@@ -33,6 +33,8 @@ export interface AnalystRunParams {
   systemPrompt: string;
   model: string;
   signal: AbortSignal;
+  /** Omitted: the model's default effort. Spoken questions use "low". */
+  reasoningEffort?: "low" | "medium" | "high";
 }
 
 export type AnalystBackendEvent =
@@ -1707,6 +1709,7 @@ function runCodexAppServer(
               ],
               environments: [],
               outputSchema: RUNTIMEBRIEF_ANALYST_JSON_SCHEMA,
+              ...(request.params.reasoningEffort ? { effort: request.params.reasoningEffort } : {}),
             },
           });
           break;

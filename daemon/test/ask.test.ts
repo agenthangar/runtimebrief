@@ -363,7 +363,7 @@ describe("POST /v1/ask", () => {
   let app: FastifyInstance;
   let dir: string;
   let repos: string[];
-  let calls: { systemPrompt: string; evidencePacket: string }[];
+  let calls: { systemPrompt: string; evidencePacket: string; reasoningEffort?: string }[];
   let behavior: "answer" | "fail" | "hold";
   let release: () => void = () => {};
   let logLines: string[];
@@ -433,6 +433,8 @@ describe("POST /v1/ask", () => {
     });
     expect(calls.length).toBe(before + 1);
     expect(calls.at(-1)!.systemPrompt).toBe(VOICE_ANALYST_SYSTEM_PROMPT);
+    expect(calls.at(-1)!.reasoningEffort).toBe("low");
+    expect(calls.at(-1)!.evidencePacket.length).toBeLessThanOrEqual(40_000);
     expect(VOICE_ANALYST_SYSTEM_PROMPT).toContain("at most two short sentences");
     const route = 'scope=project projects=fixture question="Is the fixture app branch merged yet?"';
     expect(logLines.slice(-2)).toEqual([
@@ -451,6 +453,15 @@ describe("POST /v1/ask", () => {
     expect(appAnswer.json().cached).toBe(false);
     expect(calls.length).toBe(before + 1);
     expect(calls.at(-1)!.systemPrompt).not.toBe(VOICE_ANALYST_SYSTEM_PROMPT);
+    expect(calls.at(-1)!.reasoningEffort).toBeUndefined();
+  });
+
+  it("follows the project the question names over Siri's own pick", async () => {
+    const { body } = await ask({ question: "Did the orbit tracker tests pass?", projectId: "fixture" });
+    expect(body.projects).toEqual([{ id: "orbit", name: "Orbit Tracker" }]);
+    expect(logLines.at(-1)).toContain("chosen=fixture:overridden");
+    const kept = await ask({ question: "Did the tests pass?", projectId: "fixture" });
+    expect(kept.body.projects).toEqual([{ id: "fixture", name: "Fixture App" }]);
   });
 
   it("answers a question about no particular project across the portfolio", async () => {

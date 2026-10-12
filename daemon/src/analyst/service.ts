@@ -14,6 +14,7 @@ import {
 import { AnswerCache, type LatestStatus } from "./cache.js";
 import {
   ANALYST_SYSTEM_PROMPT,
+  VOICE_CONTEXT_CHAR_BUDGET,
   buildAnalystEvidence,
   buildAnalystPrompt,
   buildPortfolioEvidence,
@@ -112,8 +113,10 @@ export interface AnalystServiceOptions {
 export const DEFAULT_ANALYST_REQUEST_TIMEOUT_MS = 60_000;
 export const ANALYST_CACHE_BACKEND = "codex-cli";
 export const ANALYST_CACHE_PROMPT_VERSION = "runtimebrief-analyst-v2";
-export const PORTFOLIO_CACHE_PROMPT_VERSION = "runtimebrief-portfolio-v3";
-export const VOICE_CACHE_PROMPT_VERSION = "runtimebrief-analyst-voice-v1";
+export const PORTFOLIO_CACHE_PROMPT_VERSION = "runtimebrief-portfolio-v4";
+export const VOICE_CACHE_PROMPT_VERSION = "runtimebrief-analyst-voice-v2";
+/** Spoken questions read fewer transcripts, so the answer arrives sooner. */
+const VOICE_MAX_TRANSCRIPTS = 3;
 /** Cache rows for portfolio answers; registered project IDs never contain "*". */
 const PORTFOLIO_CACHE_ID = "*portfolio*";
 
@@ -177,11 +180,14 @@ export function createAnalystService(
     }
   }
 
-  async function gatherTranscripts(project: ProjectConfig): Promise<TranscriptDigestInput[]> {
+  async function gatherTranscripts(
+    project: ProjectConfig,
+    maxTranscripts = analystConfig.max_transcripts,
+  ): Promise<TranscriptDigestInput[]> {
     const refs: TranscriptRef[] = [];
     for (const adapter of adapters) {
       try {
-        refs.push(...(await adapter.transcriptPaths(project, analystConfig.max_transcripts)));
+        refs.push(...(await adapter.transcriptPaths(project, maxTranscripts)));
       } catch {
         // a broken adapter must not block the analyst
       }
@@ -200,7 +206,7 @@ export function createAnalystService(
           ? parseCursorProjectTranscript(transcriptPath)
           : parseCursorSessionDir(transcriptPath),
     };
-    for (const ref of selectTranscripts(refs, analystConfig.max_transcripts)) {
+    for (const ref of selectTranscripts(refs, maxTranscripts)) {
       const parse = parsers[ref.source];
       if (!parse) continue;
       try {
@@ -266,23 +272,28 @@ export function createAnalystService(
     const project = projectsForConfig(config).find((p) => p.id === projectId);
     if (!project) throw new ProjectNotFoundError(projectId);
 
+    const voice = askOptions.voice === true;
     const [git, transcripts, iosRelease] = await Promise.all([
       gatherGit(project),
-      gatherTranscripts(project),
+      gatherTranscripts(project, voice ? Math.min(VOICE_MAX_TRANSCRIPTS, analystConfig.max_transcripts) : undefined),
       gatherIosRelease(project),
     ]);
-    const prompt = buildAnalystPrompt(question, project.name, git, transcripts, iosRelease);
+    const prompt = buildAnalystPrompt(
+      question, project.name, git, transcripts, iosRelease,
+      voice ? VOICE_CONTEXT_CHAR_BUDGET : undefined,
+    );
     const evidence = buildAnalystEvidence(git, transcripts, undefined, iosRelease);
     yield* runAnalysis({
       cacheProjectId: project.id,
       question,
       prompt,
       evidence,
-      systemPrompt: askOptions.voice ? VOICE_ANALYST_SYSTEM_PROMPT : ANALYST_SYSTEM_PROMPT,
-      promptVersion: askOptions.voice ? VOICE_CACHE_PROMPT_VERSION : ANALYST_CACHE_PROMPT_VERSION,
+      systemPrompt: voice ? VOICE_ANALYST_SYSTEM_PROMPT : ANALYST_SYSTEM_PROMPT,
+      promptVersion: voice ? VOICE_CACHE_PROMPT_VERSION : ANALYST_CACHE_PROMPT_VERSION,
+      ...(voice ? { reasoningEffort: "low" as const } : {}),
       callerSignal,
       onAnswer: (answer, answerEvidence, createdAt) => {
-        if (question === DEFAULT_STATUS_QUESTION && !askOptions.voice) {
+        if (question === DEFAULT_STATUS_QUESTION && !voice) {
           cache.setLatestStatus(project.id, analystConfig.model, ANALYST_CACHE_PROMPT_VERSION,
             answer, answerEvidence, createdAt);
         }
@@ -303,6 +314,7 @@ export function createAnalystService(
       evidence: buildPortfolioEvidence(projects),
       systemPrompt: PORTFOLIO_SYSTEM_PROMPT,
       promptVersion: PORTFOLIO_CACHE_PROMPT_VERSION,
+      reasoningEffort: "low",
       callerSignal,
     });
   }
@@ -314,6 +326,7 @@ export function createAnalystService(
     evidence: EvidenceRef[];
     systemPrompt: string;
     promptVersion: string;
+    reasoningEffort?: "low";
     callerSignal: AbortSignal | undefined;
     onAnswer?: (answer: string, evidence: EvidenceRef[], createdAt: number) => void;
   }): AsyncGenerator<AnalystChunk> {
@@ -367,6 +380,7 @@ export function createAnalystService(
         systemPrompt: request.systemPrompt,
         model: analystConfig.model,
         signal: abort.signal,
+        ...(request.reasoningEffort ? { reasoningEffort: request.reasoningEffort } : {}),
       });
 
       for await (const event of events) {

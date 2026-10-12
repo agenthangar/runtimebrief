@@ -143,12 +143,16 @@ export function buildAnalystEvidence(
   return evidence;
 }
 
+/** A spoken question gets a smaller packet so the answer arrives sooner. */
+export const VOICE_CONTEXT_CHAR_BUDGET = 40_000;
+
 export function buildAnalystPrompt(
   question: string,
   projectName: string,
   git: GitSummary | null,
   transcripts: TranscriptDigestInput[],
   iosRelease: IosReleaseSummary | null = null,
+  charBudget = CONTEXT_CHAR_BUDGET,
 ): string {
   const parts: string[] = [];
   parts.push(`Question: ${JSON.stringify(question)}`);
@@ -156,7 +160,7 @@ export function buildAnalystPrompt(
   parts.push(gitSection(git));
   parts.push(iosReleaseSection(iosRelease));
 
-  let remaining = CONTEXT_CHAR_BUDGET - parts.join("\n\n").length;
+  let remaining = charBudget - parts.join("\n\n").length;
   const transcriptSections: string[] = [];
   for (const t of transcripts) {
     const section = digestSession(t);
