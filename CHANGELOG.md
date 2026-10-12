@@ -1,5 +1,11 @@
 # Release notes
 
+## 1.0.3 (43) — 2026-10-11
+
+- A project named exactly, by its name or a spoken name, is the only match
+  Siri receives: "Evals" no longer also offers the "Eval" project, which made
+  Siri ask which one was meant.
+
 ## 1.0.3 (42) — 2026-10-11
 
 - Hide Prompts on Screen now keeps native session titles, such as “Siri

@@ -96,6 +96,13 @@ struct ProjectQuery: EntityStringQuery, EnumerableEntityQuery {
         let spellings = projects.flatMap { project in
             [(id: project.id, name: project.name)] + (project.spokenNames ?? []).map { (id: project.id, name: $0) }
         }
+        // An exact spelling ("Evals" for AgentHangar Evals) is the answer:
+        // offering near matches too ("Eval") makes Siri ask which one.
+        let spoken = ProjectFuzzyMatcher.normalize(string)
+        let exact = Set(spellings.filter { ProjectFuzzyMatcher.normalize($0.name) == spoken || ProjectFuzzyMatcher.normalize($0.id) == spoken }.map(\.id))
+        if exact.count == 1 {
+            return projects.filter { exact.contains($0.id) }
+        }
         var ids = ProjectFuzzyMatcher.rank(query: string, candidates: spellings)
         if ids.isEmpty {
             ids = ProjectMentionMatcher.resolve(string, candidates: SiriQuestion.mentionCandidates(projects))

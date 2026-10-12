@@ -59,6 +59,19 @@ struct EntityQueryTests {
         #expect(ProjectQuery.matches(for: "sky dark", in: projects).isEmpty)
     }
 
+    @Test func anExactNameOrSpokenNameNeverAsksWhichOne() {
+        let projects = [
+            summary("agenthangar-evals", "AgentHangar Evals", spoken: ["Evals", "Vyas", "Evils"]),
+            summary("eval", "Eval"),
+            summary("dotfiles", "Dotfiles", spoken: ["Dot Files"]),
+        ]
+        for (heard, id) in [("Evals", "agenthangar-evals"), ("evals", "agenthangar-evals"), ("Vyas", "agenthangar-evals"),
+                            ("Evils", "agenthangar-evals"), ("AgentHangar Evals", "agenthangar-evals"), ("Eval", "eval"),
+                            ("dot files", "dotfiles"), ("Dotfiles", "dotfiles"), ("the Dotfiles app", "dotfiles")] {
+            #expect(ProjectQuery.matches(for: heard, in: projects).map(\.id) == [id], "heard: \(heard)")
+        }
+    }
+
     @Test func spokenSpellingsJoinSiriVocabularyAndSurviveOlderDaemons() throws {
         let entity = ProjectEntity(summary: summary("slipspark", "slipspark", spoken: ["Slip Spark", "SlipSpark"]))
         let spokenNames = entity.displayRepresentation.synonyms.map { String(localized: $0) }
