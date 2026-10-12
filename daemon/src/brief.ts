@@ -1,3 +1,4 @@
+import { sessionSubject } from "./sessionSubject.js";
 import type { GitSummary } from "./adapters/filesystemGit.js";
 import type {
   BriefClaim,
@@ -164,7 +165,8 @@ export function buildProjectBrief(
   const claims: BriefClaim[] = [];
 
   for (const session of waiting.slice(0, 2)) {
-    const subject = session.summary ? ` on “${compact(session.summary, 90)}”` : "";
+    const name = sessionSubject(session);
+    const subject = name ? ` on “${compact(name, 90)}”` : "";
     claims.push({
       id: `waiting-${session.source}-${session.id}`,
       category: "attention",
@@ -174,7 +176,8 @@ export function buildProjectBrief(
   }
 
   for (const session of active.slice(0, 2)) {
-    const subject = session.summary ? ` on “${compact(session.summary, 90)}”` : "";
+    const name = sessionSubject(session);
+    const subject = name ? ` on “${compact(name, 90)}”` : "";
     claims.push({
       id: `active-${session.source}-${session.id}`,
       category: "progress",
@@ -196,7 +199,8 @@ export function buildProjectBrief(
   for (const session of completed) {
     if (completedSources.has(session.source)) continue;
     completedSources.add(session.source);
-    const subject = session.summary ? ` “${compact(session.summary, 100)}”` : "";
+    const name = sessionSubject(session);
+    const subject = name ? ` “${compact(name, 100)}”` : "";
     claims.push({
       id: `completed-${session.source}-${session.id}`,
       category: "completed",

@@ -1,3 +1,4 @@
+import { presentablePrompt } from "../sessionSubject.js";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -147,7 +148,8 @@ export class CodexSessionsAdapter implements RuntimeAdapter {
       };
       if (session.startedAt) ref.startedAt = session.startedAt;
       if (session.endedAt) ref.endedAt = session.endedAt;
-      const firstPrompt = session.userPrompts[0];
+      // Extract the request from attachment preambles before truncating.
+      const firstPrompt = presentablePrompt(session.userPrompts[0]) ?? session.userPrompts[0];
       if (firstPrompt) ref.summary = truncate(firstPrompt, 140);
       ref.state = session.state;
       ref.stateReason = session.stateReason;

@@ -138,6 +138,10 @@ struct RuntimeBriefShortcuts: AppShortcutsProvider {
                 "Show \(.applicationName) status",
                 "How are my projects doing in \(.applicationName)",
                 "Give me a status update from \(.applicationName)",
+                "What are my projects up to in \(.applicationName)",
+                "List my \(.applicationName) projects",
+                "What have my agents been doing in \(.applicationName)",
+                "Give me an overview in \(.applicationName)",
             ],
             shortTitle: "All Projects Status",
             systemImageName: "shippingbox"
@@ -162,16 +166,20 @@ struct RuntimeBriefShortcuts: AppShortcutsProvider {
             shortTitle: "Ask RuntimeBrief",
             systemImageName: "questionmark.bubble"
         )
+        // What finished, across every agent and project, without a model run.
         AppShortcut(
-            intent: ListProjectsIntent(),
+            intent: GetDigestIntent(),
             phrases: [
-                "What are my projects up to in \(.applicationName)",
-                "List my \(.applicationName) projects",
-                "What have my agents been doing in \(.applicationName)",
-                "Give me an overview in \(.applicationName)",
+                "What did my agents get done in \(.applicationName)",
+                "What did my agents get done \(\.$period) in \(.applicationName)",
+                "What did my agents do \(\.$period) in \(.applicationName)",
+                "What did my agents ship \(\.$period) in \(.applicationName)",
+                "What got done \(\.$period) in \(.applicationName)",
+                "What's new \(\.$period) in \(.applicationName)",
+                "Ask \(.applicationName) what my agents got done \(\.$period)",
             ],
-            shortTitle: "List Projects",
-            systemImageName: "list.bullet"
+            shortTitle: "What Got Done",
+            systemImageName: "checkmark.circle"
         )
     }
 }

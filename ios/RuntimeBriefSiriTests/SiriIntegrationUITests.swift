@@ -71,6 +71,10 @@ final class SiriIntegrationUITests: XCTestCase {
         let answer: String = try answerResult.value
         XCTAssertTrue(answer.contains("fictional demo response"))
 
+        let digest: String = try await definitions.intents["GetDigestIntent"]
+            .makeIntent(period: definitions.enums["DigestPeriod"].makeCase("thisWeek")).run().value
+        XCTAssertTrue(digest.contains("Agents finished work in") && digest.contains("Sample Tracker"), digest)
+
         // An open question without a chosen project: the named project is
         // found in the words, and anything else is answered for every project.
         let ask = definitions.intents["AskProjectIntent"]

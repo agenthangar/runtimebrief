@@ -66,8 +66,8 @@ enum SiriQuestion {
         let project = response.scope == .project ? response.projects.first : nil
         let title = project?.name ?? portfolioTitle
         if response.status == .answered, let answer = response.answer {
-            let short = SiriBrief.voice(answer, evidence: response.evidence)
-            let full = SiriBrief.spoken(answer, evidence: response.evidence)
+            let short = PresentationMode.text(SiriBrief.voice(answer, evidence: response.evidence))
+            let full = PresentationMode.text(SiriBrief.spoken(answer, evidence: response.evidence))
             // A saved analysis says how old it is, like the status action.
             if let project, let analyzedAt = response.analyzedAt {
                 let lead = "\(project.name), analyzed \(SiriBrief.age(of: analyzedAt)): "

@@ -197,6 +197,17 @@
         }
       }
     },
+    "Ask ${applicationName} what my agents got done ${period}": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ask ${applicationName} what my agents got done ${period}"
+          }
+        }
+      }
+    },
     "Ask ${applicationName} what's happening with ${project}": {
       "extractionState": "manual",
       "localizations": {
@@ -854,6 +865,61 @@
         }
       }
     },
+    "What did my agents do ${period} in ${applicationName}": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "What did my agents do ${period} in ${applicationName}"
+          }
+        }
+      }
+    },
+    "What did my agents get done ${period} in ${applicationName}": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "What did my agents get done ${period} in ${applicationName}"
+          }
+        }
+      }
+    },
+    "What did my agents get done in ${applicationName}": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "What did my agents get done in ${applicationName}"
+          }
+        }
+      }
+    },
+    "What did my agents ship ${period} in ${applicationName}": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "What did my agents ship ${period} in ${applicationName}"
+          }
+        }
+      }
+    },
+    "What got done ${period} in ${applicationName}": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "What got done ${period} in ${applicationName}"
+          }
+        }
+      }
+    },
     "What happened with ${project} in ${applicationName}": {
       "extractionState": "stale",
       "localizations": {
@@ -893,6 +959,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "What should I look at in ${applicationName}"
+          }
+        }
+      }
+    },
+    "What's new ${period} in ${applicationName}": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "What's new ${period} in ${applicationName}"
           }
         }
       }

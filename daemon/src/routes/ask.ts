@@ -55,6 +55,54 @@ const OVERVIEW_WORDS = new Set([
   ..."active agent agents attention blocked blocker blockers blocking busy everything need needs needing review should stuck wait waiting which work working".split(" "),
 ]);
 
+/** "What did my agents get done today?": answered from completed claims. */
+const DIGEST_WORDS = new Set(
+  "accomplish accomplished complete completed done finish finished get got ship shipped today work worked yesterday week".split(" "),
+);
+
+export function isDigestRequest(otherWords: string[]): boolean {
+  return otherWords.some((word) => DIGEST_WORDS.has(word)) &&
+    otherWords.every((word) => OVERVIEW_WORDS.has(word) || DIGEST_WORDS.has(word));
+}
+
+/** Completed work across projects since `since`, newest first, in two lines. */
+export function portfolioDigest(projects: ProjectListEntry[], since: Date, period: string): AskInterim {
+  const done = projects
+    .flatMap((project) => project.brief.claims
+      .filter((claim) => claim.category === "completed")
+      .map((claim) => ({
+        project,
+        claim,
+        at: Math.max(0, ...claim.evidence.map((ref) => (ref.timestamp ? Date.parse(ref.timestamp) : 0))),
+      })))
+    .filter((item) => item.at >= since.getTime())
+    .sort((a, b) => b.at - a.at);
+  const names = [...new Set(done.map((item) => item.project.name))];
+  if (names.length === 0) {
+    return { answer: `No completed agent work is recorded ${period}.`, evidence: [], analyzedAt: null };
+  }
+  const latest = done[0]!;
+  const evidence = scoped(latest.claim.evidence, latest.project);
+  const shown = [...names.slice(0, 3), ...(names.length > 3 ? [`${names.length - 3} more`] : [])];
+  return {
+    answer:
+      `Agents finished work in ${names.length} project${names.length === 1 ? "" : "s"} ${period}: ${namesList(shown)}. ` +
+      `Latest, ${latest.project.name}: ${sentence(latest.claim.text)}${cite(evidence)}`,
+    evidence,
+    analyzedAt: null,
+  };
+}
+
+function digestWindow(otherWords: string[], now: Date): { since: Date; period: string } {
+  if (otherWords.includes("week")) return { since: new Date(now.getTime() - 7 * 24 * 3_600_000), period: "this week" };
+  const midnight = new Date(now);
+  midnight.setHours(0, 0, 0, 0);
+  if (otherWords.includes("yesterday")) {
+    return { since: new Date(midnight.getTime() - 24 * 3_600_000), period: "since yesterday" };
+  }
+  return { since: midnight, period: "today" };
+}
+
 export function isPlainStatusRequest(otherWords: string[], scope: "project" | "portfolio"): boolean {
   const vocabulary = scope === "project" ? STATUS_WORDS : OVERVIEW_WORDS;
   return otherWords.every((word) => vocabulary.has(word));
@@ -202,6 +250,18 @@ export function registerAskRoutes(
       `scope=${scope} projects=${mentionedIds.join(",") || "-"}` +
       `${projectId ? (overridesChoice ? ` chosen=${projectId}:overridden` : " chosen=1") : ""}` +
       ` question=${JSON.stringify(question.slice(0, 300))}`;
+
+    // "What did my agents get done today?" is answered at once from the briefs.
+    if (named.length === 0 && isDigestRequest(mentions.otherWords)) {
+      const { since, period } = digestWindow(mentions.otherWords, new Date());
+      const digest = portfolioDigest(projects, since, period);
+      log(`[ask] replied ${route} status=answered instant=digest ms=0`);
+      const response: AskResponse = {
+        status: "answered", scope, projects: [], answer: digest.answer, evidence: digest.evidence,
+        cached: true, analyzedAt: null, interim: null,
+      };
+      return reply.send(response);
+    }
 
     // A plain status request is answered at once from saved evidence.
     if (named.length <= 1 && isPlainStatusRequest(mentions.otherWords, scope)) {

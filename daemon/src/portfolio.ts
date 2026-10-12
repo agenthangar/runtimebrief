@@ -1,3 +1,4 @@
+import { sessionSubject } from "./sessionSubject.js";
 import { FilesystemGitAdapter, type GitSummary } from "./adapters/filesystemGit.js";
 import { buildProjectBrief } from "./brief.js";
 import { spokenNames } from "./spokenNames.js";
@@ -82,7 +83,7 @@ function sessionSummary(session: TranscriptRef): ProjectSessionSummary {
     id: session.id,
     startedAt: session.startedAt?.toISOString() ?? null,
     endedAt: session.endedAt?.toISOString() ?? null,
-    summary: session.summary ?? null,
+    summary: sessionSubject(session),
     state: session.state ?? "unknown",
     stateReason: session.stateReason ?? "No lifecycle event was found.",
     gitBranch: session.gitBranch ?? null,

@@ -10,23 +10,28 @@ enum DemoData {
     private static var yesterday: Date { Date().addingTimeInterval(-22 * 60 * 60) }
     private static var lastWeek: Date { Date().addingTimeInterval(-6 * 24 * 60 * 60) }
 
-    private static let commitEvidence = EvidenceRef(
-        id: "demo-evidence-commit-001",
-        kind: .commit,
-        label: "Commit a1b2c3d",
-        detail: "Demo Developer: Add export validation",
-        source: "git",
-        timestamp: nil
-    )
+    // Timed like the fictional work, so "what got done" has something to say.
+    private static var commitEvidence: EvidenceRef {
+        EvidenceRef(
+            id: "demo-evidence-commit-001",
+            kind: .commit,
+            label: "Commit a1b2c3d",
+            detail: "Demo Developer: Add export validation",
+            source: "git",
+            timestamp: recent
+        )
+    }
 
-    private static let testEvidence = EvidenceRef(
-        id: "demo-evidence-session-001",
-        kind: .session,
-        label: "Codex demo session",
-        detail: "Fictional test run completed with 24 checks passing",
-        source: "codex",
-        timestamp: nil
-    )
+    private static var testEvidence: EvidenceRef {
+        EvidenceRef(
+            id: "demo-evidence-session-001",
+            kind: .session,
+            label: "Codex demo session",
+            detail: "Fictional test run completed with 24 checks passing",
+            source: "codex",
+            timestamp: recent
+        )
+    }
 
     static var projects: [ProjectSummary] {
         [sampleTrackerSummary, catalogBuilderSummary, weatherWidgetSummary]

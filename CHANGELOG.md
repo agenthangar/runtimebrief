@@ -1,5 +1,17 @@
 # Release notes
 
+## 1.0.3 (40) — 2026-10-11
+
+- "What did my agents get done today in RuntimeBrief?" names the projects
+  with finished agent work today, yesterday, or this week, and the latest
+  item, at once from saved evidence. Asking RuntimeBrief the same question
+  works too.
+- Settings → Presentation → Hide Prompts on Screen hides your prompts,
+  session titles, and agent messages in the app and in Siri's answers, for
+  demos and screen sharing.
+- Session subjects use the native title when there is one, and no longer show
+  attachment lists, conversation-continuation notices, or local file paths.
+
 ## 1.0.3 (39) — 2026-10-11
 
 - When an answer is still being prepared, Siri asks "Still checking. Keep

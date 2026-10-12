@@ -24,7 +24,9 @@ import {
   resolveProjectMentions,
 } from "../src/analyst/projectMentions.js";
 import {
+  isDigestRequest,
   isPlainStatusRequest,
+  portfolioDigest,
   portfolioInterim,
   projectInterim,
   type AskResponse,
@@ -346,6 +348,41 @@ describe("spoken questions and reasoning effort", () => {
   });
 });
 
+describe("what agents got done", () => {
+  const at = (iso: string): EvidenceRef => ({ ...ref("session-x"), timestamp: iso });
+  const done = (id: string, name: string, text: string, iso: string): ProjectListEntry => ({
+    ...entry(id, name),
+    brief: brief({ claims: [{ id: `completed-${id}`, category: "completed", text, evidence: [{ ...at(iso), id: `session-${id}` }] }] }),
+  });
+
+  it.each([
+    ["What did my agents get done today?", true],
+    ["what got shipped this week", true],
+    ["Anything finished yesterday?", true],
+    ["What needs my attention?", false],
+    ["What did Codex break in the build today?", false],
+  ])("recognizes %s", (question, expected) => {
+    expect(isDigestRequest(analyzeMentions(question as string, []).otherWords)).toBe(expected);
+  });
+
+  it("names the projects with finished work since the window began, newest first", () => {
+    const projects = [
+      done("a", "Alpha", "Codex completed “Add search”", "2026-10-11T09:00:00.000Z"),
+      done("b", "Beta", "Claude Code completed “Fix crash”", "2026-10-11T15:00:00.000Z"),
+      done("c", "Gamma", "Cursor completed “Old work”", "2026-10-09T15:00:00.000Z"),
+    ];
+    const digest = portfolioDigest(projects, new Date("2026-10-11T00:00:00.000Z"), "today");
+    expect(digest.answer).toBe(
+      "Agents finished work in 2 projects today: Beta and Alpha. Latest, Beta: Claude Code completed “Fix crash”. [session-b@b]",
+    );
+    expect(portfolioDigest(projects, new Date("2026-10-12T00:00:00.000Z"), "today").answer)
+      .toBe("No completed agent work is recorded today.");
+    const many = Array.from({ length: 6 }, (_, i) => done(`p${i}`, `P${i}`, "Codex completed “x”", `2026-10-11T1${i}:00:00.000Z`));
+    expect(portfolioDigest(many, new Date("2026-10-11T00:00:00.000Z"), "today").answer)
+      .toMatch(/^Agents finished work in 6 projects today: P5, P4, P3 and 3 more\./);
+  });
+});
+
 describe("interim answers", () => {
   it("prefers the latest completed project analysis", () => {
     const latest = { answer: "Done: Shipped. [git-commit-abc]", createdAt: 0, evidence: [ref("git-commit-abc")], model: "m" };
@@ -518,7 +555,7 @@ describe("POST /v1/ask", () => {
 
   it("returns saved evidence while a slow answer continues, then the answer on a repeat", async () => {
     behavior = "hold";
-    const pending = await ask({ question: "What did agents finish today?", waitMs: 20 });
+    const pending = await ask({ question: "What risks do the agents see in the release plan?", waitMs: 20 });
     expect(pending.body.status).toBe("pending");
     expect(pending.body.answer).toBeNull();
     expect(pending.body.interim?.answer).toMatch(/^Nothing needs your attention across 2 projects\.|^\d+ projects? needs? attention/);
@@ -526,7 +563,7 @@ describe("POST /v1/ask", () => {
     release();
     behavior = "answer";
     await new Promise((resolve) => setTimeout(resolve, 20));
-    const repeated = await ask({ question: "what did agents  finish today?", waitMs: 0 });
+    const repeated = await ask({ question: "what risks do the agents  see in the release plan?", waitMs: 0 });
     expect(repeated.body).toMatchObject({ status: "answered", interim: null });
     expect(calls.length).toBe(runs);
   });
@@ -555,6 +592,15 @@ describe("POST /v1/ask", () => {
     });
     expect(saved.body.analyzedAt).toEqual(expect.any(String));
     expect(calls.length).toBe(runs);
+  });
+
+  it("answers what agents got done at once", async () => {
+    const before = calls.length;
+    const { body } = await ask({ question: "What did my agents get done today?" });
+    expect(body).toMatchObject({ status: "answered", scope: "portfolio", cached: true });
+    expect(body.answer).toMatch(/^(Agents finished work in|No completed agent work is recorded today)/);
+    expect(calls.length).toBe(before);
+    expect(logLines.at(-1)).toContain("instant=digest");
   });
 
   it("routes configured spoken names and lists them for Siri's vocabulary", async () => {

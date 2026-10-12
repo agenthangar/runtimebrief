@@ -6,6 +6,7 @@ struct SettingsView: View {
     @State private var token = ""
     @State private var testResult: TestResult?
     @State private var testing = false
+    @AppStorage(PresentationMode.key) private var presenting = false
     @AppStorage(ProjectDiscoverySettings.key) private var discoveryEnabled = true
     @FocusState private var focusedField: Field?
 
@@ -32,6 +33,14 @@ struct SettingsView: View {
                     Text("Siri & Search")
                 } footer: {
                     Text("Allow project names, branches, and brief headlines in on-device search and Siri suggestions. Your configured shortcuts remain available.")
+                }
+                Section {
+                    Toggle("Hide Prompts on Screen", isOn: $presenting)
+                        .accessibilityIdentifier("presentation-mode-toggle")
+                } header: {
+                    Text("Presentation")
+                } footer: {
+                    Text("For demos and screen sharing: hides your prompts, session titles, and agent messages in the app and in Siri's answers. Project states and counts stay visible.")
                 }
                 Section {
                     TextField("https://your-mac.tailnet.ts.net", text: $serverURL)

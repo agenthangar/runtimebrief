@@ -123,6 +123,56 @@ struct SiriBriefTests {
         #expect(SiriBrief.voice("Version 1.0.3 shipped. Build 35 is live.", evidence: [], maxLines: 1) == "Version 1.0.3 shipped.")
     }
 
+    private func completed(_ id: String, _ name: String, _ text: String, _ at: Date) -> ProjectSummary {
+        ProjectSummary(id: id, name: name, lastActivityAt: at, branch: nil, dirty: nil, brief: ProjectBrief(
+            state: .recent, headline: "Recent work is ready to review", headlineEvidence: [], updatedAt: at, activeSessionCount: 0,
+            claims: [BriefClaim(id: "completed-\(id)", category: .completed, text: text, evidence: [
+                EvidenceRef(id: "session-\(id)", kind: .session, label: "Session", detail: "", source: "codex", timestamp: at),
+            ])]
+        ))
+    }
+
+    @Test func digestNamesProjectsWithFinishedWorkNewestFirst() {
+        let now = Date()
+        let snapshot = ProjectsStore.BriefSnapshot(projects: [
+            completed("a", "Alpha", "Codex completed “Add search”.", now.addingTimeInterval(-3_600)),
+            completed("b", "Beta", "Claude Code completed “Fix the crash”.", now.addingTimeInterval(-600)),
+            completed("c", "Gamma", "Cursor completed “Old work”.", now.addingTimeInterval(-3 * 86_400)),
+        ], fetchedAt: nil, isSaved: false, isDemo: false)
+        let text = SiriBrief.digest(snapshot, since: now.addingTimeInterval(-86_400), period: "today")
+        #expect(text == "Agents finished work in 2 projects today: Beta and Alpha. Latest, Beta: Claude Code completed “Fix the crash”.")
+        #expect(SiriBrief.sentences(text).count == 2)
+        #expect(SiriBrief.digest(snapshot, since: now, period: "today") == "No completed agent work is recorded today.")
+        let many = ProjectsStore.BriefSnapshot(projects: (0..<7).map {
+            completed("p\($0)", "P\($0)", "Codex completed “x”.", now.addingTimeInterval(Double(-$0) * 60))
+        }, fetchedAt: nil, isSaved: false, isDemo: false)
+        #expect(SiriBrief.digest(many, since: now.addingTimeInterval(-86_400), period: "today")
+            .hasPrefix("Agents finished work in 7 projects today: P0, P1, P2, and 4 more."))
+    }
+
+    @Test func presentationModeHidesQuotedPromptsButKeepsTheState() {
+        let cases = [
+            ("Codex completed “Search the whole machine for .p8 file?”.", "Codex completed."),
+            ("Claude Code is actively working on “Fix login”.", "Claude Code is actively working."),
+            ("Cursor is waiting for your input on “Approve?”.", "Cursor is waiting for your input."),
+            ("Latest commit: Add search.", "Latest commit: Add search."),
+        ]
+        for (input, expected) in cases {
+            #expect(PresentationMode.text(input, enabled: true) == expected)
+            #expect(PresentationMode.text(input, enabled: false) == input)
+        }
+    }
+
+    @Test func periodsStartAtLocalMidnightOrAWeekAgo() {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "America/Los_Angeles")!
+        let now = ISO8601DateFormatter().date(from: "2026-10-13T17:30:00Z")!  // 10:30 in Los Angeles
+        let today = DigestPeriod.today.window(now: now, calendar: calendar)
+        #expect(ISO8601DateFormatter().string(from: today.since) == "2026-10-13T07:00:00Z")
+        #expect(DigestPeriod.yesterday.window(now: now, calendar: calendar).label == "since yesterday")
+        #expect(DigestPeriod.thisWeek.window(now: now, calendar: calendar).since == now.addingTimeInterval(-7 * 86_400))
+    }
+
     @Test func attentionAndSavedBriefsAreTwoLines() {
         let projects = (0..<12).map { index in
             ProjectSummary(id: "p\(index)", name: "Project \(index)", lastActivityAt: nil, branch: nil, dirty: nil,

@@ -25,7 +25,7 @@ enum SiriBrief {
         var text = "\(project.name): \(terminated(project.brief?.headline ?? "No project brief is available"))"
         let attention = project.brief?.claims.first { $0.category == .attention && $0.text != project.brief?.headline }
         if let attention {
-            text += " \(terminated(attention.text))"
+            text += " \(terminated(PresentationMode.text(attention.text)))"
         } else if let evidenceDate = project.brief?.updatedAt {
             text += " Last activity \(dateText(evidenceDate))."
         }
@@ -115,6 +115,27 @@ enum SiriBrief {
         if elapsed < 60 * 60 { return "\(Int(elapsed / 60)) minutes ago" }
         if elapsed < 24 * 60 * 60 { return "\(Int(elapsed / 3600)) hours ago" }
         return dateText(date)
+    }
+
+    /// Which projects had completed agent work since `since`, newest first,
+    /// in two lines: the project names, then the latest completed item.
+    static func digest(_ snapshot: ProjectsStore.BriefSnapshot, since: Date, period: String) -> String {
+        let done = snapshot.projects.flatMap { project in
+            (project.brief?.claims ?? []).filter { $0.category == .completed }.compactMap { claim -> (ProjectSummary, BriefClaim, Date)? in
+                guard let at = claim.evidence.compactMap(\.timestamp).max(), at >= since else { return nil }
+                return (project, claim, at)
+            }
+        }.sorted { $0.2 > $1.2 }
+        guard let latest = done.first else {
+            return prefix(snapshot) + "No completed agent work is recorded \(period)."
+        }
+        var names: [String] = []
+        for (project, _, _) in done where !names.contains(project.name) { names.append(project.name) }
+        let shown = names.prefix(3) + (names.count > 3 ? ["\(names.count - 3) more"] : [])
+        let item = PresentationMode.text(EvidencePresentation.text(latest.1.text, evidence: latest.1.evidence))
+        return prefix(snapshot)
+            + "Agents finished work in \(names.count) project\(names.count == 1 ? "" : "s") \(period): \(shown.formatted(.list(type: .and)))."
+            + " Latest, \(latest.0.name): \(terminated(item))"
     }
 
     static func attentionProjects(_ projects: [ProjectSummary]) -> [ProjectSummary] {
