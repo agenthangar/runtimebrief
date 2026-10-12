@@ -75,15 +75,21 @@ struct RuntimeBriefShortcuts: AppShortcutsProvider {
             shortTitle: "Needs Attention",
             systemImageName: "exclamationmark.bubble"
         )
+        // A spoken message to a running agent; the message is asked for
+        // after the project, then confirmed before it is sent.
         AppShortcut(
-            intent: OpenProjectIntent(),
+            intent: TellAgentIntent(),
             phrases: [
-                "Open a project in \(.applicationName)",
-                "Open \(\.$target) in \(.applicationName)",
-                "Show \(\.$target) in \(.applicationName)",
+                "\(.applicationName) tell an agent",
+                "Tell an agent in \(.applicationName)",
+                "Tell the \(\.$project) agent in \(.applicationName)",
+                "Message the \(\.$project) agent in \(.applicationName)",
+                "Reply to the \(\.$project) agent in \(.applicationName)",
+                "Send a message to the \(\.$project) agent with \(.applicationName)",
+                "Ask \(.applicationName) to tell the \(\.$project) agent something",
             ],
-            shortTitle: "Open Project",
-            systemImageName: "shippingbox"
+            shortTitle: "Tell an Agent",
+            systemImageName: "bubble.left.and.text.bubble.right"
         )
         // Every request about one project uses the analysis action, whose
         // project is required: when Siri mishears the name, it asks "Which

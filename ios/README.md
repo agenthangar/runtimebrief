@@ -86,6 +86,7 @@ personal signing change local; do not commit it or change the production
 | Open project | Open Sample Tracker in RuntimeBrief | Opens project detail |
 | Ask anything | Ask RuntimeBrief, then any question, such as "What needs my attention?" or "Did the Sample Tracker checks pass?" | Answer text |
 | Ask about one project | Ask RuntimeBrief a question about Sample Tracker, then the question | Answer text |
+| Tell an agent | Tell the Sample Tracker agent in RuntimeBrief, then the message | Delivery text |
 | What got done | What did my agents get done today in RuntimeBrief? (also yesterday, this week) | Digest text |
 | Start coding session | Start a new coding agent for Sample Tracker from RuntimeBrief | Session receipt ID |
 | Start a named agent | Start Codex for Sample Tracker from RuntimeBrief; also Claude or Cursor | Session receipt ID |
@@ -96,6 +97,13 @@ and the latest item, from the briefs' completed claims and their evidence
 times, without an analyst run. **Settings → Presentation → Hide Prompts on
 Screen** removes quoted prompts, session titles, and agent messages from the
 app and from Siri's answers, keeping states and counts, for demos.
+
+**Tell an Agent** sends a spoken message to an agent that RuntimeBrief
+started on the project, preferring the one waiting for input, otherwise the
+most recently started live session. Siri asks for the message, reads it back
+for confirmation, and sends it with the in-app reply's durable request ID, so a
+retry never sends it twice. Sessions started elsewhere, or with Remote Control
+off, are not addressed.
 
 **Ask RuntimeBrief** is the open-ended entry point. A spoken shortcut phrase
 cannot contain free text, so Siri replies "What do you want to know?" and the

@@ -123,6 +123,9 @@ final class SiriIntegrationUITests: XCTestCase {
             XCTAssertNotNil(UUID(uuidString: receiptID))
 
         }
+        let told: String = try await definitions.intents["TellAgentIntent"]
+            .makeIntent(project: project, message: "Also add tests").run().value
+        XCTAssertTrue(told.contains("Sent to"), told)
     }
 
     @MainActor

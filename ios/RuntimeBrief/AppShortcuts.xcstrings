@@ -77,6 +77,17 @@
         }
       }
     },
+    "${applicationName} tell an agent": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "${applicationName} tell an agent"
+          }
+        }
+      }
+    },
     "Analyze ${project} with ${applicationName}": {
       "extractionState": "stale",
       "localizations": {
@@ -193,6 +204,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ask ${applicationName} something"
+          }
+        }
+      }
+    },
+    "Ask ${applicationName} to tell the ${project} agent something": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ask ${applicationName} to tell the ${project} agent something"
           }
         }
       }
@@ -526,6 +548,17 @@
         }
       }
     },
+    "Message the ${project} agent in ${applicationName}": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Message the ${project} agent in ${applicationName}"
+          }
+        }
+      }
+    },
     "Open ${target} in ${applicationName}": {
       "extractionState": "stale",
       "localizations": {
@@ -558,6 +591,17 @@
         }
       }
     },
+    "Reply to the ${project} agent in ${applicationName}": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reply to the ${project} agent in ${applicationName}"
+          }
+        }
+      }
+    },
     "Run ${applicationName} project status": {
       "extractionState": "stale",
       "localizations": {
@@ -576,6 +620,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Run a coding agent using ${applicationName}"
+          }
+        }
+      }
+    },
+    "Send a message to the ${project} agent with ${applicationName}": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Send a message to the ${project} agent with ${applicationName}"
           }
         }
       }
@@ -822,6 +877,17 @@
         }
       }
     },
+    "Tell an agent in ${applicationName}": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tell an agent in ${applicationName}"
+          }
+        }
+      }
+    },
     "Tell me a project's status from ${applicationName}": {
       "extractionState": "stale",
       "localizations": {
@@ -851,6 +917,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Tell me the status of ${project} from ${applicationName}"
+          }
+        }
+      }
+    },
+    "Tell the ${project} agent in ${applicationName}": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tell the ${project} agent in ${applicationName}"
           }
         }
       }

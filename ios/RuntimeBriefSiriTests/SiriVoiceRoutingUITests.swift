@@ -15,6 +15,7 @@ final class SiriVoiceRoutingUITests: XCTestCase {
         try await Task.sleep(for: .seconds(10))
 
         for (request, expected) in [
+            ("Tell the Sample Tracker agent in RuntimeBrief", "What should I tell the agent"),
             ("RuntimeBrief start Codex", "Which project should Codex work on"),
             ("Start Codex for Sample Tracker from RuntimeBrief", "What should Codex work on"),
             ("Start Codex for the Sample Tracker app from RuntimeBrief", "What should Codex work on"),

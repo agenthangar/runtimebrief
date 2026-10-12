@@ -1,5 +1,13 @@
 # Release notes
 
+## 1.0.3 (41) — 2026-10-11
+
+- "Tell the Meal Planner agent in RuntimeBrief", then the message: Siri reads
+  it back for confirmation and sends it to the agent RuntimeBrief started on
+  that project — the one waiting for input first, otherwise the most recent.
+  Works for Claude Code, Codex, and Cursor. It replaces the Open Project
+  phrase; Open Project remains a Shortcuts action.
+
 ## 1.0.3 (40) — 2026-10-11
 
 - "What did my agents get done today in RuntimeBrief?" names the projects
