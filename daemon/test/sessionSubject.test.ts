@@ -24,5 +24,8 @@ describe("session subjects", () => {
     }
     expect(presentablePrompt("Read /Users/someone/project/secrets.txt and ~/notes.md please")).toBe("Read and please");
     expect(sessionSubject({ title: "This session is being continued from a previous conversation", summary: "Ship it" })).toBe("Ship it");
+    expect(sessionSubject({ title: "RuntimeBrief Meal Planner 21bfbe3a", summary: "Fix the login crash" })).toBe("Fix the login crash");
+    expect(sessionSubject({ title: "RuntimeBrief Home We Go e316bf2a-5b6f-43a7-a4aa-d1d2f231dcb9" })).toBeNull();
+    expect(sessionSubject({ title: "RuntimeBrief Siri integration" })).toBe("RuntimeBrief Siri integration");
   });
 });
