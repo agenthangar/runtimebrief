@@ -20,9 +20,10 @@ do not replace its history or create another root commit.
 3. Run `scripts/verify-release-privacy.sh` before committing and against the
    intended commit before pushing. Keep local configuration, credentials,
    transcripts, screenshots, logs, and generated build output outside Git.
-4. Push the reviewed commits to `main` and verify its daemon and iOS CI checks.
-   Check security-analysis results separately; do not describe a pending scan
-   as passed.
+4. Push the reviewed commits to `main` and verify its daemon CI check. GitHub
+   CI does not build or test the iOS app; run the iOS and Siri suites before
+   any iOS upload. Check security-analysis results separately; do not describe
+   a pending scan as passed.
 5. Deploy the daemon from the reviewed source, rebuild its dependencies for
    the installed Node runtime, and reload the launchd service. Keep its
    executable and dependencies in a stable location independent of ongoing
@@ -75,6 +76,6 @@ rejects the new model and permission fields. See the
 
 After the first CI run, enable private vulnerability reporting, secret scanning
 and push protection, Dependabot security updates, and branch protection for the
-daemon and iOS checks. Recreate only the intended collaborators and settings;
+daemon check. Recreate only the intended collaborators and settings;
 pull requests, branches, Actions data, secrets, releases, and other private
 repository state should not be migrated.
