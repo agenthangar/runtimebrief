@@ -19,5 +19,8 @@ the `RuntimeBriefTests` suite in a current iOS Simulator. Contributors must use
 their own Apple development team for device builds; signing configuration and
 credentials must never be committed.
 
+GitHub CI runs only the daemon checks. If you change `ios/`, run the iOS
+suites yourself and say which ones passed in the pull request.
+
 Security-sensitive changes should include tests. Do not use real transcripts,
 tokens, filesystem paths, or private repository content as fixtures.

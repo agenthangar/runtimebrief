@@ -29,8 +29,7 @@ jobs:
             runner: ubuntu-latest
           - language: swift
             build-mode: manual
-            # CodeQL currently supports Swift through 6.3. The release and
-            # system App Intents tests use Xcode 27 in ci.yml.
+            # CodeQL currently supports Swift through 6.3.
             runner: macos-26
 
     steps:
