@@ -4,6 +4,7 @@ import AppIntents
 struct ProjectDetailView: View {
     let project: ProjectSummary
     @AppStorage(ProjectDiscoverySettings.key) private var discoveryEnabled = true
+    @AppStorage(PresentationMode.key) private var presenting = false
 
     @State private var card: ProjectCard?
     @State private var statusText = ""
@@ -464,7 +465,8 @@ struct ProjectDetailView: View {
                             Spacer()
                             RelativeTimeText(date: session.endedAt ?? session.startedAt)
                         }
-                        if let summary = session.summary {
+                        if let summary = session.summary,
+                           PresentationMode.showsSessionSummary(source: session.summarySource, enabled: presenting) {
                             Text(summary)
                                 .font(.subheadline)
                                 .lineLimit(3)
@@ -493,7 +495,7 @@ struct ProjectDetailView: View {
                             .font(.caption)
                             .foregroundStyle(.secondary)
                         }
-                        if let conclusion = session.conclusion, !conclusion.isEmpty {
+                        if let conclusion = session.conclusion, !conclusion.isEmpty, !presenting {
                             Text(conclusion)
                                 .font(.caption)
                                 .foregroundStyle(.secondary)

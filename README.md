@@ -7,6 +7,8 @@ in progress, and what needs your attention.
 
 > *"Hey Siri, what's the state of the sample tracker app?"*
 >
+> *"Hey Siri, ask RuntimeBrief."* … *"Is anything blocked right now?"*
+>
 > *"The shopping-list work landed this morning and all 12 tests pass. A Codex
 > session is still working on export; nothing is waiting for you."*
 
@@ -232,11 +234,12 @@ All endpoints require `Authorization: Bearer <token>` and are rate-limited to
 | Endpoint | Description |
 | --- | --- |
 | `GET /v1/health` | Daemon version and uptime |
-| `GET /v1/projects` | Deterministic portfolio entries and evidence |
+| `GET /v1/projects` | Deterministic portfolio entries and evidence, with `spokenNames` (other spellings for speech) |
 | `GET /v1/projects/:id` | Git, agent lifecycle, brief, and iOS release details |
 | `GET /v1/projects/:id/status` | On-demand analyst status answer |
 | `GET /v1/projects/:id/voice-status` | Latest completed analysis, returned immediately; queues a refresh when missing or old |
 | `POST /v1/projects/:id/ask` | Analyst answer for `{ question }` |
+| `POST /v1/ask` | Any question `{ question, projectId?, waitMs? }`: routed to the named project's analyst or the portfolio analyst; returns `answered`, or `pending`/`failed` with saved `interim` evidence after `waitMs` (default 8000) |
 | `POST /v1/projects/:id/actions` | Propose an allowlisted decision; never executes it |
 | `GET /v1/actions` | Unexpired pending decisions |
 | `POST /v1/actions/:id/decision` | Idempotently record approve/reject |
@@ -294,6 +297,15 @@ analyst:
   cache_ttl_minutes: 10
   background_refresh_hours: 3
   max_transcripts: 5
+```
+
+Speech recognition can mishear invented project names. List what Siri hears
+under `spoken_names`, keyed by project ID; RuntimeBrief adds these names to
+Siri's vocabulary and to question routing:
+
+```yaml
+spoken_names:
+  skyspark: ["Sky Park"]
 ```
 
 The daemon precomputes a cited Done/Now/Next analysis for each registered

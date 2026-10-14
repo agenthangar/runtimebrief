@@ -180,7 +180,7 @@ enum SiriSessionLauncher {
         } else {
             switch receipt.state {
             case "failed": status = "The session could not start. \(receipt.message)"
-            case "starting": status = "The session is starting. Task completion is not yet confirmed."
+            case "starting": status = "It's starting now."
             case "running": status = "The agent is working."
             case "needs_input": status = "The agent needs your input."
             case "completed": status = "The agent's turn is ready to review."

@@ -7,6 +7,7 @@ import { makeAuthHook } from "./auth.js";
 import { registerHealthRoutes } from "./routes/health.js";
 import { registerProjectRoutes } from "./routes/projects.js";
 import { registerAnalystRoutes } from "./routes/analyst.js";
+import { registerAskRoutes } from "./routes/ask.js";
 import { registerDecisionRoutes } from "./routes/decisions.js";
 import { registerLaunchRoutes } from "./routes/launches.js";
 import type { LaunchService } from "./launches/service.js";
@@ -24,6 +25,8 @@ export interface ServerDeps {
   iosReleases?: IosReleaseProvider;
   decisions?: DecisionStore;
   launches?: LaunchService;
+  /** Receives one line per spoken question; defaults to stdout. */
+  askLog?: (line: string) => void;
 }
 
 /**
@@ -56,8 +59,9 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
     app.addHook("preParsing", makeAuthHook(deps.config.auth.token_hash));
 
     registerHealthRoutes(app, VERSION);
-    registerProjectRoutes(app, deps);
+    const projectList = registerProjectRoutes(app, deps);
     registerAnalystRoutes(app, deps);
+    registerAskRoutes(app, deps, projectList);
     app.addHook("onClose", async () => { deps.analyst.close?.(); });
     registerDecisionRoutes(app, deps);
     registerLaunchRoutes(app, deps);

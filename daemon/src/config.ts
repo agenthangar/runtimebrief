@@ -58,6 +58,9 @@ export const configSchema = z.object({
   }),
   project_roots: z.array(z.string()).default([]),
   projects: z.array(projectSchema).default([]),
+  /** Extra names Siri may hear for a project, keyed by project ID, e.g.
+   * `skyspark: ["Sky Park"]` when speech recognition mishears its name. */
+  spoken_names: z.record(z.string(), z.array(z.string().min(1).max(80)).max(10)).default({}),
   claude_session_backend: z.enum(["t", "native"]).default("native"),
   analyst: z
     .object({

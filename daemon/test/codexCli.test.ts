@@ -697,6 +697,27 @@ function wireSuccessfulProtocol(
 }
 
 describe("Codex CLI same-process analyst boundary", () => {
+  it("asks for the requested reasoning effort only when one is given", async () => {
+    for (const effort of [undefined, "low"] as const) {
+      const root = testRoot();
+      const child = new FakeCodexChild();
+      const received: Array<Record<string, unknown>> = [];
+      const runner = createTestCodexCliRunner(root, {
+        codexPath: "/usr/local/bin/codex-fixture",
+        env: { HOME: "/Users/fixture", PATH: "/usr/local/bin:/usr/bin:/bin", LANG: "en_US.UTF-8" },
+        spawnImpl: (_command, _args, options) => {
+          wireSuccessfulProtocol(child, options.cwd, options.env.CODEX_HOME!, received);
+          return child;
+        },
+      });
+      await drain(runner, { ...params(), ...(effort ? { reasoningEffort: effort } : {}) });
+      const turn = received.find((message) => message.method === "turn/start")!;
+      const turnParams = turn.params as Record<string, unknown>;
+      if (effort) expect(turnParams.effort).toBe(effort);
+      else expect(turnParams).not.toHaveProperty("effort");
+    }
+  });
+
   it("attests every boundary on one process before sending evidence", async () => {
     const root = testRoot();
     const child = new FakeCodexChild();

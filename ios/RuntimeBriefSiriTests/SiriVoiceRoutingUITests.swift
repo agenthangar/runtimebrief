@@ -15,9 +15,15 @@ final class SiriVoiceRoutingUITests: XCTestCase {
         try await Task.sleep(for: .seconds(10))
 
         for (request, expected) in [
+            ("Tell the Sample Tracker agent in RuntimeBrief", "What should I tell the agent"),
             ("RuntimeBrief start Codex", "Which project should Codex work on"),
             ("Start Codex for Sample Tracker from RuntimeBrief", "What should Codex work on"),
             ("Start Codex for the Sample Tracker app from RuntimeBrief", "What should Codex work on"),
+            // Wordings from a recorded run that Siri did not route before.
+            ("Start Cursor for Sample Tracker via RuntimeBrief", "What should Cursor work on"),
+            ("Start a Cursor session for Sample Tracker via RuntimeBrief", "What should Cursor work on"),
+            ("Start Claude for Sample Tracker with RuntimeBrief", "What should Claude"),
+            ("Tell the Sample Tracker agent via RuntimeBrief", "What should I tell the agent"),
         ] {
             XCUIDevice.shared.siriService.activate(voiceRecognitionText: request)
             let dialog = XCUIDevice.shared.siriService.staticTexts.matching(
@@ -99,20 +105,24 @@ final class SiriVoiceRoutingUITests: XCTestCase {
 
         for request in [
             "Get me status from RuntimeBrief",
-            "Get a project status in RuntimeBrief",
+            "How are my projects doing in RuntimeBrief",
             "Show Runtime Brief status",
             "What's the status of Sample Tracker in RuntimeBrief",
             "Can you tell me the status of the Sample Tracker app from RuntimeBrief",
             "Get me the analysis of the project Sample Tracker from RuntimeBrief",
             "Give me the latest analysis of the project Sample Tracker from RuntimeBrief",
             "RuntimeBrief analysis for Sample Tracker",
+            "Ask RuntimeBrief what's the status of Sample Tracker",
+            "Ask RuntimeBrief how Sample Tracker is doing",
+            "What did my agents get done this week in RuntimeBrief",
         ] {
             XCUIDevice.shared.siriService.activate(voiceRecognitionText: request)
             let initial = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
             initial.name = "Siri response: \(request)"
             initial.lifetime = .keepAlways
             add(initial)
-            let expected = request.contains("Sample Tracker") ? "24 demo checks pass" : "You have 3 projects"
+            let expected = request.contains("get done") ? "Agents finished work"
+                : request.contains("Sample Tracker") ? "24 demo checks pass" : "You have 3 projects"
             let answer = XCUIDevice.shared.siriService.staticTexts.matching(
                 NSPredicate(format: "label CONTAINS[c] %@", expected)
             ).firstMatch
@@ -122,6 +132,68 @@ final class SiriVoiceRoutingUITests: XCTestCase {
             screenshot.lifetime = .keepAlways
             add(screenshot)
             XCTAssertTrue(matched, "Siri did not return the project brief for: \(request). \(XCUIDevice.shared.siriService.debugDescription)")
+            guard matched else { return }
+            app.activate()
+        }
+    }
+
+    @MainActor
+    func testRecognizedOpenQuestionAsksWhatToKnow() async throws {
+        try requireRoutingTest()
+        let app = XCUIApplication()
+        app.launchEnvironment["RUNTIMEBRIEF_E2E_CLEAR_STATE"] = "1"
+        app.launchEnvironment["RUNTIMEBRIEF_E2E_DEMO"] = "1"
+        app.launch()
+        XCTAssertTrue(app.staticTexts["demo-data-banner"].waitForExistence(timeout: 10))
+        try await Task.sleep(for: .seconds(10))
+
+        for request in [
+            "Ask RuntimeBrief",
+            "Ask RuntimeBrief a question",
+            "I have a question for RuntimeBrief",
+            "Talk to RuntimeBrief",
+            "Ask RuntimeBrief about my agents",
+        ] {
+            XCUIDevice.shared.siriService.activate(voiceRecognitionText: request)
+            let prompt = XCUIDevice.shared.siriService.staticTexts.matching(
+                NSPredicate(format: "label CONTAINS[c] %@", "What do you want to know")
+            ).firstMatch
+            let matched = prompt.waitForExistence(timeout: 30)
+            let screenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+            screenshot.name = request
+            screenshot.lifetime = .keepAlways
+            add(screenshot)
+            XCTAssertTrue(matched, "Siri did not open the question prompt for: \(request). \(XCUIDevice.shared.siriService.debugDescription)")
+            guard matched else { return }
+            app.activate()
+        }
+    }
+
+    @MainActor
+    func testProjectRequestsWithoutARecognizedNameAskWhichProject() async throws {
+        try requireRoutingTest()
+        let app = XCUIApplication()
+        app.launchEnvironment["RUNTIMEBRIEF_E2E_CLEAR_STATE"] = "1"
+        app.launchEnvironment["RUNTIMEBRIEF_E2E_DEMO"] = "1"
+        app.launch()
+        XCTAssertTrue(app.staticTexts["demo-data-banner"].waitForExistence(timeout: 10))
+        try await Task.sleep(for: .seconds(10))
+
+        for request in [
+            "Get a project status in RuntimeBrief",
+            "Tell me a project's status from RuntimeBrief",
+            "Ask RuntimeBrief for the status of Zebra Quasar",
+        ] {
+            XCUIDevice.shared.siriService.activate(voiceRecognitionText: request)
+            let prompt = XCUIDevice.shared.siriService.staticTexts.matching(
+                NSPredicate(format: "label CONTAINS[c] %@", "Which project")
+            ).firstMatch
+            let matched = prompt.waitForExistence(timeout: 30)
+            let screenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+            screenshot.name = request
+            screenshot.lifetime = .keepAlways
+            add(screenshot)
+            XCTAssertTrue(matched, "Siri answered for every project instead of asking which: \(request). \(XCUIDevice.shared.siriService.debugDescription)")
             guard matched else { return }
             app.activate()
         }

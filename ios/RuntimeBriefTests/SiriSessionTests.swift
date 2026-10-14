@@ -152,7 +152,7 @@ struct SiriSessionTests {
             state: "starting", message: "Starting", nativeId: nil, sessionId: nil, cwd: "/tmp/fixture", openedAt: nil)
         receipt.provider = .codex
         receipt.remoteControl = ClaudeRemoteControl(state: "starting", url: nil)
-        #expect(SiriSessionLauncher.describe(receipt, projectName: project.name, isDemo: false).contains("completion is not yet confirmed"))
+        #expect(SiriSessionLauncher.describe(receipt, projectName: project.name, isDemo: false).contains("It's starting now."))
         #expect(SiriSessionLauncher.describe(receipt, projectName: project.name, isDemo: false).contains("terminal starting"))
         let failed = ClaudeLaunch(id: "failed", projectId: project.id, name: "Fixture", createdAt: Date(),
             state: "failed", message: "Starting failed", nativeId: nil, sessionId: nil, cwd: "/tmp/fixture", openedAt: nil)

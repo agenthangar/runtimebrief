@@ -9,6 +9,9 @@ struct ProjectSummary: Codable, Identifiable, Hashable, Sendable {
     let branch: String?
     let dirty: Bool?
     let brief: ProjectBrief?
+    /// Other spellings Siri may hear, such as "Slip Spark" for "slipspark".
+    /// Older daemons omit it.
+    var spokenNames: [String]? = nil
 }
 
 struct ProjectCard: Codable, Sendable {
@@ -110,6 +113,15 @@ struct BriefClaim: Codable, Identifiable, Hashable, Sendable {
     let category: BriefClaimCategory
     let text: String
     let evidence: [EvidenceRef]
+    /// The quoted session subject and whether it is a native title or the
+    /// person's request. Older daemons omit it.
+    var subject: ClaimSubject? = nil
+}
+
+struct ClaimSubject: Codable, Hashable, Sendable {
+    let text: String
+    /// "title" or "request".
+    let source: String
 }
 
 struct ProjectBrief: Codable, Hashable, Sendable {
@@ -153,6 +165,8 @@ struct SessionInfo: Codable, Identifiable, Hashable, Sendable {
     let filesTouched: [String]?
     let toolUseCount: Int?
     let conclusion: String?
+    /// "title" when `summary` is a native session title. Older daemons omit it.
+    var summarySource: String? = nil
 }
 
 enum AgentSessionState: String, Codable, Hashable, Sendable {
@@ -182,6 +196,34 @@ struct VoiceStatus: Codable, Sendable, Equatable {
     let evidence: [EvidenceRef]
     let refreshing: Bool
     let unavailable: Bool
+}
+
+/// `POST /v1/ask`: a free-form question, answered for one named project or
+/// across the portfolio, or saved evidence while the answer is unavailable.
+struct AskResponse: Codable, Sendable, Equatable {
+    enum Status: String, Codable, Sendable { case answered, pending, failed }
+    enum Scope: String, Codable, Sendable { case project, portfolio }
+
+    struct NamedProject: Codable, Sendable, Equatable {
+        let id: String
+        let name: String
+    }
+
+    struct Interim: Codable, Sendable, Equatable {
+        let answer: String
+        let evidence: [EvidenceRef]
+        let analyzedAt: Date?
+    }
+
+    let status: Status
+    let scope: Scope
+    let projects: [NamedProject]
+    let answer: String?
+    let evidence: [EvidenceRef]
+    let cached: Bool
+    /// Set when the answer is a saved analysis rather than a new one.
+    var analyzedAt: Date? = nil
+    let interim: Interim?
 }
 
 struct HealthInfo: Codable, Sendable {

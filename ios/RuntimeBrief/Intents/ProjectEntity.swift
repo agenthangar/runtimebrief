@@ -12,12 +12,14 @@ struct ProjectEntity: AppEntity, IndexedEntity {
     @Property(title: "Brief") var headline: String
     @Property(title: "State") var state: String
     @Property(title: "Evidence Updated") var updatedAt: Date?
+    /// Other spellings of the name that Siri should recognize.
+    var spokenNames: [String] = []
 
     var attributeSet: CSSearchableItemAttributeSet {
         let attributes = defaultAttributeSet
         attributes.title = name
         attributes.contentDescription = headline
-        attributes.keywords = [name, state, "project", "RuntimeBrief"] + [branch].compactMap { $0 }
+        attributes.keywords = [name, state, "project", "RuntimeBrief"] + [branch].compactMap { $0 } + spokenNames
         attributes.contentModificationDate = updatedAt
         return attributes
     }
@@ -26,6 +28,7 @@ struct ProjectEntity: AppEntity, IndexedEntity {
         // Siri's phrase expansion uses display names, rather than the string
         // query's normalization. Register common spoken forms of the name.
         let synonyms: [LocalizedStringResource] = ["\(name) app", "\(name) project", "the \(name) app"]
+            + spokenNames.flatMap { spoken -> [LocalizedStringResource] in ["\(spoken)", "\(spoken) app", "the \(spoken) app"] }
         if let branch {
             return DisplayRepresentation(title: "\(name)", subtitle: "\(branch)", synonyms: synonyms)
         } else {
@@ -40,6 +43,7 @@ struct ProjectEntity: AppEntity, IndexedEntity {
         self.headline = summary.brief?.headline ?? "No project brief available."
         self.state = summary.brief?.state.rawValue ?? "unavailable"
         self.updatedAt = summary.brief?.updatedAt ?? summary.lastActivityAt
+        self.spokenNames = summary.spokenNames ?? []
     }
 
     init(id: String, name: String, branch: String? = nil) {
@@ -83,11 +87,28 @@ struct ProjectQuery: EntityStringQuery, EnumerableEntityQuery {
 
     func entities(matching string: String) async throws -> [ProjectEntity] {
         let projects = try await ProjectsStore.shared.projects()
-        return ProjectFuzzyMatcher
-            .rank(query: string, candidates: projects.map { ($0.id, $0.name) })
-            .compactMap { match in
-                projects.first { $0.id == match }.map(ProjectEntity.init(summary:))
-            }
+        return Self.matches(for: string, in: projects).map(ProjectEntity.init(summary:))
+    }
+
+    /// Siri passes the name as it heard it. Try every known spelling, then a
+    /// misheard name inside the words ("slip park" for SlipSpark).
+    static func matches(for string: String, in projects: [ProjectSummary]) -> [ProjectSummary] {
+        let spellings = projects.flatMap { project in
+            [(id: project.id, name: project.name)] + (project.spokenNames ?? []).map { (id: project.id, name: $0) }
+        }
+        // An exact spelling ("Evals" for AgentHangar Evals) is the answer:
+        // offering near matches too ("Eval") makes Siri ask which one.
+        let spoken = ProjectFuzzyMatcher.normalize(string)
+        let exact = Set(spellings.filter { ProjectFuzzyMatcher.normalize($0.name) == spoken || ProjectFuzzyMatcher.normalize($0.id) == spoken }.map(\.id))
+        if exact.count == 1 {
+            return projects.filter { exact.contains($0.id) }
+        }
+        var ids = ProjectFuzzyMatcher.rank(query: string, candidates: spellings)
+        if ids.isEmpty {
+            ids = ProjectMentionMatcher.resolve(string, candidates: SiriQuestion.mentionCandidates(projects))
+        }
+        var seen = Set<String>()
+        return ids.filter { seen.insert($0).inserted }.compactMap { id in projects.first { $0.id == id } }
     }
 
     func suggestedEntities() async throws -> [ProjectEntity] {

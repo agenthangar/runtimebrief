@@ -10,23 +10,28 @@ enum DemoData {
     private static var yesterday: Date { Date().addingTimeInterval(-22 * 60 * 60) }
     private static var lastWeek: Date { Date().addingTimeInterval(-6 * 24 * 60 * 60) }
 
-    private static let commitEvidence = EvidenceRef(
-        id: "demo-evidence-commit-001",
-        kind: .commit,
-        label: "Commit a1b2c3d",
-        detail: "Demo Developer: Add export validation",
-        source: "git",
-        timestamp: nil
-    )
+    // Timed like the fictional work, so "what got done" has something to say.
+    private static var commitEvidence: EvidenceRef {
+        EvidenceRef(
+            id: "demo-evidence-commit-001",
+            kind: .commit,
+            label: "Commit a1b2c3d",
+            detail: "Demo Developer: Add export validation",
+            source: "git",
+            timestamp: recent
+        )
+    }
 
-    private static let testEvidence = EvidenceRef(
-        id: "demo-evidence-session-001",
-        kind: .session,
-        label: "Codex demo session",
-        detail: "Fictional test run completed with 24 checks passing",
-        source: "codex",
-        timestamp: nil
-    )
+    private static var testEvidence: EvidenceRef {
+        EvidenceRef(
+            id: "demo-evidence-session-001",
+            kind: .session,
+            label: "Codex demo session",
+            detail: "Fictional test run completed with 24 checks passing",
+            source: "codex",
+            timestamp: recent
+        )
+    }
 
     static var projects: [ProjectSummary] {
         [sampleTrackerSummary, catalogBuilderSummary, weatherWidgetSummary]
@@ -57,6 +62,26 @@ enum DemoData {
             cached: true,
             truncated: false,
             evidence: [commitEvidence, testEvidence]
+        )
+    }
+
+    /// Fictional answer to any spoken question, routed like the daemon's.
+    static func askResponse(question: String, projectID: String?) throws -> AskResponse {
+        let ids = projectID.map { [$0] }
+            ?? ProjectMentionMatcher.resolve(question, candidates: projects.map { ($0.id, $0.name) })
+        let named = try ids.map { id -> AskResponse.NamedProject in
+            let card = try card(id: id)
+            return AskResponse.NamedProject(id: card.id, name: card.name)
+        }
+        if named.count == 1 {
+            let answer = try analystAnswer(projectID: named[0].id, question: question)
+            return AskResponse(status: .answered, scope: .project, projects: named, answer: answer.answer,
+                               evidence: answer.evidence ?? [], cached: true, interim: nil)
+        }
+        return AskResponse(
+            status: .answered, scope: .portfolio, projects: named,
+            answer: "This is a fictional demo response. Catalog Builder needs your attention for a copy decision, Sample Tracker's export validation is ready to review, and Weather Widget is quiet. [demo-evidence-commit-001]",
+            evidence: [commitEvidence], cached: true, interim: nil
         )
     }
 
@@ -336,6 +361,10 @@ struct DemoRuntimeBriefDataSource: RuntimeBriefDataSource {
 
     func ask(projectID: String, question: String) async throws -> AnalystAnswer {
         try DemoData.analystAnswer(projectID: projectID, question: question)
+    }
+
+    func askAnything(question: String, projectID: String?) async throws -> AskResponse {
+        try DemoData.askResponse(question: question, projectID: projectID)
     }
 
     func streamStatus(projectID: String) -> AsyncThrowingStream<AnalystStreamEvent, Error> {

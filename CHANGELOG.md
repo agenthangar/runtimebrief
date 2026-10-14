@@ -1,5 +1,100 @@
 # Release notes
 
+## 1.0.3 (44) — 2026-10-13
+
+- Siri now understands "via", "with" and "in RuntimeBrief" when starting an
+  agent, such as "Start Cursor for Visitor via RuntimeBrief", and "start a
+  Cursor session for …". "Tell the … agent via RuntimeBrief" and "What's the
+  status of … via RuntimeBrief" also work.
+- Starting an agent by voice now ends with "Codex for Dotfiles. It's starting
+  now." instead of "Task completion is not yet confirmed."
+
+## 1.0.3 (43) — 2026-10-11
+
+- A project named exactly, by its name or a spoken name, is the only match
+  Siri receives: "Evals" no longer also offers the "Eval" project, which made
+  Siri ask which one was meant.
+
+## 1.0.3 (42) — 2026-10-11
+
+- Hide Prompts on Screen now keeps native session titles, such as “Siri
+  natural language integration”, and hides only your own prompts and agent
+  messages.
+
+## 1.0.3 (41) — 2026-10-11
+
+- "Tell the Meal Planner agent in RuntimeBrief", then the message: Siri reads
+  it back for confirmation and sends it to the agent RuntimeBrief started on
+  that project — the one waiting for input first, otherwise the most recent.
+  Works for Claude Code, Codex, and Cursor. It replaces the Open Project
+  phrase; Open Project remains a Shortcuts action.
+
+## 1.0.3 (40) — 2026-10-11
+
+- "What did my agents get done today in RuntimeBrief?" names the projects
+  with finished agent work today, yesterday, or this week, and the latest
+  item, at once from saved evidence. Asking RuntimeBrief the same question
+  works too.
+- Settings → Presentation → Hide Prompts on Screen hides your prompts,
+  session titles, and agent messages in the app and in Siri's answers, for
+  demos and screen sharing.
+- Session subjects use the native title when there is one, and no longer show
+  attachment lists, conversation-continuation notices, or local file paths.
+
+## 1.0.3 (39) — 2026-10-11
+
+- When an answer is still being prepared, Siri asks "Still checking. Keep
+  waiting?" and answers after a yes, instead of asking you to repeat the
+  question.
+- Spoken questions run the analyst with low reasoning effort and a smaller
+  evidence packet, so answers arrive sooner.
+- "My project park" finds the one project whose name begins or ends with
+  "park", and a project named in the question wins over Siri's own pick.
+
+## 1.0.3 (38) — 2026-10-11
+
+- When Siri cannot recognize the project in a status request, ask "Which
+  project?" instead of answering for every project. Status for every project
+  keeps its own phrases, such as "How are my projects doing in RuntimeBrief".
+- Answer plain status and overview questions at once from saved analyses,
+  with their age, instead of waiting for a new analysis.
+- Add `spoken_names` to the daemon config for names Siri mishears, and tell
+  the portfolio analyst that spoken project names may be misheard.
+- Read "Recently, the latest session…" rather than "Recently, The latest…".
+- Daemon: answer project lists at once from the last scan (up to six hours
+  old) while rescanning, and rescan every five minutes, so a slow scan on a
+  busy Mac no longer times out the app's connection test or Siri.
+
+## 1.0.3 (37) — 2026-10-10
+
+- Find a project whose name Siri mishears slightly, such as "slip park" for
+  SlipSpark, when only one project is that close.
+- Teach Siri each app's own spelling from its Xcode project, such as
+  "SlipSpark" and "Slip Spark" for a folder named `slipspark`.
+- Answer one-sentence requests such as "Ask RuntimeBrief what's the status of
+  SlipSpark" without a follow-up question.
+- Record the question Siri sent in the Mac's private daemon log.
+
+## 1.0.3 (36) — 2026-10-10
+
+- Keep every Siri answer to two short lines with the most important update
+  first: open questions, project status and analysis, attention, and the
+  project list. Shortcuts still receive the full answer.
+- Recognize pluralized spoken project names, such as "slip sparks".
+- Log each spoken question's route, outcome, and timing on the Mac, without
+  the question text.
+
+## 1.0.3 (35) — 2026-10-10
+
+- Ask RuntimeBrief anything through Siri in your own words: say "Ask
+  RuntimeBrief", then the question. A question that names a project is
+  answered by that project's analyst; anything else is answered across all
+  projects from their briefs and latest analyses.
+- Add `POST /v1/ask`. Slow answers keep running on the Mac while Siri speaks
+  the latest saved analysis; repeating the question returns the finished answer.
+- Keep older daemons usable: questions naming one project still reach its
+  analyst, and other questions get the overview with an update reminder.
+
 ## 1.0.2 (19) — 2026-09-30
 
 - Select Claude, Codex, and Cursor models from each native harness catalog.

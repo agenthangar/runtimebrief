@@ -17,16 +17,16 @@ enum SiriBrief {
         let urgent = needsAttention.prefix(2).map(\.name).joined(separator: " and ")
         let detail = needsAttention.isEmpty ? "Nothing is marked as needing your attention." :
             "\(needsAttention.count) need your attention, including \(urgent)."
-        return prefix(snapshot) + "You have \(count) project\(count == 1 ? "" : "s"). \(detail) Ask for a project by name for its latest analysis."
+        return prefix(snapshot) + "You have \(count) project\(count == 1 ? "" : "s"). \(detail)"
     }
 
     static func project(_ project: ProjectSummary, snapshot: ProjectsStore.BriefSnapshot) -> String {
-        var text = "\(project.name): \(project.brief?.headline ?? "No project brief is available.")"
-        let attention = project.brief?.claims.filter { $0.category == .attention } ?? []
-        for claim in attention.prefix(2) where claim.text != project.brief?.headline {
-            text += " \(claim.text)"
-        }
-        if let evidenceDate = project.brief?.updatedAt {
+        // Two lines: the headline, then its attention reason or evidence time.
+        var text = "\(project.name): \(terminated(project.brief?.headline ?? "No project brief is available"))"
+        let attention = project.brief?.claims.first { $0.category == .attention && $0.text != project.brief?.headline }
+        if let attention {
+            text += " \(terminated(PresentationMode.text(for: attention)))"
+        } else if let evidenceDate = project.brief?.updatedAt {
             text += " Last activity \(dateText(evidenceDate))."
         }
         return prefix(snapshot) + text
@@ -40,25 +40,102 @@ enum SiriBrief {
             }
             return "I'm preparing an analysis for \(project.name). The current brief says: \(headline) Ask me again shortly."
         }
-        let lines = EvidencePresentation.text(answer, evidence: status.evidence).split(separator: "\n").map { line in
+        return "\(project.name), analyzed \(age(of: analyzedAt)): \(voice(answer, evidence: status.evidence))"
+    }
+
+    /// An analyst answer as one spoken paragraph: no evidence IDs, and the
+    /// status labels read as sentence openings.
+    static func spoken(_ answer: String, evidence: [EvidenceRef]) -> String {
+        let lines = EvidencePresentation.text(answer, evidence: evidence).split(separator: "\n").map { line in
             String(line)
                 .trimmingCharacters(in: .whitespacesAndNewlines)
                 .replacingOccurrences(of: #"^Done:\s*"#, with: "Recently, ", options: [.regularExpression, .caseInsensitive])
                 .replacingOccurrences(of: #"^Now:\s*"#, with: "Currently, ", options: [.regularExpression, .caseInsensitive])
                 .replacingOccurrences(of: #"^Next:\s*"#, with: "Next, ", options: [.regularExpression, .caseInsensitive])
         }.filter { !$0.isEmpty }
-        let spoken = lines.map { $0.hasSuffix(".") ? $0 : $0 + "." }.joined(separator: " ")
-        let elapsed = max(0, Date().timeIntervalSince(analyzedAt))
-        let age: String
-        if elapsed < 60 * 5 { age = "just now" }
-        else if elapsed < 60 * 60 { age = "\(Int(elapsed / 60)) minutes ago" }
-        else if elapsed < 24 * 60 * 60 { age = "\(Int(elapsed / 3600)) hours ago" }
-        else { age = dateText(analyzedAt) }
-        let refreshNote: String
-        if status.unavailable { refreshNote = " I couldn't refresh it right now." }
-        else if status.refreshing { refreshNote = " I'm refreshing the analysis now." }
-        else { refreshNote = "" }
-        return "\(project.name), analyzed \(age). \(spoken)\(refreshNote)"
+        return lines.map { $0.hasSuffix(".") || $0.hasSuffix("?") || $0.hasSuffix("!") ? $0 : $0 + "." }
+            .joined(separator: " ")
+    }
+
+    /// The spoken form Siri says: at most `maxLines` short lines, most
+    /// important first. A Done/Now/Next analysis keeps its first known lines
+    /// in that order; any other answer keeps its first sentences.
+    static func voice(_ answer: String, evidence: [EvidenceRef], maxLines: Int = 2) -> String {
+        let text = EvidencePresentation.text(answer, evidence: evidence)
+        let lines = text.split(separator: "\n").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+        let leads = [("done", "Recently, "), ("now", "Currently, "), ("next", "Next, ")]
+        var labeled: [String: String] = [:]
+        for line in lines {
+            guard let colon = line.firstIndex(of: ":") else { continue }
+            let label = line[..<colon].lowercased()
+            if leads.contains(where: { $0.0 == label }) {
+                labeled[label] = line[line.index(after: colon)...].trimmingCharacters(in: .whitespaces)
+            }
+        }
+        let chosen: [String]
+        if !labeled.isEmpty {
+            let known = leads.compactMap { label, lead in
+                labeled[label].flatMap { isUnknown($0) ? nil : lead + continuing($0) }
+            }
+            chosen = known.isEmpty ? ["Unknown from available evidence."] : Array(known.prefix(maxLines))
+        } else {
+            chosen = Array(sentences(lines.joined(separator: " ")).prefix(maxLines))
+        }
+        return chosen.map(terminated).joined(separator: " ")
+    }
+
+    static func sentences(_ text: String) -> [String] {
+        text.replacingOccurrences(of: #"(?<=[.!?])\s+(?=[A-Z0-9"“])"#, with: "\n", options: .regularExpression)
+            .split(separator: "\n").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+    }
+
+    /// "Recently, the latest session…": a sentence opener that follows the
+    /// spoken lead is lowercased; names and acronyms keep their case.
+    private static let continuingOpeners: Set<String> = [
+        "A", "All", "An", "Both", "Each", "It", "Its", "Most", "No", "Nothing",
+        "Several", "Some", "That", "The", "There", "These", "This", "Those",
+    ]
+
+    private static func continuing(_ text: String) -> String {
+        guard let first = text.split(separator: " ").first, continuingOpeners.contains(String(first)) else { return text }
+        return text.prefix(1).lowercased() + text.dropFirst()
+    }
+
+    private static func isUnknown(_ line: String) -> Bool {
+        line.range(of: #"^Unknown from available evidence\.?$"#, options: [.regularExpression, .caseInsensitive]) != nil
+    }
+
+    private static func terminated(_ line: String) -> String {
+        line.hasSuffix(".") || line.hasSuffix("?") || line.hasSuffix("!") ? line : line + "."
+    }
+
+    static func age(of date: Date, now: Date = Date()) -> String {
+        let elapsed = max(0, now.timeIntervalSince(date))
+        if elapsed < 60 * 5 { return "just now" }
+        if elapsed < 60 * 60 { return "\(Int(elapsed / 60)) minutes ago" }
+        if elapsed < 24 * 60 * 60 { return "\(Int(elapsed / 3600)) hours ago" }
+        return dateText(date)
+    }
+
+    /// Which projects had completed agent work since `since`, newest first,
+    /// in two lines: the project names, then the latest completed item.
+    static func digest(_ snapshot: ProjectsStore.BriefSnapshot, since: Date, period: String) -> String {
+        let done = snapshot.projects.flatMap { project in
+            (project.brief?.claims ?? []).filter { $0.category == .completed }.compactMap { claim -> (ProjectSummary, BriefClaim, Date)? in
+                guard let at = claim.evidence.compactMap(\.timestamp).max(), at >= since else { return nil }
+                return (project, claim, at)
+            }
+        }.sorted { $0.2 > $1.2 }
+        guard let latest = done.first else {
+            return prefix(snapshot) + "No completed agent work is recorded \(period)."
+        }
+        var names: [String] = []
+        for (project, _, _) in done where !names.contains(project.name) { names.append(project.name) }
+        let shown = names.prefix(3) + (names.count > 3 ? ["\(names.count - 3) more"] : [])
+        let item = PresentationMode.text(for: latest.1)
+        return prefix(snapshot)
+            + "Agents finished work in \(names.count) project\(names.count == 1 ? "" : "s") \(period): \(shown.formatted(.list(type: .and)))."
+            + " Latest, \(latest.0.name): \(terminated(item))"
     }
 
     static func attentionProjects(_ projects: [ProjectSummary]) -> [ProjectSummary] {
@@ -71,15 +148,20 @@ enum SiriBrief {
             return prefix(snapshot) + "No projects are registered yet. Add projects on your Mac."
         }
         let projects = attentionProjects(snapshot.projects)
-        let unavailable = snapshot.projects.filter { $0.brief == nil || $0.brief?.state == .unavailable }
-        var text = projects.isEmpty ? "No attention items were found in the available briefs." :
-            "\(projects.count) project\(projects.count == 1 ? " needs" : "s need") attention. "
-                + projects.prefix(5).map { "\($0.name): \($0.brief?.headline ?? "Review this project.")" }.joined(separator: " ")
-        if projects.count > 5 { text += " Open RuntimeBrief for the remaining \(projects.count - 5)." }
-        if !unavailable.isEmpty {
-            text += " \(unavailable.count) project\(unavailable.count == 1 ? " has" : "s have") no available brief."
+        guard let first = projects.first else {
+            let unavailable = snapshot.projects.filter { $0.brief == nil || $0.brief?.state == .unavailable }
+            var text = "No attention items were found in the available briefs."
+            if !unavailable.isEmpty {
+                text += " \(unavailable.count) project\(unavailable.count == 1 ? " has" : "s have") no available brief."
+            }
+            return prefix(snapshot) + text
         }
-        return prefix(snapshot) + text
+        // Two lines: who needs attention, then the first one's reason.
+        let names = projects.prefix(3).map(\.name) + (projects.count > 3 ? ["\(projects.count - 3) more"] : [])
+        let reason = terminated(first.brief?.headline ?? "Review this project")
+        return prefix(snapshot)
+            + "\(projects.count) project\(projects.count == 1 ? " needs" : "s need") attention: \(names.formatted(.list(type: .and)))."
+            + " \(first.name): \(reason)"
     }
 
     static func prefix(_ snapshot: ProjectsStore.BriefSnapshot) -> String {

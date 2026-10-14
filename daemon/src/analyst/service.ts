@@ -14,9 +14,15 @@ import {
 import { AnswerCache, type LatestStatus } from "./cache.js";
 import {
   ANALYST_SYSTEM_PROMPT,
+  VOICE_CONTEXT_CHAR_BUDGET,
   buildAnalystEvidence,
   buildAnalystPrompt,
+  buildPortfolioEvidence,
+  buildPortfolioPrompt,
   DEFAULT_STATUS_QUESTION,
+  PORTFOLIO_SYSTEM_PROMPT,
+  VOICE_ANALYST_SYSTEM_PROMPT,
+  type PortfolioAskProject,
   type TranscriptDigestInput,
 } from "./prompts.js";
 import {
@@ -42,11 +48,26 @@ export interface AnalystService {
     projectId: string,
     question: string,
     callerSignal?: AbortSignal,
+    options?: AskOptions,
+  ): AsyncGenerator<AnalystChunk>;
+  /** Answers across projects from their briefs and latest analyses. */
+  askPortfolio(
+    question: string,
+    projects: PortfolioAskProject[],
+    mentionedIds?: readonly string[],
+    callerSignal?: AbortSignal,
   ): AsyncGenerator<AnalystChunk>;
   statusQuestion: string;
   voiceStatus(projectId: string): { status: LatestStatus | null; refreshing: boolean; unavailable: boolean };
+  /** The latest completed status analysis, without queueing a refresh. */
+  latestStatus(projectId: string): LatestStatus | null;
   startBackgroundRefresh(): void;
   close(): void;
+}
+
+export interface AskOptions {
+  /** A spoken question: a two-sentence answer, cached apart from app answers. */
+  voice?: boolean;
 }
 
 export class ProjectNotFoundError extends Error {
@@ -92,6 +113,12 @@ export interface AnalystServiceOptions {
 export const DEFAULT_ANALYST_REQUEST_TIMEOUT_MS = 60_000;
 export const ANALYST_CACHE_BACKEND = "codex-cli";
 export const ANALYST_CACHE_PROMPT_VERSION = "runtimebrief-analyst-v2";
+export const PORTFOLIO_CACHE_PROMPT_VERSION = "runtimebrief-portfolio-v4";
+export const VOICE_CACHE_PROMPT_VERSION = "runtimebrief-analyst-voice-v2";
+/** Spoken questions read fewer transcripts, so the answer arrives sooner. */
+const VOICE_MAX_TRANSCRIPTS = 3;
+/** Cache rows for portfolio answers; registered project IDs never contain "*". */
+const PORTFOLIO_CACHE_ID = "*portfolio*";
 
 /**
  * Do not surface uncited model assertions as project facts. A line with no
@@ -153,11 +180,14 @@ export function createAnalystService(
     }
   }
 
-  async function gatherTranscripts(project: ProjectConfig): Promise<TranscriptDigestInput[]> {
+  async function gatherTranscripts(
+    project: ProjectConfig,
+    maxTranscripts = analystConfig.max_transcripts,
+  ): Promise<TranscriptDigestInput[]> {
     const refs: TranscriptRef[] = [];
     for (const adapter of adapters) {
       try {
-        refs.push(...(await adapter.transcriptPaths(project, analystConfig.max_transcripts)));
+        refs.push(...(await adapter.transcriptPaths(project, maxTranscripts)));
       } catch {
         // a broken adapter must not block the analyst
       }
@@ -176,7 +206,7 @@ export function createAnalystService(
           ? parseCursorProjectTranscript(transcriptPath)
           : parseCursorSessionDir(transcriptPath),
     };
-    for (const ref of selectTranscripts(refs, analystConfig.max_transcripts)) {
+    for (const ref of selectTranscripts(refs, maxTranscripts)) {
       const parse = parsers[ref.source];
       if (!parse) continue;
       try {
@@ -237,37 +267,87 @@ export function createAnalystService(
     projectId: string,
     question: string,
     callerSignal?: AbortSignal,
+    askOptions: AskOptions = {},
   ): AsyncGenerator<AnalystChunk> {
     const project = projectsForConfig(config).find((p) => p.id === projectId);
     if (!project) throw new ProjectNotFoundError(projectId);
 
+    const voice = askOptions.voice === true;
     const [git, transcripts, iosRelease] = await Promise.all([
       gatherGit(project),
-      gatherTranscripts(project),
+      gatherTranscripts(project, voice ? Math.min(VOICE_MAX_TRANSCRIPTS, analystConfig.max_transcripts) : undefined),
       gatherIosRelease(project),
     ]);
-    const prompt = buildAnalystPrompt(question, project.name, git, transcripts, iosRelease);
+    const prompt = buildAnalystPrompt(
+      question, project.name, git, transcripts, iosRelease,
+      voice ? VOICE_CONTEXT_CHAR_BUDGET : undefined,
+    );
     const evidence = buildAnalystEvidence(git, transcripts, undefined, iosRelease);
+    yield* runAnalysis({
+      cacheProjectId: project.id,
+      question,
+      prompt,
+      evidence,
+      systemPrompt: voice ? VOICE_ANALYST_SYSTEM_PROMPT : ANALYST_SYSTEM_PROMPT,
+      promptVersion: voice ? VOICE_CACHE_PROMPT_VERSION : ANALYST_CACHE_PROMPT_VERSION,
+      ...(voice ? { reasoningEffort: "low" as const } : {}),
+      callerSignal,
+      onAnswer: (answer, answerEvidence, createdAt) => {
+        if (question === DEFAULT_STATUS_QUESTION && !voice) {
+          cache.setLatestStatus(project.id, analystConfig.model, ANALYST_CACHE_PROMPT_VERSION,
+            answer, answerEvidence, createdAt);
+        }
+      },
+    });
+  }
+
+  async function* askPortfolio(
+    question: string,
+    projects: PortfolioAskProject[],
+    mentionedIds: readonly string[] = [],
+    callerSignal?: AbortSignal,
+  ): AsyncGenerator<AnalystChunk> {
+    yield* runAnalysis({
+      cacheProjectId: PORTFOLIO_CACHE_ID,
+      question,
+      prompt: buildPortfolioPrompt(question, projects, mentionedIds),
+      evidence: buildPortfolioEvidence(projects),
+      systemPrompt: PORTFOLIO_SYSTEM_PROMPT,
+      promptVersion: PORTFOLIO_CACHE_PROMPT_VERSION,
+      reasoningEffort: "low",
+      callerSignal,
+    });
+  }
+
+  async function* runAnalysis(request: {
+    cacheProjectId: string;
+    question: string;
+    prompt: string;
+    evidence: EvidenceRef[];
+    systemPrompt: string;
+    promptVersion: string;
+    reasoningEffort?: "low";
+    callerSignal: AbortSignal | undefined;
+    onAnswer?: (answer: string, evidence: EvidenceRef[], createdAt: number) => void;
+  }): AsyncGenerator<AnalystChunk> {
+    const { cacheProjectId, question, prompt, evidence, callerSignal, onAnswer } = request;
     const firstSectionEnd = prompt.indexOf("\n\n");
     const filteredEvidenceForCache =
       firstSectionEnd === -1 ? prompt : prompt.slice(firstSectionEnd + 2);
     const cacheIdentity = {
       backend: ANALYST_CACHE_BACKEND,
       model: analystConfig.model,
-      promptVersion: ANALYST_CACHE_PROMPT_VERSION,
+      promptVersion: request.promptVersion,
       evidenceHash: AnswerCache.evidenceHash(filteredEvidenceForCache),
     };
     const cached = cache.get(
-      project.id,
+      cacheProjectId,
       question,
       cacheIdentity,
       analystConfig.cache_ttl_minutes,
     );
     if (cached) {
-      if (question === DEFAULT_STATUS_QUESTION) {
-        cache.setLatestStatus(project.id, analystConfig.model, ANALYST_CACHE_PROMPT_VERSION,
-          cached.answer, cached.evidence, cached.createdAt);
-      }
+      onAnswer?.(cached.answer, cached.evidence, cached.createdAt);
       yield { type: "text", text: cached.answer };
       yield {
         type: "done",
@@ -294,22 +374,33 @@ export function createAnalystService(
     requestTimeout.unref();
     let finalText: string | null = null;
 
-    try {
+    const runOnce = async (reasoningEffort?: "low"): Promise<string | null> => {
       const events = runner({
         evidencePacket: prompt,
-        systemPrompt: ANALYST_SYSTEM_PROMPT,
+        systemPrompt: request.systemPrompt,
         model: analystConfig.model,
         signal: abort.signal,
+        ...(reasoningEffort ? { reasoningEffort } : {}),
       });
-
       for await (const event of events) {
         if (event.type === "result") {
           if (event.isError) {
             throw new Error("Codex CLI analyst did not produce a valid result.");
           }
-          finalText = event.finalText;
-          break;
+          return event.finalText;
         }
+      }
+      return null;
+    };
+
+    try {
+      try {
+        finalText = await runOnce(request.reasoningEffort);
+      } catch (error) {
+        // A Codex CLI or model that rejects the effort setting must not fail
+        // every spoken question: retry once at the default effort.
+        if (!request.reasoningEffort || abort.signal.aborted) throw error;
+        finalText = await runOnce();
       }
     } finally {
       clearTimeout(requestTimeout);
@@ -323,13 +414,8 @@ export function createAnalystService(
 
     if (answer.length > 0) {
       const analyzedAt = Date.now();
-      cache.set(project.id, question, cacheIdentity, answer, evidence, analyzedAt);
-      if (question === DEFAULT_STATUS_QUESTION) {
-        cache.setLatestStatus(project.id, analystConfig.model, ANALYST_CACHE_PROMPT_VERSION,
-          answer, evidence, analyzedAt);
-      }
-    }
-    if (answer.length > 0) {
+      cache.set(cacheProjectId, question, cacheIdentity, answer, evidence, analyzedAt);
+      onAnswer?.(answer, evidence, analyzedAt);
       yield { type: "text", text: answer };
     }
     // Codex CLI uses the user's ChatGPT plan and does not expose a dollar cost.
@@ -398,5 +484,13 @@ export function createAnalystService(
     refreshQueue.length = 0;
   }
 
-  return { ask, statusQuestion: DEFAULT_STATUS_QUESTION, voiceStatus, startBackgroundRefresh, close };
+  return {
+    ask,
+    askPortfolio,
+    statusQuestion: DEFAULT_STATUS_QUESTION,
+    voiceStatus,
+    latestStatus: latest,
+    startBackgroundRefresh,
+    close,
+  };
 }

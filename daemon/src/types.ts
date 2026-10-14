@@ -15,6 +15,8 @@ export interface ProjectConfig {
    * Approval is only recorded by RuntimeBrief; execution remains out of scope.
    */
   allowed_actions?: string[] | undefined;
+  /** Extra spoken names from the config's `spoken_names` map. */
+  spoken_names?: string[] | undefined;
 }
 
 export interface TranscriptSourceConfig {
@@ -97,6 +99,9 @@ export interface BriefClaim {
   text: string;
   /** Every claim must carry at least one concrete source record. */
   evidence: EvidenceRef[];
+  /** The quoted session subject in `text`, and whether it is a native title
+   * or the person's request, so presentation mode can hide requests only. */
+  subject?: { text: string; source: "title" | "request" };
 }
 
 export type ProjectBriefState = "active" | "attention" | "recent" | "quiet" | "unavailable";

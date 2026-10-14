@@ -107,9 +107,10 @@ struct BriefStateBadge: View {
 
 struct ClaimLabel: View {
     let claim: BriefClaim
+    @AppStorage(PresentationMode.key) private var presenting = false
 
     var body: some View {
-        Label(EvidencePresentation.text(claim.text, evidence: claim.evidence), systemImage: icon)
+        Label(PresentationMode.text(for: claim, enabled: presenting), systemImage: icon)
             .font(.subheadline)
             .foregroundStyle(.primary)
             .accessibilityIdentifier("project-brief-claim")

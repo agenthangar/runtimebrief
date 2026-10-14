@@ -1,5 +1,7 @@
+import { describedSubject } from "./sessionSubject.js";
 import { FilesystemGitAdapter, type GitSummary } from "./adapters/filesystemGit.js";
 import { buildProjectBrief } from "./brief.js";
+import { spokenNames } from "./spokenNames.js";
 import type { IosReleaseProvider, IosReleaseSummary } from "./iosRelease.js";
 import type {
   EvidenceRef,
@@ -16,6 +18,8 @@ export type ProjectProvider = () => ProjectConfig[];
 export interface ProjectListEntry {
   id: string;
   name: string;
+  /** Other spellings of the name for speech recognition, e.g. "Slip Spark". */
+  spokenNames: string[];
   lastActivityAt: string | null;
   branch: string | null;
   dirty: boolean | null;
@@ -28,6 +32,8 @@ export interface ProjectSessionSummary {
   startedAt: string | null;
   endedAt: string | null;
   summary: string | null;
+  /** "title" for a native session title, "request" for the person's words. */
+  summarySource: "title" | "request" | null;
   state: string;
   stateReason: string;
   gitBranch: string | null;
@@ -79,7 +85,8 @@ function sessionSummary(session: TranscriptRef): ProjectSessionSummary {
     id: session.id,
     startedAt: session.startedAt?.toISOString() ?? null,
     endedAt: session.endedAt?.toISOString() ?? null,
-    summary: session.summary ?? null,
+    summary: describedSubject(session)?.text ?? null,
+    summarySource: describedSubject(session)?.source ?? null,
     state: session.state ?? "unknown",
     stateReason: session.stateReason ?? "No lifecycle event was found.",
     gitBranch: session.gitBranch ?? null,
@@ -151,6 +158,7 @@ export class PortfolioService {
       entry: {
         id: project.id,
         name: project.name,
+        spokenNames: [...new Set([...(project.spoken_names ?? []), ...spokenNames(project.path, project.name)])],
         lastActivityAt: lastActivityAt(git, sessions),
         branch: git?.branch ?? null,
         dirty: git?.dirty ?? null,

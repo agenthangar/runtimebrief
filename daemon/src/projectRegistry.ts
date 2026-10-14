@@ -91,5 +91,8 @@ export function projectsForConfig(config: RuntimeBriefConfig): ProjectConfig[] {
     }
   }
 
-  return projects;
+  return projects.map((project) => {
+    const spoken = config.spoken_names[project.id];
+    return spoken && spoken.length > 0 ? { ...project, spoken_names: spoken } : project;
+  });
 }

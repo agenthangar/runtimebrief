@@ -88,10 +88,74 @@ personal signing change local; do not commit it or change the production
 | Needs attention | What needs attention in RuntimeBrief? | Project entities |
 | List projects | List my RuntimeBrief projects | Project entities |
 | Open project | Open Sample Tracker in RuntimeBrief | Opens project detail |
-| Ask the analyst | Ask RuntimeBrief a question about Sample Tracker | Answer text |
+| Ask anything | Ask RuntimeBrief, then any question, such as "What needs my attention?" or "Did the Sample Tracker checks pass?" | Answer text |
+| Ask about one project | Ask RuntimeBrief a question about Sample Tracker, then the question | Answer text |
+| Tell an agent | Tell the Sample Tracker agent in RuntimeBrief, then the message | Delivery text |
+| What got done | What did my agents get done today in RuntimeBrief? (also yesterday, this week) | Digest text |
 | Start coding session | Start a new coding agent for Sample Tracker from RuntimeBrief | Session receipt ID |
 | Start a named agent | Start Codex for Sample Tracker from RuntimeBrief; also Claude or Cursor | Session receipt ID |
 | Start with spoken follow-ups | RuntimeBrief start Codex, then name the project and task | Session receipt ID |
+
+**What Got Done** names the projects with completed agent work in the period
+and the latest item, from the briefs' completed claims and their evidence
+times, without an analyst run. **Settings → Presentation → Hide Prompts on
+Screen** removes quoted prompts and agent messages from the app and from
+Siri's answers, keeping native session titles, states, and counts, for demos.
+The daemon marks each quoted subject as a title or a request.
+
+**Tell an Agent** sends a spoken message to an agent that RuntimeBrief
+started on the project, preferring the one waiting for input, otherwise the
+most recently started live session. Siri asks for the message, reads it back
+for confirmation, and sends it with the in-app reply's durable request ID, so a
+retry never sends it twice. Sessions started elsewhere, or with Remote Control
+off, are not addressed.
+
+**Ask RuntimeBrief** is the open-ended entry point. A spoken shortcut phrase
+cannot contain free text, so Siri replies "What do you want to know?" and the
+next sentence can be any question in the person's own words. Other entry
+phrases include "I have a question for RuntimeBrief", "Talk to RuntimeBrief",
+and "Ask RuntimeBrief about my agents". The app sends the dictated question to
+`POST /v1/ask`. The daemon finds any registered project the question names,
+including joined or split names such as "sampletracker" or "sample tracker".
+A question naming one project goes to that project's analyst; any other
+question goes to the portfolio analyst, which reads every project's brief and
+latest saved analysis. Siri speaks the answer without evidence IDs and names
+the project it is about.
+
+Every spoken answer is at most two short lines, most important update first.
+The analysts are asked for two sentences, and the app also keeps only the first
+two lines; a Done/Now/Next analysis is read as its done and current lines.
+Status, attention, and list replies follow the same limit. The Shortcuts value
+of an open question is the full answer.
+
+The daemon waits up to eight seconds for an answer, and spoken questions use
+low reasoning effort and a smaller evidence packet. A slower answer continues
+on the Mac while Siri asks "Still checking. Keep waiting?"; each yes waits
+again for the same analysis, up to three times. After that, or after a no,
+asking the same question again returns the finished answer without another
+model run. The daemon's private
+log records each question as Siri sent it, with its route, outcome, and timing.
+
+Every request about one project ("What's the status of SlipSpark in
+RuntimeBrief", "Ask RuntimeBrief how SlipSpark is doing") uses the Project
+Status action, whose project is required: when Siri cannot recognize the name,
+it asks "Which project?" and resolves the reply instead of answering for every
+project. Status for all projects has separate phrases such as "How are my
+projects doing in RuntimeBrief". A plain status or overview question asked
+through "Ask RuntimeBrief" is answered at once from the saved analysis, with
+its age; other questions run the analyst.
+
+Project names may be split, joined, pluralized, or slightly misheard: "slip
+park" finds SlipSpark when no other project is as close and the first letter
+matches. For a name Siri consistently mishears, add what it hears to the
+daemon's `spoken_names` config. Each project also offers Siri other spellings of its name taken from
+its Xcode project, so a folder named `slipspark` is also "SlipSpark" and "Slip
+Spark". One-sentence status requests such as "Ask RuntimeBrief what's the
+status of SlipSpark" need no follow-up; any other question still starts with
+"Ask RuntimeBrief" because a shortcut phrase cannot carry free text. With the Mac unreachable, Siri
+uses the saved briefs with the existing saved-data warning. A daemon without
+`POST /v1/ask` still answers questions that name one project through that
+project's analyst, and gives the overview with an update reminder otherwise.
 
 **Start Coding Session** supports Claude Code, Codex, and Cursor through the
 same native adapters and `/sessions` API as the app. Requests can use agent,
@@ -143,7 +207,8 @@ explicit saved-data warning and timestamp. Authentication and configuration
 failures stop the action instead of returning cached data.
 
 Answers include a Siri card and reusable Shortcuts values. Asking a question
-remains an explicit analyst action. Existing custom actions work on iOS 26;
+remains an explicit analyst action; the Shortcuts action takes a question and
+an optional project. Existing custom actions work on iOS 26;
 iOS 27 also exposes the system opening schema. Project rows and detail views
 provide entity context for requests about visible content.
 
