@@ -115,12 +115,13 @@ export class AgentSessionsStore {
 
   private synchronizeScope(): void {
     const settings = ServerSettingsStore.load();
+    const persistedURL = ServerSettingsStore.persistedURL();
     const identity =
       this.identityOverride?.() ??
       (RuntimeBriefModeStore.isDemoEnabled
         ? "demo"
-        : ServerSettingsStore.isConfigured(settings)
-          ? `${settings.baseURL}|${settings.token}`
+        : persistedURL && settings.token
+          ? `${persistedURL}|${settings.token}`
           : "unconfigured");
     const current = identity === "demo" || identity === "unconfigured" ? identity : cyrb53(identity);
     if (current === this.scope) return;

@@ -55,7 +55,10 @@ still answer 401.
 - No Siri, Spotlight, or App Intents. Project discovery stays on iOS.
 - The daemon token lives in origin-scoped local storage, not the Keychain.
 - Settings pre-fills the origin that served the page. Task-retry identity
-  still uses the saved URL or `unconfigured` until you tap Save.
+  and the agent-session cache use the saved URL or `unconfigured` until you
+  tap Save. Saving the same Mac, including its implicit HTTPS port, keeps
+  the portfolio.
+- A Refresh control sits beside Settings. Touch pull-to-refresh still works.
 - The terminal uses xterm.js instead of SwiftTerm.
 - Navigation is hash-based so the daemon does not grow a catch-all SPA route.
 

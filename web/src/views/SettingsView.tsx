@@ -27,7 +27,7 @@ export function SettingsView({ onDismiss }: { onDismiss: () => void }) {
       const previous = ServerSettingsStore.load();
       ServerSettingsStore.save(serverURL, token);
       const current = ServerSettingsStore.load();
-      if (previous.baseURL !== current.baseURL || previous.token !== current.token) {
+      if (!ServerSettingsStore.sameConnection(previous, current)) {
         ProjectsStore.shared.clear();
         ProjectNavigation.popToRoot();
       }

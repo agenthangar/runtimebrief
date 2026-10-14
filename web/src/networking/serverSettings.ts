@@ -60,6 +60,17 @@ export const ServerSettingsStore = {
   },
 
   /**
+   * True when Save did not change the Mac the client is already using.
+   * Page origins omit the default HTTPS port; normalizeURL writes :443.
+   * Those are the same endpoint, so the portfolio cache stays.
+   */
+  sameConnection(previous: ServerSettings, current: ServerSettings): boolean {
+    const previousURL = normalizeURL(previous.baseURL ?? "");
+    const currentURL = normalizeURL(current.baseURL ?? "");
+    return previousURL === currentURL && (previous.token ?? "") === (current.token ?? "");
+  },
+
+  /**
    * URL the user saved. Does not fall back to the page origin. iOS draft
    * identity uses the persisted address or "unconfigured".
    */

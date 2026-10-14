@@ -1,3 +1,4 @@
+import { StrictMode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -9,6 +10,7 @@ import { RuntimeBriefModeStore, type RuntimeBriefDataSource } from "../src/netwo
 import { AgentSessionsStore } from "../src/networking/agentSessionsStore";
 import { ProjectsStore } from "../src/networking/projectsStore";
 import { ServerSettingsStore } from "../src/networking/serverSettings";
+import { ProjectDetailView } from "../src/views/ProjectDetailView";
 import { SessionConversationView } from "../src/views/SessionConversationView";
 import { SettingsView } from "../src/views/SettingsView";
 
@@ -69,9 +71,11 @@ describe("first-launch demo", () => {
     expect(screen.getByTestId("explore-demo")).toBeInTheDocument();
     expect(screen.getByTestId("connect-your-mac")).toBeInTheDocument();
     expect(screen.getByTestId("open-settings")).toBeInTheDocument();
+    expect(screen.getByTestId("refresh-portfolio")).toBeInTheDocument();
 
     await enterDemo();
     expect(screen.queryByTestId("open-settings")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("refresh-portfolio")).not.toBeInTheDocument();
     expect(screen.getByTestId("exit-demo")).toBeInTheDocument();
     expect(screen.getByTestId("project-link-demo-sample-tracker")).toHaveTextContent("Sample Tracker");
     expect(screen.getByTestId("project-link-demo-catalog-builder")).toHaveTextContent("Catalog Builder");
@@ -148,6 +152,20 @@ describe("first-launch demo", () => {
     expect(await screen.findByTestId("explore-demo")).toBeInTheDocument();
     expect(screen.getByTestId("empty-state")).toBeInTheDocument();
     expect(screen.queryByTestId("portfolio-brief-list")).not.toBeInTheDocument();
+  });
+
+  it("offers Done to dismiss the ask keyboard", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await enterDemo();
+    await openSampleTracker();
+    await user.click(await screen.findByTestId("ask-section-toggle"));
+    const field = await screen.findByTestId("demo-question-field");
+    await user.click(field);
+    expect(screen.getByTestId("ask-keyboard-done")).toBeInTheDocument();
+    await user.click(screen.getByTestId("ask-keyboard-done"));
+    expect(screen.queryByTestId("ask-keyboard-done")).not.toBeInTheDocument();
+    expect(field).not.toHaveFocus();
   });
 });
 
@@ -349,6 +367,156 @@ describe("SettingsView", () => {
     await user.click(screen.getByTestId("test-connection"));
     expect(await screen.findByTestId("test-result")).toHaveTextContent("The daemon rejected the token");
     expect(onDismiss).not.toHaveBeenCalled();
+  });
+
+  it("keeps the portfolio when Save writes the same Mac", async () => {
+    const user = userEvent.setup();
+    localStorage.setItem("backbrief-daemon-token", "test-token");
+    const clear = vi.spyOn(ProjectsStore.shared, "clear");
+    const onDismiss = vi.fn();
+    render(<SettingsView onDismiss={onDismiss} />);
+    await user.click(screen.getByTestId("settings-save"));
+    expect(clear).not.toHaveBeenCalled();
+    expect(onDismiss).toHaveBeenCalled();
+    clear.mockRestore();
+  });
+
+  it("clears the portfolio when Save points at a different Mac", async () => {
+    const user = userEvent.setup();
+    const clear = vi.spyOn(ProjectsStore.shared, "clear");
+    const onDismiss = vi.fn();
+    render(<SettingsView onDismiss={onDismiss} />);
+    await user.clear(screen.getByTestId("settings-server"));
+    await user.type(screen.getByTestId("settings-server"), "https://mac.example.ts.net");
+    await user.type(screen.getByTestId("settings-token"), "test-token");
+    await user.click(screen.getByTestId("settings-save"));
+    expect(clear).toHaveBeenCalled();
+    expect(onDismiss).toHaveBeenCalled();
+    clear.mockRestore();
+  });
+});
+
+describe("project detail parity", () => {
+  const meal: ProjectSummary = {
+    id: "meal",
+    name: "Sample Tracker App",
+    lastActivityAt: null,
+    branch: "main",
+    dirty: false,
+    brief: null,
+  };
+
+  it("opens a project from a hash deep link", async () => {
+    ServerSettingsStore.save("http://127.0.0.1:8484", "test-token");
+    stubFetch({
+      "/v1/projects/meal/voice-status": {
+        body: JSON.stringify({
+          answer: "Export checks passed.",
+          analyzedAt: "2026-09-30T12:00:00.000Z",
+          model: "gpt-6-luna",
+          evidence: [],
+          refreshing: false,
+          unavailable: false,
+        }),
+      },
+      "/v1/projects/meal": {
+        body: JSON.stringify({
+          id: "meal",
+          name: "Sample Tracker App",
+          path: "/dev/meal",
+          lastActivityAt: null,
+          git: null,
+          brief: null,
+          sessions: [],
+          iosRelease: null,
+        }),
+      },
+      "/v1/projects": {
+        body: JSON.stringify([
+          { id: "meal", name: "Sample Tracker App", lastActivityAt: null, branch: "main", dirty: false },
+        ]),
+      },
+      "/v1/providers": { body: JSON.stringify({ providers: [] }) },
+    });
+    window.location.hash = "#/projects/meal";
+    render(<App />);
+    expect(await screen.findByRole("heading", { name: "Sample Tracker App" })).toBeInTheDocument();
+    expect(await screen.findByTestId("analyst-update-text")).toHaveTextContent("Export checks passed");
+    expect(screen.queryByTestId("empty-state")).not.toBeInTheDocument();
+  });
+
+  it("ignores a voice-status failure from a superseded request", async () => {
+    ServerSettingsStore.save("http://127.0.0.1:8484", "test-token");
+    const voice: Array<(response: Response) => void> = [];
+    vi.stubGlobal("fetch", async (input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+      const path = new URL(url, "http://127.0.0.1").pathname;
+      if (path.endsWith("/voice-status")) {
+        return new Promise<Response>((resolve) => voice.push(resolve));
+      }
+      if (path.endsWith("/v1/projects/meal")) {
+        return new Response(
+          JSON.stringify({
+            id: "meal",
+            name: "Sample Tracker App",
+            path: "/dev/meal",
+            lastActivityAt: null,
+            git: null,
+            brief: null,
+            sessions: [],
+            iosRelease: null,
+          }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        );
+      }
+      if (path.endsWith("/v1/providers") || path.endsWith("/sessions")) {
+        return new Response(path.endsWith("/sessions") ? '{"capability":{"available":true,"message":"Ready"},"launches":[]}' : '{"providers":[]}', {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      }
+      return new Response("not found", { status: 404 });
+    });
+    render(
+      <StrictMode>
+        <ProjectDetailView project={meal} />
+      </StrictMode>,
+    );
+    await waitFor(() => expect(voice.length).toBeGreaterThanOrEqual(2));
+    voice[voice.length - 1]!(
+      new Response(
+        JSON.stringify({
+          answer: "Export checks passed.",
+          analyzedAt: "2026-09-30T12:00:00.000Z",
+          model: "gpt-6-luna",
+          evidence: [],
+          refreshing: false,
+          unavailable: false,
+        }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      ),
+    );
+    expect(await screen.findByTestId("analyst-update-text")).toHaveTextContent("Export checks passed");
+    voice[0]!(new Response("no", { status: 500, headers: { "content-type": "application/json" } }));
+    await waitFor(() => expect(screen.queryByText(/daemon returned an error/i)).not.toBeInTheDocument());
+    expect(screen.getByTestId("analyst-update-text")).toHaveTextContent("Export checks passed");
+  });
+
+  it("preserves daemon project order", async () => {
+    ServerSettingsStore.save("http://127.0.0.1:8484", "test-token");
+    stubFetch({
+      "/v1/projects": {
+        body: JSON.stringify([
+          { id: "meal", name: "Sample Tracker App", lastActivityAt: null, branch: "main", dirty: false },
+          { id: "earlier-project", name: "Earlier", lastActivityAt: null, branch: "main", dirty: false },
+        ]),
+      },
+      "/v1/providers": { body: JSON.stringify({ providers: [] }) },
+    });
+    render(<App />);
+    const recent = await screen.findByTestId("project-link-meal");
+    const earlier = screen.getByTestId("project-link-earlier-project");
+    expect(recent.compareDocumentPosition(earlier) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
   });
 });
 

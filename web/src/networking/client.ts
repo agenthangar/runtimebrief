@@ -395,6 +395,8 @@ export class RuntimeBriefClient {
 }
 
 function escape(id: string): string {
+  // Daemon ids come from slugify(): [a-z0-9-]. encodeURIComponent leaves those
+  // unchanged, matching iOS urlPathAllowed for every id the daemon assigns.
   return encodeURIComponent(id);
 }
 

@@ -57,7 +57,9 @@ export function ProjectDetailView({ project }: { project: ProjectSummary }) {
   const [sessionsExpanded, setSessionsExpanded] = useState(false);
   const [commitsExpanded, setCommitsExpanded] = useState(false);
   const requesting = useRef(false);
+  const statusGeneration = useRef(0);
   const questionField = useRef<HTMLInputElement>(null);
+  const [questionFocused, setQuestionFocused] = useState(false);
 
   const loadCard = useCallback(async () => {
     try {
@@ -69,11 +71,14 @@ export function ProjectDetailView({ project }: { project: ProjectSummary }) {
 
   const loadCachedStatus = useCallback(async () => {
     if (requesting.current) return;
+    const ticket = ++statusGeneration.current;
     requesting.current = true;
     setRequestingStatus(true);
     setStatusError(null);
+    const current = () => ticket === statusGeneration.current;
     try {
       const status = await RuntimeBriefDataSourceFactory.current(6).voiceStatus(project.id);
+      if (!current()) return;
       setStatusRefreshing(status.refreshing);
       setStatusUnavailable(status.unavailable);
       if (status.answer && status.answer.length > 0) {
@@ -82,17 +87,26 @@ export function ProjectDetailView({ project }: { project: ProjectSummary }) {
         setStatusUpdatedAt(status.analyzedAt);
       }
     } catch (error) {
+      // A superseded read (navigation, strict-mode remount) must not replace
+      // a newer analysis with "unavailable", matching iOS task cancellation.
+      if (!current()) return;
       setStatusError(describeError(error));
       setStatusUnavailable(true);
       setStatusRefreshing(false);
     } finally {
-      requesting.current = false;
-      setRequestingStatus(false);
+      if (current()) {
+        requesting.current = false;
+        setRequestingStatus(false);
+      }
     }
   }, [project.id]);
 
   useEffect(() => {
     void Promise.all([loadCard(), loadCachedStatus()]);
+    return () => {
+      statusGeneration.current += 1;
+      requesting.current = false;
+    };
   }, [loadCard, loadCachedStatus]);
 
   // While a background refresh is in progress and the section is open, poll every 5s.
@@ -291,6 +305,19 @@ export function ProjectDetailView({ project }: { project: ProjectSummary }) {
           header={<span className="t-headline">Ask about this project</span>}
         >
           <div className="stack g12">
+            {questionFocused ? (
+              <div className="row" style={{ justifyContent: "flex-end" }}>
+                <button
+                  type="button"
+                  className="btn plain"
+                  data-testid="ask-keyboard-done"
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() => questionField.current?.blur()}
+                >
+                  Done
+                </button>
+              </div>
+            ) : null}
             <form
               className="row"
               onSubmit={(event) => {
@@ -304,6 +331,8 @@ export function ProjectDetailView({ project }: { project: ProjectSummary }) {
                 type="text"
                 placeholder="e.g. did the tests pass?"
                 value={question}
+                onFocus={() => setQuestionFocused(true)}
+                onBlur={() => setQuestionFocused(false)}
                 onChange={(event) => setQuestion(event.target.value)}
                 aria-label="Ask about this project"
                 data-testid="demo-question-field"

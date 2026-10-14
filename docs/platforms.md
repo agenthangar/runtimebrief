@@ -30,8 +30,12 @@ Cursor, or the analyst.
   local storage. Settings copy on web says so.
 - **Settings URL:** iOS starts with an empty server field. The web app
   pre-fills the origin that served the page because the daemon hosts the
-  client. Task-retry identity still uses the saved URL or `unconfigured`,
-  matching iOS, until the user taps Save.
+  client. Task-retry identity and the agent-session cache use the saved URL
+  or `unconfigured` until the user taps Save. Save compares normalized
+  endpoints, so adding the implicit HTTPS port does not clear the portfolio.
+- **Portfolio refresh:** iOS uses pull-to-refresh. Web keeps that for touch
+  and also shows a Refresh control beside Settings, because a desktop pointer
+  has no pull gesture.
 - **Routing:** iOS uses NavigationPath; web uses `#/` and `#/projects/<id>`
   so the daemon can keep an explicit static-file public surface.
 - **Terminal:** SwiftTerm on iOS, xterm.js on web.

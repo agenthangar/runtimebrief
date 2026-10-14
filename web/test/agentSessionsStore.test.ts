@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { makeMemoryStore } from "../src/lib/storage";
 import { AgentSessionsStore, cyrb53 } from "../src/networking/agentSessionsStore";
+import { ServerSettingsStore } from "../src/networking/serverSettings";
 import { RuntimeBriefClient } from "../src/networking/client";
 import { LiveRuntimeBriefDataSource } from "../src/networking/dataSource";
 import { SessionReplyDraft } from "../src/networking/drafts";
@@ -177,6 +178,18 @@ describe("AgentSessionsStore", () => {
     store.remember({ ...launch, state: "running" }, scope);
     expect(store.cached("fixture")?.launches).toHaveLength(1);
     expect(store.cached("fixture")?.launches[0]?.state).toBe("running");
+  });
+});
+
+describe("connection scope", () => {
+  it("stays unconfigured when a token exists without a saved URL", () => {
+    localStorage.clear();
+    localStorage.setItem("backbrief-daemon-token", "secret");
+    const store = new AgentSessionsStore({ cache: null });
+    expect(store.connectionScope()).toBe("unconfigured");
+    ServerSettingsStore.save("https://mac.example.ts.net", "secret");
+    expect(store.connectionScope()).toBe(cyrb53("https://mac.example.ts.net:443|secret"));
+    localStorage.clear();
   });
 });
 

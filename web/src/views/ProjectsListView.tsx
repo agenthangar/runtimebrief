@@ -106,15 +106,27 @@ export function ProjectsListView() {
       Exit Demo
     </button>
   ) : (
-    <button
-      type="button"
-      className="glass-button icon"
-      onClick={() => setShowSettings(true)}
-      aria-label="Settings"
-      data-testid="open-settings"
-    >
-      <Symbol name="gearshape" size={20} strokeWidth={1.75} />
-    </button>
+    <>
+      <button
+        type="button"
+        className="glass-button icon"
+        onClick={() => void refresh()}
+        disabled={isLoading}
+        aria-label="Refresh"
+        data-testid="refresh-portfolio"
+      >
+        <Symbol name="arrow.clockwise" size={20} />
+      </button>
+      <button
+        type="button"
+        className="glass-button icon"
+        onClick={() => setShowSettings(true)}
+        aria-label="Settings"
+        data-testid="open-settings"
+      >
+        <Symbol name="gearshape" size={20} strokeWidth={1.75} />
+      </button>
+    </>
   );
 
   // Keep the empty state up while a refresh is in flight so Exit Demo does

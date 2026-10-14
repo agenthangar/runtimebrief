@@ -91,6 +91,30 @@ describe("SessionLaunchDraft", () => {
   });
 });
 
+describe("ServerSettingsStore.sameConnection", () => {
+  it("treats a portless HTTPS origin and its :443 form as the same Mac", () => {
+    const token = "token";
+    expect(
+      ServerSettingsStore.sameConnection(
+        { baseURL: "https://mac.example.ts.net", token },
+        { baseURL: "https://mac.example.ts.net:443", token },
+      ),
+    ).toBe(true);
+    expect(
+      ServerSettingsStore.sameConnection(
+        { baseURL: "https://mac.example.ts.net", token },
+        { baseURL: "https://other.example.ts.net:443", token },
+      ),
+    ).toBe(false);
+    expect(
+      ServerSettingsStore.sameConnection(
+        { baseURL: "https://mac.example.ts.net:443", token: "a" },
+        { baseURL: "https://mac.example.ts.net:443", token: "b" },
+      ),
+    ).toBe(false);
+  });
+});
+
 describe("ServerSettingsStore.draftScope", () => {
   it("uses demo, the saved URL, or unconfigured — never the implicit page origin", () => {
     const store = makeMemoryStore();
