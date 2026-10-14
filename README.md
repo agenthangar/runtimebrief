@@ -12,9 +12,10 @@ in progress, and what needs your attention.
 > *"The shopping-list work landed this morning and all 12 tests pass. A Codex
 > session is still working on export; nothing is waiting for you."*
 
-The daemon and plugin are built from source. The iOS app can also be built
-from source; maintainers distribute internal TestFlight builds. See the
-[release notes](CHANGELOG.md) for changes and build compatibility.
+The daemon and plugin are built from source. Get the iPhone app on the
+[App Store](https://apps.apple.com/us/app/runtimebrief/id6789999252) (iOS 26
+or later), or build it from source. See the [release notes](CHANGELOG.md) for
+changes and build compatibility.
 
 ## What you get
 
@@ -140,8 +141,9 @@ the same URL with `:443` appended. Serve remains private to your tailnet and
 supplies the certificate required by iOS App Transport Security. Do not use
 Tailscale Funnel or expose the daemon directly to the public internet.
 
-See [ios/README.md](ios/README.md) to generate and build the iOS project. Enter
-the server address and daemon token in Settings. **Test Connection** verifies
+Install [RuntimeBrief from the App Store](https://apps.apple.com/us/app/runtimebrief/id6789999252),
+or see [ios/README.md](ios/README.md) to build it from source. Enter the server
+address and daemon token in Settings. **Test Connection** verifies
 both daemon health and usable project data; tap **Save** after it succeeds.
 The app refreshes when it becomes active and supports pull to refresh. If a
 refresh fails, the saved brief stays visible with the error. See
