@@ -1,0 +1,20 @@
+{
+  "name": "runtimebrief-promo",
+  "private": true,
+  "scripts": {
+    "studio": "remotion studio",
+    "render": "remotion render Promo out/promo.mp4",
+    "render:preview": "remotion render AppPreview out/app-preview.mp4"
+  },
+  "dependencies": {
+    "@remotion/cli": "4.0.535",
+    "@remotion/google-fonts": "4.0.535",
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
+    "remotion": "4.0.535"
+  },
+  "devDependencies": {
+    "@types/react": "19.1.8",
+    "typescript": "5.8.3"
+  }
+}
