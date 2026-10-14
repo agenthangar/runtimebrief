@@ -2,6 +2,10 @@
 
 SwiftUI + App Intents client for [runtimebriefd](../daemon). Claude setup terminals use the pinned SwiftTerm package.
 
+The released app is on the
+[App Store](https://apps.apple.com/us/app/runtimebrief/id6789999252) and runs
+on iOS 26 or later. Build from source to change the app or test unreleased work.
+
 ## Build
 
 This directory ships as an [XcodeGen](https://github.com/yonaskolb/XcodeGen)
