@@ -1,5 +1,14 @@
 # Release notes
 
+## 1.0.3 (44) — 2026-10-13
+
+- Siri now understands "via", "with" and "in RuntimeBrief" when starting an
+  agent, such as "Start Cursor for Visitor via RuntimeBrief", and "start a
+  Cursor session for …". "Tell the … agent via RuntimeBrief" and "What's the
+  status of … via RuntimeBrief" also work.
+- Starting an agent by voice now ends with "Codex for Dotfiles. It's starting
+  now." instead of "Task completion is not yet confirmed."
+
 ## 1.0.3 (43) — 2026-10-11
 
 - A project named exactly, by its name or a spoken name, is the only match

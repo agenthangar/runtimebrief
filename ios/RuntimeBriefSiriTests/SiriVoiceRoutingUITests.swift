@@ -19,6 +19,11 @@ final class SiriVoiceRoutingUITests: XCTestCase {
             ("RuntimeBrief start Codex", "Which project should Codex work on"),
             ("Start Codex for Sample Tracker from RuntimeBrief", "What should Codex work on"),
             ("Start Codex for the Sample Tracker app from RuntimeBrief", "What should Codex work on"),
+            // Wordings from a recorded run that Siri did not route before.
+            ("Start Cursor for Sample Tracker via RuntimeBrief", "What should Cursor work on"),
+            ("Start a Cursor session for Sample Tracker via RuntimeBrief", "What should Cursor work on"),
+            ("Start Claude for Sample Tracker with RuntimeBrief", "What should Claude"),
+            ("Tell the Sample Tracker agent via RuntimeBrief", "What should I tell the agent"),
         ] {
             XCUIDevice.shared.siriService.activate(voiceRecognitionText: request)
             let dialog = XCUIDevice.shared.siriService.staticTexts.matching(
