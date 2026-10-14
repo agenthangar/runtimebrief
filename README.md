@@ -17,6 +17,17 @@ The daemon and plugin are built from source. Get the iPhone app on the
 or later), or build it from source. See the [release notes](CHANGELOG.md) for
 changes and build compatibility.
 
+## Watch the demo
+
+![Siri answering what needs attention and a project's status in RuntimeBrief](docs/media/demo/siri.gif)
+
+[Watch the 75-second demo](docs/media/demo/runtimebrief-demo.mp4) ·
+[Static cover](docs/media/demo/runtimebrief-demo-poster.jpg) ·
+[Capture notes](docs/media/demo/README.md)
+
+The tour uses the app's offline demo, so its data is fictional, and the Siri screens
+are recreated from the app's replies.
+
 ## What you get
 
 - A deterministic, zero-model-cost portfolio brief with evidence for every
