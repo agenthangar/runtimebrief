@@ -1644,6 +1644,83 @@
           }
         }
       }
+    },
+    "Start coding session in ${applicationName}": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start coding session in ${applicationName}"
+          }
+        }
+      }
+    },
+    "Start a session in ${applicationName}": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start a session in ${applicationName}"
+          }
+        }
+      }
+    },
+    "Start a new session in ${applicationName}": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start a new session in ${applicationName}"
+          }
+        }
+      }
+    },
+    "Start a new coding session in ${applicationName}": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start a new coding session in ${applicationName}"
+          }
+        }
+      }
+    },
+    "New coding session in ${applicationName}": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "New coding session in ${applicationName}"
+          }
+        }
+      }
+    },
+    "Start coding session for ${project} in ${applicationName}": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start coding session for ${project} in ${applicationName}"
+          }
+        }
+      }
+    },
+    "Start a coding session for ${project} in ${applicationName}": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start a coding session for ${project} in ${applicationName}"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

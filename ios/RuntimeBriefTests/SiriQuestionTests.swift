@@ -124,7 +124,7 @@ struct SiriQuestionTests {
                     #expect(!reply.text.contains("Review is next"), "\(label)")
                     #expect(reply.detail.contains("Review is next"), "Shortcuts still get the whole answer")
                 } else {
-                    #expect(reply.text.hasSuffix("Recently, Export shipped."), "\(label)")
+                    #expect(reply.text.hasSuffix("Right now, Waiting for review."), "\(label)")
                 }
             }
         }
@@ -135,7 +135,7 @@ struct SiriQuestionTests {
                              answer: "Done: The latest session fixed ingredient search. [git-commit-abc]\nNow: The working tree is clean. [git-commit-abc]\nNext: Ship it. [git-commit-abc]")
         saved.analyzedAt = Date().addingTimeInterval(-2 * 3600)
         let reply = SiriQuestion.reply(for: saved)
-        #expect(reply.text == "Sample Tracker, analyzed 2 hours ago: Recently, the latest session fixed ingredient search. Currently, the working tree is clean.")
+        #expect(reply.text == "Sample Tracker: Right now, the working tree is clean. Recently, the latest session fixed ingredient search.")
         #expect(reply.detail.contains("Next, Ship it."))
         let decoded = try JSONDecoder.runtimeBrief.decode(AskResponse.self, from: Data(
             #"{"status":"answered","scope":"project","projects":[],"answer":"Ok.","evidence":[],"cached":true,"analyzedAt":"2026-10-10T10:00:00.000Z","interim":null}"#.utf8))
@@ -179,7 +179,7 @@ struct SiriQuestionTests {
         ])
         let reply = try await SiriQuestion.answer(question: "Is anything blocked?", projectID: nil, dataSource: source, store: store())
         #expect(reply.title == SiriQuestion.portfolioTitle)
-        #expect(reply.text.contains("You have 3 projects"))
+        #expect(reply.text.contains("Catalog Builder needs you"))
         #expect(reply.text.hasSuffix("Update RuntimeBrief on your Mac to ask more."))
     }
 
@@ -194,7 +194,7 @@ struct SiriQuestionTests {
         #expect(project.text.hasPrefix("Your Mac is unreachable. Using saved briefs"))
         #expect(project.text.contains("Export validation is ready to review"))
         let overview = try await SiriQuestion.answer(question: "anything new?", projectID: nil, dataSource: offline, store: store)
-        #expect(overview.text.contains("You have 3 projects"))
+        #expect(overview.text.contains("Catalog Builder needs you"))
     }
 
     @Test func unauthorizedIsNotMaskedBySavedBriefs() async throws {

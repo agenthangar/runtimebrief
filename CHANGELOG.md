@@ -1,5 +1,17 @@
 # Release notes
 
+## 1.0.4 (46) — 2026-11-10
+
+- Siri speaks status the way you'd say it: who needs you, what's ready to
+  review and what agents are working on, by name, without counts, commit
+  hashes, pull request numbers or file names. A project's status starts with
+  what's happening right now and only mentions its age when it's old.
+- "Start coding session in RuntimeBrief" and "Start a session in RuntimeBrief"
+  now start a coding agent, as well as "Start a coding session for … in
+  RuntimeBrief".
+- The Mac's analyst writes status for listening and re-analyzes projects once
+  with the new wording.
+
 ## 1.0.4 (45) — 2026-11-10
 
 - Siri understands more everyday ways to ask for updates: "Give me updates

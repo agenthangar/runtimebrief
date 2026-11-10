@@ -68,10 +68,11 @@ enum SiriQuestion {
         if response.status == .answered, let answer = response.answer {
             let short = PresentationMode.text(SiriBrief.voice(answer, evidence: response.evidence))
             let full = PresentationMode.text(SiriBrief.spoken(answer, evidence: response.evidence))
-            // A saved analysis says how old it is, like the status action.
+            // A saved analysis says how old it is only when that matters.
             if let project, let analyzedAt = response.analyzedAt {
-                let lead = "\(project.name), analyzed \(SiriBrief.age(of: analyzedAt)): "
-                return SiriQuestionReply(title: title, text: lead + short, detail: lead + full)
+                let lead = "\(project.name): "
+                let stale = Date().timeIntervalSince(analyzedAt) > 12 * 3600 ? " This is from \(SiriBrief.age(of: analyzedAt))." : ""
+                return SiriQuestionReply(title: title, text: lead + short + stale, detail: lead + full + stale)
             }
             return SiriQuestionReply(
                 title: title,
