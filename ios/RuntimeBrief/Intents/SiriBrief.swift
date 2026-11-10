@@ -8,16 +8,34 @@ struct SiriIntentFailure: LocalizedError {
 /// Formatting is shared by voice responses, Shortcuts output, and snippets.
 /// Fetching the snapshot never invokes /status or /ask.
 enum SiriBrief {
+    /// Spoken overview for listening: who needs you, what is ready, what is
+    /// running. Project names only, no counts.
     static func overview(_ snapshot: ProjectsStore.BriefSnapshot) -> String {
         guard !snapshot.projects.isEmpty else {
             return prefix(snapshot) + "No projects are registered yet. Add projects on your Mac."
         }
-        let count = snapshot.projects.count
-        let needsAttention = attentionProjects(snapshot.projects)
-        let urgent = needsAttention.prefix(2).map(\.name).joined(separator: " and ")
-        let detail = needsAttention.isEmpty ? "Nothing is marked as needing your attention." :
-            "\(needsAttention.count) need your attention, including \(urgent)."
-        return prefix(snapshot) + "You have \(count) project\(count == 1 ? "" : "s"). \(detail)"
+        let attention = attentionProjects(snapshot.projects)
+        let attentionIDs = Set(attention.map(\.id))
+        let ready = byRecency(snapshot.projects.filter { $0.brief?.state == .recent && !attentionIDs.contains($0.id) })
+        let working = byRecency(snapshot.projects.filter { $0.brief?.state == .active && !attentionIDs.contains($0.id) })
+        var parts: [String] = []
+        if !attention.isEmpty { parts.append("\(names(attention)) \(attention.count == 1 ? "needs" : "need") you.") }
+        if !ready.isEmpty { parts.append("\(names(ready)) \(ready.count == 1 ? "has" : "have") work ready to review.") }
+        if !working.isEmpty { parts.append("Agents are working on \(names(working)).") }
+        if parts.isEmpty { parts.append("All quiet. Nothing needs you right now.") }
+        else if attention.isEmpty { parts.append("Nothing needs you right now.") }
+        return prefix(snapshot) + parts.joined(separator: " ")
+    }
+
+    /// "A", "A and B", or "A, B and others": never a count.
+    static func names(_ projects: [ProjectSummary]) -> String {
+        let shown = projects.prefix(2).map(\.name)
+        if projects.count > 2 { return shown.joined(separator: ", ") + " and others" }
+        return shown.joined(separator: " and ")
+    }
+
+    private static func byRecency(_ projects: [ProjectSummary]) -> [ProjectSummary] {
+        projects.sorted { ($0.brief?.updatedAt ?? $0.lastActivityAt ?? .distantPast) > ($1.brief?.updatedAt ?? $1.lastActivityAt ?? .distantPast) }
     }
 
     static func project(_ project: ProjectSummary, snapshot: ProjectsStore.BriefSnapshot) -> String {
@@ -27,7 +45,7 @@ enum SiriBrief {
         if let attention {
             text += " \(terminated(PresentationMode.text(for: attention)))"
         } else if let evidenceDate = project.brief?.updatedAt {
-            text += " Last activity \(dateText(evidenceDate))."
+            text += " Last activity \(age(of: evidenceDate))."
         }
         return prefix(snapshot) + text
     }
@@ -40,7 +58,9 @@ enum SiriBrief {
             }
             return "I'm preparing an analysis for \(project.name). The current brief says: \(headline) Ask me again shortly."
         }
-        return "\(project.name), analyzed \(age(of: analyzedAt)): \(voice(answer, evidence: status.evidence))"
+        // Say the age only when the analysis is old enough to matter.
+        let stale = Date().timeIntervalSince(analyzedAt) > 12 * 3600 ? " This is from \(age(of: analyzedAt))." : ""
+        return "\(project.name): \(voice(answer, evidence: status.evidence))\(stale)"
     }
 
     /// An analyst answer as one spoken paragraph: no evidence IDs, and the
@@ -63,7 +83,8 @@ enum SiriBrief {
     static func voice(_ answer: String, evidence: [EvidenceRef], maxLines: Int = 2) -> String {
         let text = EvidencePresentation.text(answer, evidence: evidence)
         let lines = text.split(separator: "\n").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
-        let leads = [("done", "Recently, "), ("now", "Currently, "), ("next", "Next, ")]
+        // What is happening now matters most when listening, then what finished.
+        let leads = [("now", "Right now, "), ("done", "Recently, "), ("next", "Next, ")]
         var labeled: [String: String] = [:]
         for line in lines {
             guard let colon = line.firstIndex(of: ":") else { continue }
@@ -81,7 +102,28 @@ enum SiriBrief {
         } else {
             chosen = Array(sentences(lines.joined(separator: " ")).prefix(maxLines))
         }
-        return chosen.map(terminated).joined(separator: " ")
+        return chosen.map { terminated(plain($0)) }.joined(separator: " ")
+    }
+
+    /// Drops what is hard to follow by ear: commit hashes, issue and pull
+    /// request numbers, file paths and asides in parentheses.
+    static func plain(_ line: String) -> String {
+        var text = line
+        let patterns = [
+            #"\s*\([^()]*\)"#,                                  // asides
+            #"`[^`]*`"#,                                          // code spans
+            #"\b[\w.-]+(?:/[\w.-]+){2,}\b"#,                      // paths
+            #"\b[\w-]+\.(?:swift|ts|tsx|json|yml|yaml|kt|py|plist|xcstrings)\b"#, // file names
+            #"\s*(?:\b(?:PR|pull request|issue)\s*)?#\d+\b"#,          // #123
+            #"\b(?=[0-9a-f]*\d)(?=[0-9a-f]*[a-f])[0-9a-f]{7,40}\b"#, // hashes
+        ]
+        for pattern in patterns {
+            text = text.replacingOccurrences(of: pattern, with: "", options: [.regularExpression, .caseInsensitive])
+        }
+        text = text.replacingOccurrences(of: #"\s+\b(?:in|to|for|at|of|from|on)\s*([.!?])$"#, with: "$1", options: [.regularExpression, .caseInsensitive])
+            .replacingOccurrences(of: #"\s{2,}"#, with: " ", options: .regularExpression)
+            .replacingOccurrences(of: #"\s+([.,;:!?])"#, with: "$1", options: .regularExpression)
+        return text.trimmingCharacters(in: .whitespaces)
     }
 
     static func sentences(_ text: String) -> [String] {
@@ -109,12 +151,15 @@ enum SiriBrief {
         line.hasSuffix(".") || line.hasSuffix("?") || line.hasSuffix("!") ? line : line + "."
     }
 
-    static func age(of date: Date, now: Date = Date()) -> String {
+    static func age(of date: Date, now: Date = Date(), calendar: Calendar = .current) -> String {
         let elapsed = max(0, now.timeIntervalSince(date))
-        if elapsed < 60 * 5 { return "just now" }
-        if elapsed < 60 * 60 { return "\(Int(elapsed / 60)) minutes ago" }
-        if elapsed < 24 * 60 * 60 { return "\(Int(elapsed / 3600)) hours ago" }
-        return dateText(date)
+        if elapsed < 60 * 10 { return "just now" }
+        if elapsed < 60 * 60 { return "in the last hour" }
+        if elapsed < 2 * 60 * 60 { return "an hour ago" }
+        if calendar.isDate(date, inSameDayAs: now) { return "earlier today" }
+        if calendar.isDateInYesterday(date) { return "yesterday" }
+        if elapsed < 7 * 24 * 3600 { return "this week" }
+        return "a while ago"
     }
 
     /// Which projects had completed agent work since `since`, newest first,
@@ -131,11 +176,15 @@ enum SiriBrief {
         }
         var names: [String] = []
         for (project, _, _) in done where !names.contains(project.name) { names.append(project.name) }
-        let shown = names.prefix(3) + (names.count > 3 ? ["\(names.count - 3) more"] : [])
         let item = PresentationMode.text(for: latest.1)
         return prefix(snapshot)
-            + "Agents finished work in \(names.count) project\(names.count == 1 ? "" : "s") \(period): \(shown.formatted(.list(type: .and)))."
-            + " Latest, \(latest.0.name): \(terminated(item))"
+            + "Agents finished work \(period) on \(spokenList(names))."
+            + " Latest, \(latest.0.name): \(terminated(plain(item)))"
+    }
+
+    private static func spokenList(_ names: [String]) -> String {
+        if names.count > 3 { return names.prefix(3).joined(separator: ", ") + " and others" }
+        return names.formatted(.list(type: .and))
     }
 
     static func attentionProjects(_ projects: [ProjectSummary]) -> [ProjectSummary] {
@@ -150,30 +199,25 @@ enum SiriBrief {
         let projects = attentionProjects(snapshot.projects)
         guard let first = projects.first else {
             let unavailable = snapshot.projects.filter { $0.brief == nil || $0.brief?.state == .unavailable }
-            var text = "No attention items were found in the available briefs."
+            var text = "Nothing needs your attention."
             if !unavailable.isEmpty {
-                text += " \(unavailable.count) project\(unavailable.count == 1 ? " has" : "s have") no available brief."
+                text += " \(names(unavailable)) \(unavailable.count == 1 ? "has" : "have") no brief yet."
             }
             return prefix(snapshot) + text
         }
         // Two lines: who needs attention, then the first one's reason.
-        let names = projects.prefix(3).map(\.name) + (projects.count > 3 ? ["\(projects.count - 3) more"] : [])
-        let reason = terminated(first.brief?.headline ?? "Review this project")
+        let reason = terminated(plain(first.brief?.headline ?? "Review this project"))
         return prefix(snapshot)
-            + "\(projects.count) project\(projects.count == 1 ? " needs" : "s need") attention: \(names.formatted(.list(type: .and)))."
+            + "\(spokenList(projects.map(\.name))) \(projects.count == 1 ? "needs" : "need") you."
             + " \(first.name): \(reason)"
     }
 
     static func prefix(_ snapshot: ProjectsStore.BriefSnapshot) -> String {
         if snapshot.isDemo { return "Fictional demo. " }
         if snapshot.isSaved {
-            let saved = snapshot.fetchedAt.map { " from \(dateText($0))" } ?? ""
+            let saved = snapshot.fetchedAt.map { " from \(age(of: $0))" } ?? ""
             return "Your Mac is unreachable. Using saved briefs\(saved). "
         }
         return ""
-    }
-
-    private static func dateText(_ date: Date) -> String {
-        date.formatted(date: .abbreviated, time: .shortened)
     }
 }

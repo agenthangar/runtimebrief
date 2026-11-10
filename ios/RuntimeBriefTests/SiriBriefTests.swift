@@ -55,7 +55,7 @@ struct SiriBriefTests {
     @Test func attentionDoesNotCallUnavailableProjectsClear() {
         let unavailable = ProjectSummary(id: "unknown", name: "Unknown", lastActivityAt: nil, branch: nil, dirty: nil, brief: nil)
         let snapshot = ProjectsStore.BriefSnapshot(projects: [unavailable], fetchedAt: nil, isSaved: false, isDemo: false)
-        #expect(SiriBrief.attention(snapshot).contains("1 project has no available brief"))
+        #expect(SiriBrief.attention(snapshot).contains("Unknown has no brief yet"))
         #expect(SiriBrief.attentionProjects(snapshot.projects).isEmpty)
     }
 
@@ -82,7 +82,7 @@ struct SiriBriefTests {
         #expect(projects.count == 1)
         #expect(projects.first?.name == "Catalog Builder")
         #expect(SiriBrief.attention(snapshot).hasPrefix("Fictional demo."))
-        #expect(SiriBrief.overview(snapshot).contains("You have 3 projects."))
+        #expect(SiriBrief.overview(snapshot) == "Fictional demo. Catalog Builder needs you. Sample Tracker has work ready to review.")
         let empty = ProjectsStore.BriefSnapshot(projects: [], fetchedAt: nil, isSaved: false, isDemo: false)
         #expect(SiriBrief.overview(empty).contains("No projects are registered yet"))
     }
@@ -94,12 +94,15 @@ struct SiriBriefTests {
         )
         let spoken = SiriBrief.analyzedProject(DemoData.projects[0], status: status)
         // Two lines: the latest completed and current work, not the advice.
-        #expect(spoken == "Sample Tracker, analyzed 20 minutes ago: Recently, Export checks passed. Currently, Ready to review.")
+        #expect(spoken == "Sample Tracker: Right now, Ready to review. Recently, Export checks passed.")
         let waiting = VoiceStatus(answer: nil, analyzedAt: nil, model: nil, evidence: [], refreshing: true, unavailable: false)
         #expect(SiriBrief.analyzedProject(DemoData.projects[0], status: waiting).contains("preparing an analysis"))
         let older = VoiceStatus(answer: status.answer, analyzedAt: Date().addingTimeInterval(-6 * 3600),
                                 model: status.model, evidence: [], refreshing: false, unavailable: true)
-        #expect(SiriBrief.analyzedProject(DemoData.projects[0], status: older).hasPrefix("Sample Tracker, analyzed 6 hours ago:"))
+        #expect(SiriBrief.analyzedProject(DemoData.projects[0], status: older).hasPrefix("Sample Tracker: Right now,"))
+        let stale = VoiceStatus(answer: status.answer, analyzedAt: Date().addingTimeInterval(-3 * 86_400),
+                                model: status.model, evidence: [], refreshing: false, unavailable: true)
+        #expect(SiriBrief.analyzedProject(DemoData.projects[0], status: stale).hasSuffix("This is from this week."))
     }
 
     @Test func spokenAnswersAreAtMostTwoLinesWithTheImportantUpdatesFirst() {
@@ -109,7 +112,7 @@ struct SiriBriefTests {
         let next = "Review the crash fix. [session-codex-1]"
         // Every combination of known and unknown Done/Now/Next lines.
         for mask in 0..<8 {
-            let parts = [("Done", done, "Recently, Shipped"), ("Now", now, "Currently, an agent"), ("Next", next, "Next, Review")]
+            let parts = [("Now", now, "Right now, an agent"), ("Done", done, "Recently, Shipped"), ("Next", next, "Next, Review")]
             let lines = parts.enumerated().map { index, part in "\(part.0): " + (mask & (1 << index) != 0 ? part.1 : unknown) }
             let spoken = SiriBrief.voice(lines.joined(separator: "\n"), evidence: [])
             let expected = parts.enumerated().filter { mask & (1 << $0.offset) != 0 }.map(\.element.2).prefix(2)
@@ -140,14 +143,14 @@ struct SiriBriefTests {
             completed("c", "Gamma", "Cursor completed “Old work”.", now.addingTimeInterval(-3 * 86_400)),
         ], fetchedAt: nil, isSaved: false, isDemo: false)
         let text = SiriBrief.digest(snapshot, since: now.addingTimeInterval(-86_400), period: "today")
-        #expect(text == "Agents finished work in 2 projects today: Beta and Alpha. Latest, Beta: Claude Code completed “Fix the crash”.")
+        #expect(text == "Agents finished work today on Beta and Alpha. Latest, Beta: Claude Code completed “Fix the crash”.")
         #expect(SiriBrief.sentences(text).count == 2)
         #expect(SiriBrief.digest(snapshot, since: now, period: "today") == "No completed agent work is recorded today.")
         let many = ProjectsStore.BriefSnapshot(projects: (0..<7).map {
             completed("p\($0)", "P\($0)", "Codex completed “x”.", now.addingTimeInterval(Double(-$0) * 60))
         }, fetchedAt: nil, isSaved: false, isDemo: false)
         #expect(SiriBrief.digest(many, since: now.addingTimeInterval(-86_400), period: "today")
-            .hasPrefix("Agents finished work in 7 projects today: P0, P1, P2, and 4 more."))
+            .hasPrefix("Agents finished work today on P0, P1, P2 and others."))
     }
 
     @Test func presentationModeHidesQuotedPromptsButKeepsTheState() {
@@ -200,7 +203,8 @@ struct SiriBriefTests {
             let text = SiriBrief.attention(snapshot)
             #expect(SiriBrief.sentences(text).count == 2, "\(text)")
             #expect(text.contains("Project 0: Waiting for approval 0."))
-            if count > 3 { #expect(text.contains("\(count - 3) more")) }
+            if count > 3 { #expect(text.contains("and others")) }
+            #expect(text.rangeOfCharacter(from: .decimalDigits) == nil || text.contains("approval"), "\(text)")
         }
     }
 
@@ -312,7 +316,7 @@ struct SiriBriefTests {
         #expect(analysisResult.value == statusResult.value)
         status.project = nil
         let overviewResult = try await status.perform()
-        #expect(overviewResult.value?.contains("You have 3 projects") == true)
+        #expect(overviewResult.value?.contains("Catalog Builder needs you") == true)
         let attentionResult = try await GetAttentionIntent().perform()
         #expect(attentionResult.value?.map(\.name) == ["Catalog Builder"])
         let listResult = try await ListProjectsIntent().perform()
@@ -393,4 +397,27 @@ private actor BlockingProjectIndex: ProjectSearchIndex {
         }
     }
     func resume() { continuation?.resume() }
+
+    @Test func spokenStatusDropsHashesPathsAndIssueNumbers() {
+        let cases = [
+            ("Merged the login fix (#61) in commit 3b923c7a.", "Merged the login fix in commit."),
+            ("Updated `SiriBrief.swift` and ios/RuntimeBrief/Intents to read plainly.", "Updated and to read plainly."),
+            ("Fixed the crash in PR #120.", "Fixed the crash."),
+            ("Shipped the new phrases.", "Shipped the new phrases."),
+        ]
+        for (input, expected) in cases { #expect(SiriBrief.plain(input) == expected, "\(input)") }
+        // A sweep of every Done/Now/Next answer the demo can give stays free of hashes and citations.
+        for line in ["Done: Merged 9ab1fdf (#30). [git-commit-1]", "Now: Editing daemon/src/server.ts. [session-1]"] {
+            let spoken = SiriBrief.voice(line, evidence: [])
+            #expect(!spoken.contains("#") && !spoken.contains("[") && !spoken.contains("9ab1fdf") && !spoken.contains("/"), "\(spoken)")
+        }
+    }
+
+    @Test func spokenAgeUsesWordsNotNumbers() {
+        let now = Date()
+        for minutes in stride(from: 0, through: 60 * 24 * 30, by: 37) {
+            let text = SiriBrief.age(of: now.addingTimeInterval(Double(-minutes) * 60), now: now)
+            #expect(text.rangeOfCharacter(from: .decimalDigits) == nil, "\(minutes): \(text)")
+        }
+    }
 }

@@ -112,9 +112,9 @@ export interface AnalystServiceOptions {
 
 export const DEFAULT_ANALYST_REQUEST_TIMEOUT_MS = 60_000;
 export const ANALYST_CACHE_BACKEND = "codex-cli";
-export const ANALYST_CACHE_PROMPT_VERSION = "runtimebrief-analyst-v2";
-export const PORTFOLIO_CACHE_PROMPT_VERSION = "runtimebrief-portfolio-v4";
-export const VOICE_CACHE_PROMPT_VERSION = "runtimebrief-analyst-voice-v2";
+export const ANALYST_CACHE_PROMPT_VERSION = "runtimebrief-analyst-v3";
+export const PORTFOLIO_CACHE_PROMPT_VERSION = "runtimebrief-portfolio-v5";
+export const VOICE_CACHE_PROMPT_VERSION = "runtimebrief-analyst-voice-v3";
 /** Spoken questions read fewer transcripts, so the answer arrives sooner. */
 const VOICE_MAX_TRANSCRIPTS = 3;
 /** Cache rows for portfolio answers; registered project IDs never contain "*". */
