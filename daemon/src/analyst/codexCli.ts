@@ -1829,6 +1829,14 @@ function runCodexAppServer(
         }
         return;
       }
+      if (method === "turn/moderationMetadata") {
+        // Newer Codex reports the service's safety-classifier result for the
+        // turn. It carries no tool, model output or answer text; only the ids
+        // are checked and the classifier flags are discarded unread.
+        const moderation = z.object({ threadId: z.string(), turnId: z.string() }).passthrough().parse(params);
+        requireMatchingIds(moderation.threadId, moderation.turnId);
+        return;
+      }
       if (method === "thread/tokenUsage/updated") {
         const usageEvent = usageNotificationSchema.parse(params);
         requireMatchingIds(usageEvent.threadId, usageEvent.turnId);

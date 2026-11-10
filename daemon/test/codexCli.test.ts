@@ -477,6 +477,8 @@ interface ProtocolOptions {
   toolItemType?: string;
   orphanCompletedItem?: boolean;
   unknownNotification?: string;
+  /** Codex reports its safety-classifier result for the turn; "other" uses another turn's ids. */
+  moderationMetadata?: "matching" | "other";
   warningMessage?: string;
   finalText?: string;
   tokenUsages?: TokenUsageFixture[];
@@ -666,6 +668,22 @@ function wireSuccessfulProtocol(
               },
             },
           });
+          if (options.moderationMetadata) {
+            const ids = options.moderationMetadata === "matching"
+              ? { threadId, turnId }
+              : { threadId, turnId: "another-turn" };
+            writeServer(child, {
+              method: "turn/moderationMetadata",
+              params: {
+                ...ids,
+                metadata: {
+                  prompt: { omnimod: { protection_type: "omnimod", outputs: [{ results: [{ category_flags: { A1: false, REFUSED: false } }], is_blocked: false }] } },
+                  generation: {}, tool_call: {}, tool_response: {},
+                },
+                emittedAtMs: 1_794_353_466_124,
+              },
+            });
+          }
           for (const total of
             options.tokenUsages ?? [
               { inputTokens: 100, cachedInputTokens: 10, outputTokens: 5 },
@@ -1399,6 +1417,36 @@ describe("Codex CLI same-process analyst boundary", () => {
       spawnImpl: (_command, _args, options) => {
         wireSuccessfulProtocol(child, options.cwd, options.env.CODEX_HOME!, [], {
           orphanCompletedItem: true,
+        });
+        return child;
+      },
+    });
+    await expect(drain(runner)).rejects.toThrow("invalid app-server response");
+  });
+
+  it("accepts Codex's moderation metadata for the same turn and ignores its flags", async () => {
+    const root = testRoot();
+    const child = new FakeCodexChild();
+    const runner = createTestCodexCliRunner(root, {
+      spawnImpl: (_command, _args, options) => {
+        wireSuccessfulProtocol(child, options.cwd, options.env.CODEX_HOME!, [], {
+          moderationMetadata: "matching",
+        });
+        return child;
+      },
+    });
+    const chunks = await drain(runner);
+    expect(JSON.stringify(chunks)).toContain("Done: Clean.");
+    expect(JSON.stringify(chunks)).not.toContain("omnimod");
+  });
+
+  it("fails closed on moderation metadata for another turn", async () => {
+    const root = testRoot();
+    const child = new FakeCodexChild();
+    const runner = createTestCodexCliRunner(root, {
+      spawnImpl: (_command, _args, options) => {
+        wireSuccessfulProtocol(child, options.cwd, options.env.CODEX_HOME!, [], {
+          moderationMetadata: "other",
         });
         return child;
       },
