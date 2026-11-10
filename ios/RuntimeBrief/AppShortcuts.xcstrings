@@ -1534,6 +1534,116 @@
           }
         }
       }
+    },
+    "${applicationName} updates": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "${applicationName} updates"
+          }
+        }
+      }
+    },
+    "Any updates in ${applicationName}": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Any updates in ${applicationName}"
+          }
+        }
+      }
+    },
+    "Get updates from ${applicationName}": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Get updates from ${applicationName}"
+          }
+        }
+      }
+    },
+    "Give me an update from ${applicationName}": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Give me an update from ${applicationName}"
+          }
+        }
+      }
+    },
+    "Give me project status from ${applicationName}": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Give me project status from ${applicationName}"
+          }
+        }
+      }
+    },
+    "Give me the project status from ${applicationName}": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Give me the project status from ${applicationName}"
+          }
+        }
+      }
+    },
+    "Give me updates from ${applicationName}": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Give me updates from ${applicationName}"
+          }
+        }
+      }
+    },
+    "Project status from ${applicationName}": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Project status from ${applicationName}"
+          }
+        }
+      }
+    },
+    "What's new in ${applicationName}": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "What's new in ${applicationName}"
+          }
+        }
+      }
+    },
+    "What's the project status in ${applicationName}": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "What's the project status in ${applicationName}"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

@@ -1,5 +1,13 @@
 # Release notes
 
+## 1.0.4 (45) — 2026-11-10
+
+- Siri understands more everyday ways to ask for updates: "Give me updates
+  from RuntimeBrief", "Any updates in RuntimeBrief", "What's new in
+  RuntimeBrief" and "RuntimeBrief updates" read every project's status.
+  "Give me project status from RuntimeBrief" and "What's the project status
+  in RuntimeBrief" ask which project, then read its status.
+
 ## 1.0.3 (44) — 2026-10-13
 
 - Siri now understands "via", "with" and "in RuntimeBrief" when starting an
